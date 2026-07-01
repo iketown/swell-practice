@@ -1,0 +1,32 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdminEmail() {
+      return signedIn()
+        && request.auth.token.email in [
+          'be@ike.works',
+          'chriscronmusic@gmail.com'
+        ];
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && (
+          isAdminEmail()
+          || firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid))
+        );
+    }
+
+    match /songs/{songSlug}/{filePath=**} {
+      allow read: if true;
+      allow create, update: if isAdmin()
+        && request.resource.size < 200 * 1024 * 1024;
+      allow delete: if isAdmin();
+    }
+  }
+}
