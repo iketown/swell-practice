@@ -25,7 +25,7 @@ export function AssetLinks({ assets }: { assets: SongAsset[] }) {
             href={asset.downloadUrl || "#"}
             target={asset.downloadUrl && asset.downloadUrl !== "#" ? "_blank" : undefined}
             rel="noreferrer"
-            className="inline-flex max-w-full items-center gap-2 rounded-md border bg-background px-2.5 py-1.5 text-sm font-medium shadow-[0_8px_20px_-18px_rgba(20,38,54,0.45)] transition-colors hover:bg-accent [&_svg]:size-4"
+            className="swell-file-link"
           >
             <AssetIcon fileType={asset.fileType} />
             <span className="truncate">{asset.displayName || asset.filename}</span>
@@ -38,7 +38,7 @@ export function AssetLinks({ assets }: { assets: SongAsset[] }) {
           {assets
             .filter((asset) => asset.fileType === "audio" && asset.downloadUrl && asset.downloadUrl !== "#")
             .map((asset) => (
-              <div key={`${asset.id}-player`} className="grid gap-1">
+              <div key={`${asset.id}-player`} className="swell-audio-panel">
                 <Badge variant="secondary">{asset.displayName || asset.filename}</Badge>
                 <audio controls preload="none" src={asset.downloadUrl} className="h-10 w-full" />
               </div>

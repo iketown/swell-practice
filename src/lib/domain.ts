@@ -112,6 +112,12 @@ export function inferPartSlugs(filename: string, availablePartSlugs = DEFAULT_PA
   const joined = `_${normalized}_`;
   const available = new Set<string>(availablePartSlugs);
   const inferred = new Set<string>();
+  const hasVocalGroupCue =
+    tokens.has("vox") ||
+    tokens.has("allvox") ||
+    tokens.has("allvocals") ||
+    tokens.has("vocal") ||
+    tokens.has("vocals");
 
   for (let i = 1; i <= 5; i += 1) {
     if (
@@ -132,13 +138,13 @@ export function inferPartSlugs(filename: string, availablePartSlugs = DEFAULT_PA
     inferred.add("keys");
   }
 
-  if (tokens.has("vox") || tokens.has("vocal") || tokens.has("vocals")) {
+  if (hasVocalGroupCue) {
     for (const slug of available) {
       if (slug.startsWith("voc_")) inferred.add(slug);
     }
   }
 
-  if (tokens.has("all") || tokens.has("full") || tokens.has("general") || tokens.has("mix")) {
+  if (!hasVocalGroupCue && (tokens.has("all") || tokens.has("full") || tokens.has("general") || tokens.has("mix"))) {
     for (const slug of available) inferred.add(slug);
   }
 

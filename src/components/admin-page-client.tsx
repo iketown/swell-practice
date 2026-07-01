@@ -147,10 +147,11 @@ export function AdminPageClient() {
 
   return (
     <AppShell>
-      <section className="flex flex-wrap items-start justify-between gap-4 rounded-lg border bg-card p-4 shadow-[0_14px_36px_-32px_rgba(20,38,54,0.55)]">
+      <section className="swell-panel flex flex-wrap items-start justify-between gap-4 p-4 sm:p-5">
         <div className="grid gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Admin</h1>
-          <p className="max-w-2xl text-muted-foreground">Create songs, then upload and assign files from each song page.</p>
+          <p className="swell-page-kicker">Owner tools</p>
+          <h1 className="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">Admin</h1>
+          <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">Create songs, then upload and assign files from each song page.</p>
         </div>
       </section>
 
@@ -217,7 +218,7 @@ export function AdminPageClient() {
           ) : songs.length ? (
             <div className="flex flex-col gap-2">
               {songs.map((song) => (
-                <div key={song.id} className="flex flex-col gap-3 rounded-lg border bg-background p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div key={song.id} className="flex flex-col gap-3 rounded-lg border bg-card p-3 transition-colors hover:bg-muted/35 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <Link href={`/songs/${song.slug}`} className="font-medium hover:underline">
                       {song.title}

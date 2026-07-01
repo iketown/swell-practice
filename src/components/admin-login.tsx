@@ -45,7 +45,7 @@ export function AdminLogin() {
     <div className="fixed bottom-16 left-4 z-40 sm:left-5">
       <button
         type="button"
-        className={buttonVariants({ variant: admin.isAdmin ? "default" : "outline", size: "sm", className: "shadow-sm" })}
+        className={buttonVariants({ variant: admin.isAdmin ? "default" : "outline", size: "sm", className: "bg-card shadow-sm" })}
         onClick={() => setOpen(true)}
       >
         admin

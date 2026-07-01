@@ -36,9 +36,13 @@ export function PartPageClient({ partSlug }: { partSlug: string }) {
 
   return (
     <AppShell>
-      <section className="grid gap-1 rounded-lg border bg-card p-4 shadow-[0_14px_36px_-32px_rgba(20,38,54,0.55)]">
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{partLabel(partSlug)}</h1>
-        <p className="max-w-2xl text-muted-foreground">Every song with files assigned to this part.</p>
+      <section className="swell-panel flex flex-wrap items-start justify-between gap-4 p-4 sm:p-5">
+        <div className="grid gap-1.5">
+          <p className="swell-page-kicker">Part page</p>
+          <h1 className="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">{partLabel(partSlug)}</h1>
+          <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">Every song with files assigned to this part.</p>
+        </div>
+        <Badge variant="secondary">{loading ? "Loading" : `${rows.length} songs`}</Badge>
       </section>
 
       {loading ? (
@@ -49,7 +53,7 @@ export function PartPageClient({ partSlug }: { partSlug: string }) {
       ) : rows.length ? (
         <section className="grid gap-2.5">
           {rows.map((row) => (
-            <Card key={`${row.song.id}-${row.part.slug}`} size="sm" className="transition-colors hover:bg-card/80">
+            <Card key={`${row.song.id}-${row.part.slug}`} size="sm" className="transition-colors hover:bg-muted/35">
               <CardHeader>
                 <CardTitle className="flex flex-wrap items-center justify-between gap-2">
                   <Link href={`/songs/${row.song.slug}`} className="hover:underline">
@@ -60,7 +64,7 @@ export function PartPageClient({ partSlug }: { partSlug: string }) {
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
                 <AssetLinks assets={row.assets} />
-                <Button render={<Link href={`/songs/${row.song.slug}`} />} variant="outline" size="sm" nativeButton={false}>
+                <Button render={<Link href={`/songs/${row.song.slug}`} />} variant="outline" size="sm" nativeButton={false} className="self-start bg-card">
                   Open song
                 </Button>
               </CardContent>

@@ -88,15 +88,25 @@ export function SongPageClient({ slug }: { slug: string }) {
   }
 
   const assetMap = new Map(bundle.assets.map((asset) => [asset.id, asset]));
+  const assignedAssetCount = bundle.assets.filter((asset) => asset.assignedPartSlugs.length > 0).length;
 
   return (
     <AppShell>
-      <section className="rounded-lg border bg-card p-4 shadow-[0_14px_36px_-32px_rgba(20,38,54,0.55)]">
-        <div className="grid gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{bundle.song.title.toUpperCase()}</h1>
+      <section className="swell-panel p-4 sm:p-5">
+        <div className="grid gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="grid gap-1.5">
+              <p className="swell-page-kicker">Song</p>
+              <h1 className="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">{bundle.song.title.toUpperCase()}</h1>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="secondary">{bundle.assets.length} assets</Badge>
+              <Badge variant="outline">{assignedAssetCount} assigned</Badge>
+            </div>
+          </div>
           <div className="flex flex-wrap gap-2">
             {bundle.parts.map((part) => (
-              <Button key={part.slug} render={<Link href={`/parts/${part.slug}`} />} variant="outline" size="sm" nativeButton={false}>
+              <Button key={part.slug} render={<Link href={`/parts/${part.slug}`} />} variant="outline" size="sm" nativeButton={false} className="bg-card">
                 {part.label}
               </Button>
             ))}
@@ -113,7 +123,7 @@ export function SongPageClient({ slug }: { slug: string }) {
           const assets = part.assetIds.map((assetId) => assetMap.get(assetId)).filter((asset): asset is SongAsset => Boolean(asset));
 
           return (
-            <Card key={part.slug} size="sm" className="transition-colors hover:bg-card/80">
+            <Card key={part.slug} size="sm" className="transition-colors hover:bg-muted/35">
               <CardHeader>
                 <CardTitle className="flex flex-wrap items-center justify-between gap-2">
                   <Link href={`/parts/${part.slug}`} className="hover:underline">
@@ -147,9 +157,12 @@ export function SongPageClient({ slug }: { slug: string }) {
 
 function AssetAssignmentPanel({ bundle, onEditAsset }: { bundle: SongBundle; onEditAsset: (asset: SongAsset) => void }) {
   return (
-    <Card>
+    <Card className="bg-secondary/45">
       <CardHeader>
-        <CardTitle>ASSETS</CardTitle>
+        <CardTitle className="flex flex-wrap items-center justify-between gap-2">
+          <span>ASSETS</span>
+          <Badge variant="secondary">{bundle.assets.length} uploaded</Badge>
+        </CardTitle>
       </CardHeader>
       <CardContent>
         {bundle.assets.length ? (
@@ -183,13 +196,15 @@ function UploadPanel({ onDrop, uploading }: { onDrop: (files: File[]) => Promise
       <CardContent>
         <div
           {...getRootProps()}
-          className="flex min-h-32 cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-muted/50 p-5 text-center transition-colors hover:bg-accent"
+          className="flex min-h-32 cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-secondary/55 p-5 text-center transition-colors hover:bg-accent"
         >
           <input {...getInputProps()} />
-          <UploadIcon aria-hidden />
+          <span className="grid size-10 place-items-center rounded-full bg-card text-primary ring-1 ring-border">
+            <UploadIcon aria-hidden />
+          </span>
           <div className="grid gap-1">
             <p className="font-medium">{uploading ? "Uploading..." : isDragActive ? "Drop files here" : "Drop mp3s, PDFs, videos, or zips here"}</p>
-            <p className="text-sm text-muted-foreground">Filenames like `voc_1`, `vox`, `guit_a`, or `all` will suggest part assignments.</p>
+            <p className="text-sm text-muted-foreground">Filenames like `voc_1`, `allvox`, `guit_a`, or `all` will suggest part assignments.</p>
           </div>
         </div>
       </CardContent>

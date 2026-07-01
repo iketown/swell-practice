@@ -5,8 +5,9 @@ import { MusicIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Song } from "@/lib/domain";
@@ -35,18 +36,22 @@ export function SongIndexClient() {
 
   return (
     <AppShell>
-      <section className="flex flex-col gap-4 rounded-lg border bg-card p-4 shadow-[0_14px_36px_-32px_rgba(20,38,54,0.55)]">
+      <section className="swell-panel flex flex-col gap-5 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="grid gap-1">
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Songs</h1>
-            <p className="max-w-2xl text-muted-foreground">
+          <div className="grid gap-1.5">
+            <p className="swell-page-kicker">Practice library</p>
+            <h1 className="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">Songs</h1>
+            <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">
               Pick a song to see every assigned part, or jump straight to the role you sing or play.
             </p>
           </div>
+          <Badge variant="secondary" className="mt-1">
+            {loading ? "Loading" : `${songs.length} songs`}
+          </Badge>
         </div>
         <div className="flex flex-wrap gap-2">
           {DEFAULT_PART_SLUGS.map((slug) => (
-            <Button key={slug} render={<Link href={`/parts/${slug}`} />} variant="outline" nativeButton={false}>
+            <Button key={slug} render={<Link href={`/parts/${slug}`} />} variant="outline" nativeButton={false} className="bg-card">
               {partLabel(slug)}
             </Button>
           ))}
@@ -61,20 +66,26 @@ export function SongIndexClient() {
       ) : songs.length ? (
         <section className="grid gap-2.5">
           {songs.map((song) => (
-            <Card key={song.id} size="sm" className="transition-colors hover:bg-card/80">
-              <CardHeader>
-                <CardTitle>
-                  <Link href={`/songs/${song.slug}`} className="hover:underline">
-                    {song.title}
-                  </Link>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Button render={<Link href={`/songs/${song.slug}`} />} variant="secondary" size="sm" nativeButton={false}>
-                  Open song
-                </Button>
-              </CardContent>
-            </Card>
+            <Link
+              key={song.id}
+              href={`/songs/${song.slug}`}
+              aria-label={`Open ${song.title}`}
+              className="group/song-card block rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
+            >
+              <Card size="sm" className="cursor-pointer transition-colors hover:bg-muted/70">
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    <span className="group-hover/song-card:underline">{song.title}</span>
+                  </CardTitle>
+                  <CardAction>
+                    <span className={buttonVariants({ variant: "secondary", size: "sm", className: "pointer-events-none" })}>Open</span>
+                  </CardAction>
+                </CardHeader>
+                <CardContent>
+                  <p className="truncate text-sm text-muted-foreground">/songs/{song.slug}</p>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </section>
       ) : (

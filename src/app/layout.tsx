@@ -12,9 +12,16 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const favicon = process.env.NODE_ENV === "development" ? "/favicon-local.png" : "/favicon-production.png";
+
 export const metadata: Metadata = {
   title: "The Swell Parts",
   description: "Internal song parts library for The Swell",
+  icons: {
+    icon: [{ url: favicon, type: "image/png" }],
+    shortcut: [{ url: favicon, type: "image/png" }],
+    apple: [{ url: favicon, type: "image/png" }],
+  },
 };
 
 export default function RootLayout({
