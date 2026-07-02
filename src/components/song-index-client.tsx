@@ -5,18 +5,23 @@ import { MusicIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
+import { SongFilterInput } from "@/components/song-filter-input";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Song } from "@/lib/domain";
-import { DEFAULT_PART_SLUGS, partLabel } from "@/lib/domain";
+import { DEFAULT_PART_SLUGS, partLabel, rankSongsForQuery } from "@/lib/domain";
 import { listSongs } from "@/lib/firestore";
+import { cn } from "@/lib/utils";
 
 export function SongIndexClient() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
+  const [songQuery, setSongQuery] = useState("");
+  const rankedSongs = rankSongsForQuery(songs, songQuery);
+  const matchingSongCount = rankedSongs.filter((item) => item.matchesQuery).length;
 
   useEffect(() => {
     let active = true;
@@ -56,6 +61,7 @@ export function SongIndexClient() {
             </Button>
           ))}
         </div>
+        <SongFilterInput id="public-song-search" songs={songs} value={songQuery} onChange={setSongQuery} matchCount={matchingSongCount} />
       </section>
 
       {loading ? (
@@ -65,12 +71,15 @@ export function SongIndexClient() {
         </div>
       ) : songs.length ? (
         <section className="grid gap-2.5">
-          {songs.map((song) => (
+          {rankedSongs.map(({ song, matchesQuery }) => (
             <Link
               key={song.id}
               href={`/songs/${song.slug}`}
               aria-label={`Open ${song.title}`}
-              className="group/song-card block rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
+              className={cn(
+                "group/song-card block rounded-lg outline-none transition-opacity focus-visible:ring-3 focus-visible:ring-ring/40",
+                songQuery.trim() && !matchesQuery ? "opacity-50" : "opacity-100"
+              )}
             >
               <Card size="sm" className="cursor-pointer transition-colors hover:bg-muted/70">
                 <CardHeader>

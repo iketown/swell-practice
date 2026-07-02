@@ -123,7 +123,11 @@ export function SongPageClient({ slug }: { slug: string }) {
           const assets = part.assetIds.map((assetId) => assetMap.get(assetId)).filter((asset): asset is SongAsset => Boolean(asset));
 
           return (
-            <Card key={part.slug} size="sm" className="transition-colors hover:bg-muted/35">
+            <Card
+              key={part.slug}
+              size="sm"
+              className="transform-gpu transition-[box-shadow,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-[1.01] hover:shadow-[0_18px_42px_-32px_var(--swell-espresso)]"
+            >
               <CardHeader>
                 <CardTitle className="flex flex-wrap items-center justify-between gap-2">
                   <Link href={`/parts/${part.slug}`} className="hover:underline">

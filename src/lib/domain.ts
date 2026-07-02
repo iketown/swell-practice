@@ -76,6 +76,57 @@ export function sortTitle(title: string) {
   return title.replace(/^(the|a|an)\s+/i, "").toLowerCase();
 }
 
+function normalizeSearchText(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+export function rankSongForQuery(song: Song, query: string) {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) return 0;
+
+  const title = normalizeSearchText(song.title);
+  const slug = normalizeSearchText(song.slug);
+  const words = title.split(" ");
+
+  if (title.startsWith(normalizedQuery)) return 0;
+  if (words.some((word) => word.startsWith(normalizedQuery))) return 1;
+
+  const titleIndex = title.indexOf(normalizedQuery);
+  if (titleIndex >= 0) return 2 + titleIndex / 1000;
+
+  const slugIndex = slug.indexOf(normalizedQuery);
+  if (slugIndex >= 0) return 3 + slugIndex / 1000;
+
+  return null;
+}
+
+export function rankSongsForQuery(songs: Song[], query: string) {
+  const hasQuery = Boolean(normalizeSearchText(query));
+
+  return songs
+    .map((song, index) => {
+      const rank = rankSongForQuery(song, query);
+
+      return {
+        song,
+        matchesQuery: !hasQuery || rank !== null,
+        rank: rank ?? Number.POSITIVE_INFINITY,
+        index,
+      };
+    })
+    .sort((a, b) => {
+      if (!hasQuery) return a.index - b.index;
+      if (a.matchesQuery !== b.matchesQuery) return a.matchesQuery ? -1 : 1;
+      if (a.rank !== b.rank) return a.rank - b.rank;
+      return a.index - b.index;
+    });
+}
+
 export function sanitizeFilename(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 120);
 }

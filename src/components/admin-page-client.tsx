@@ -6,6 +6,7 @@ import { ExternalLinkIcon, PencilIcon, PlusIcon, RefreshCwIcon, Trash2Icon } fro
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
+import { SongFilterInput } from "@/components/song-filter-input";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -22,7 +23,9 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAdmin } from "@/hooks/use-admin";
 import type { Song } from "@/lib/domain";
+import { rankSongsForQuery } from "@/lib/domain";
 import { createSong, deleteSong, listSongs, updateSong } from "@/lib/firestore";
+import { cn } from "@/lib/utils";
 
 export function AdminPageClient() {
   const admin = useAdmin();
@@ -41,6 +44,9 @@ export function AdminPageClient() {
   const [deletingSong, setDeletingSong] = useState<Song | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [songQuery, setSongQuery] = useState("");
+  const rankedSongs = rankSongsForQuery(songs, songQuery);
+  const matchingSongCount = rankedSongs.filter((item) => item.matchesQuery).length;
 
   useEffect(() => {
     if (!admin.loading && !admin.isAdmin) {
@@ -195,6 +201,14 @@ export function AdminPageClient() {
         <CardHeader>
           <CardTitle>Songs</CardTitle>
           <CardDescription>Rename, open, or remove songs from the library.</CardDescription>
+          <SongFilterInput
+            id="admin-song-search"
+            songs={songs}
+            value={songQuery}
+            onChange={setSongQuery}
+            matchCount={matchingSongCount}
+            className="sm:max-w-sm"
+          />
           <CardAction>
             <Button variant="outline" size="sm" onClick={() => void refreshSongs()} disabled={songsLoading}>
               <RefreshCwIcon data-icon="inline-start" />
@@ -217,15 +231,24 @@ export function AdminPageClient() {
             </Empty>
           ) : songs.length ? (
             <div className="flex flex-col gap-2">
-              {songs.map((song) => (
-                <div key={song.id} className="flex flex-col gap-3 rounded-lg border bg-card p-3 transition-colors hover:bg-muted/35 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <Link href={`/songs/${song.slug}`} className="font-medium hover:underline">
-                      {song.title}
-                    </Link>
+              {rankedSongs.map(({ song, matchesQuery }) => (
+                <div
+                  key={song.id}
+                  className={cn(
+                    "group/admin-song relative flex flex-col gap-3 rounded-lg border bg-card p-3 transition-[background-color,opacity] hover:bg-muted/35 sm:flex-row sm:items-center sm:justify-between",
+                    songQuery.trim() && !matchesQuery ? "opacity-50" : "opacity-100"
+                  )}
+                >
+                  <Link
+                    href={`/songs/${song.slug}`}
+                    aria-label={`Open ${song.title}`}
+                    className="absolute inset-0 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
+                  />
+                  <div className="pointer-events-none min-w-0">
+                    <p className="font-medium group-hover/admin-song:underline">{song.title}</p>
                     <p className="truncate text-sm text-muted-foreground">/songs/{song.slug}</p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="relative flex flex-wrap gap-2">
                     <Button render={<Link href={`/songs/${song.slug}`} />} variant="secondary" size="sm" nativeButton={false}>
                       <ExternalLinkIcon data-icon="inline-start" />
                       Open
