@@ -88,31 +88,11 @@ export function SongPageClient({ slug }: { slug: string }) {
   }
 
   const assetMap = new Map(bundle.assets.map((asset) => [asset.id, asset]));
-  const assignedAssetCount = bundle.assets.filter((asset) => asset.assignedPartSlugs.length > 0).length;
-
   return (
     <AppShell>
-      <section className="swell-panel p-4 sm:p-5">
-        <div className="grid gap-3">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="grid gap-1.5">
-              <p className="swell-page-kicker">Song</p>
-              <h1 className="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">{bundle.song.title.toUpperCase()}</h1>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary">{bundle.assets.length} assets</Badge>
-              <Badge variant="outline">{assignedAssetCount} assigned</Badge>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {bundle.parts.map((part) => (
-              <Button key={part.slug} render={<Link href={`/parts/${part.slug}`} />} variant="outline" size="sm" nativeButton={false} className="bg-card">
-                {part.label}
-              </Button>
-            ))}
-          </div>
-        </div>
-      </section>
+      <header className="py-1 sm:py-2">
+        <h1 className="swell-song-title">{bundle.song.title}</h1>
+      </header>
 
       {admin.isAdmin ? <UploadPanel onDrop={onDrop} uploading={uploading} /> : null}
 

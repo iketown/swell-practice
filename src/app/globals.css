@@ -161,6 +161,18 @@
     @apply text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground;
   }
 
+  .swell-song-title {
+    @apply text-5xl leading-[0.88] tracking-tight sm:text-6xl lg:text-7xl;
+    font-family: var(--font-londrina-solid), var(--font-geist-sans), sans-serif;
+    font-weight: 400;
+  }
+
+  .swell-part-title {
+    @apply text-5xl leading-[0.88] tracking-tight sm:text-6xl lg:text-7xl;
+    font-family: var(--font-londrina-shadow), var(--font-geist-sans), sans-serif;
+    font-weight: 400;
+  }
+
   .swell-soft-chip {
     @apply border bg-secondary text-secondary-foreground shadow-none;
   }
