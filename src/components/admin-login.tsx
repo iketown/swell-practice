@@ -55,9 +55,16 @@ export function AdminLogin() {
           {!admin.hasFirebaseConfig ? (
             <>
               <DialogHeader>
-                <DialogTitle>Admin</DialogTitle>
-                <DialogDescription>Firebase env vars are not configured yet. Read-only demo data is showing.</DialogDescription>
+                <DialogTitle>Demo admin mode</DialogTitle>
+                <DialogDescription>
+                  Firebase is not configured. Admin screens are available with local demo data so the full workflow can be reviewed.
+                </DialogDescription>
               </DialogHeader>
+              <DialogFooter>
+                <Button render={<Link href="/admin" onClick={() => setOpen(false)} />} nativeButton={false}>
+                  Open admin
+                </Button>
+              </DialogFooter>
             </>
           ) : admin.loading ? (
             <DialogHeader>

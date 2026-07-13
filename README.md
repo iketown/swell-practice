@@ -10,7 +10,7 @@ pnpm install --ignore-scripts
 pnpm dev
 ```
 
-Without Firebase env vars, the site renders demo seed data so routes can be reviewed immediately.
+Without Firebase env vars, the site renders writable local demo data so routes can be reviewed immediately. In a configured workspace, append `?demo=1` to an admin or assignment URL to review the sample member/band workflow without reading or writing Firebase.
 
 ## Firebase
 
@@ -42,3 +42,17 @@ That means Vercel/UI and Firebase rules both know who can administer the library
 - `/songs/[songSlug]` song detail, admin upload, asset assignments
 - `/parts/[partSlug]` all songs for one part
 - `/admin` create song
+- `/admin/members` create and edit members
+- `/admin/bands` create bands and manage their rosters
+- `/assignments/[songSlug]` assign a song's parts for a selected band
+- `/members/[memberSlug]` show one member's effective parts for a selected band
+
+## Assignment Model
+
+- `members` stores the public name, display name, and slug for each person.
+- `memberPrivate` stores admin-only email, phone, and notes under the same document ID.
+- `bands` stores a five-character code and an array of member IDs.
+- `memberSongDefaults` stores one default part array per member and song.
+- `bandSongOverrides` stores only the member/song assignments that differ in a particular band.
+
+Effective parts are `band override ?? member-song default`. Creating a new band does not copy assignments, so swapping one person into a lineup requires only a roster change and any true exceptions.

@@ -1,5 +1,5 @@
-import { SongIndexClient } from "@/components/song-index-client";
+import { HomePageClient } from "@/components/home-page-client";
 
 export default function Home() {
-  return <SongIndexClient />;
+  return <HomePageClient />;
 }

@@ -26,6 +26,30 @@ service cloud.firestore {
       }
     }
 
+    match /members/{memberId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /memberPrivate/{memberId} {
+      allow read, create, update, delete: if isAdmin();
+    }
+
+    match /bands/{bandId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /memberSongDefaults/{assignmentId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /bandSongOverrides/{overrideId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
     match /admins/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if false;

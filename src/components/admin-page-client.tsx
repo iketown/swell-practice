@@ -6,6 +6,7 @@ import { ExternalLinkIcon, PencilIcon, PlusIcon, RefreshCwIcon, Trash2Icon } fro
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
+import { AdminSectionNav } from "@/components/admin-section-nav";
 import { SongFilterInput } from "@/components/song-filter-input";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -160,6 +161,8 @@ export function AdminPageClient() {
           <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">Create songs, then upload and assign files from each song page.</p>
         </div>
       </section>
+
+      <AdminSectionNav />
 
       <Card>
         <CardHeader>

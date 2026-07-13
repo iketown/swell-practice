@@ -1,7 +1,7 @@
 "use client";
 
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from "firebase/auth";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import { adminEmails, auth, hasFirebaseConfig } from "@/lib/firebase";
 
@@ -22,13 +22,20 @@ export function useAdmin() {
   }, []);
 
   const email = user?.email?.toLowerCase() ?? "";
-  const isAdmin = Boolean(user && emails.includes(email));
+  const queryDemo = useSyncExternalStore(
+    () => () => undefined,
+    () => new URLSearchParams(window.location.search).get("demo") === "1",
+    () => false,
+  );
+  const isDemoAdmin = !hasFirebaseConfig || queryDemo;
+  const isAdmin = isDemoAdmin || Boolean(user && emails.includes(email));
   const needsConfig = hasFirebaseConfig && emails.length === 0;
 
   return {
     user,
-    loading,
+    loading: isDemoAdmin ? false : loading,
     isAdmin,
+    isDemoAdmin,
     needsConfig,
     hasFirebaseConfig,
     signIn: (email: string, password: string) => {

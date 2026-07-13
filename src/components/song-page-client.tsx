@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CheckIcon, ImageIcon, PencilIcon, UploadIcon } from "lucide-react";
+import { CheckIcon, ClipboardListIcon, ImageIcon, PencilIcon, UploadIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 
@@ -90,8 +90,14 @@ export function SongPageClient({ slug }: { slug: string }) {
   const assetMap = new Map(bundle.assets.map((asset) => [asset.id, asset]));
   return (
     <AppShell>
-      <header className="py-1 sm:py-2">
+      <header className="flex flex-col gap-3 py-1 sm:flex-row sm:items-end sm:justify-between sm:py-2">
         <h1 className="swell-song-title">{bundle.song.title}</h1>
+        {admin.isAdmin ? (
+          <Button render={<Link href={`/assignments/${bundle.song.slug}`} />} variant="secondary" nativeButton={false}>
+            <ClipboardListIcon data-icon="inline-start" />
+            Assign members
+          </Button>
+        ) : null}
       </header>
 
       {admin.isAdmin ? <UploadPanel onDrop={onDrop} uploading={uploading} /> : null}

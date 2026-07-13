@@ -43,6 +43,51 @@ export interface PartSongRow {
   assets: SongAsset[];
 }
 
+export interface BandMember {
+  id: string;
+  firstName: string;
+  lastName: string;
+  displayName: string;
+  slug: string;
+  email?: string;
+  phone?: string;
+  notes?: string;
+}
+
+export interface Band {
+  id: string;
+  title: string;
+  code: string;
+  memberIds: string[];
+}
+
+export interface MemberSongDefault {
+  memberId: string;
+  songId: string;
+  partSlugs: string[];
+}
+
+export interface BandSongOverride {
+  bandId: string;
+  songId: string;
+  memberId: string;
+  partSlugs: string[];
+}
+
+export interface EffectiveMemberAssignment {
+  member: BandMember;
+  defaultPartSlugs: string[];
+  effectivePartSlugs: string[];
+  hasOverride: boolean;
+}
+
+export interface SongAssignmentBundle {
+  song: Song;
+  parts: SongPart[];
+  band: Band;
+  assignments: EffectiveMemberAssignment[];
+}
+
 export const DEFAULT_PART_SLUGS = [
   "voc_1",
   "voc_2",
@@ -77,6 +122,27 @@ export function slugify(value: string) {
 
 export function sortTitle(title: string) {
   return title.replace(/^(the|a|an)\s+/i, "").toLowerCase();
+}
+
+export function samePartSlugs(left: readonly string[], right: readonly string[]) {
+  if (left.length !== right.length) return false;
+  const rightSet = new Set(right);
+  return left.every((partSlug) => rightSet.has(partSlug));
+}
+
+export function sortPartSlugs(partSlugs: readonly string[], parts: readonly SongPart[]) {
+  const order = new Map(parts.map((part, index) => [part.slug, part.sortOrder ?? index]));
+  return [...new Set(partSlugs)].sort(
+    (left, right) => (order.get(left) ?? Number.MAX_SAFE_INTEGER) - (order.get(right) ?? Number.MAX_SAFE_INTEGER),
+  );
+}
+
+const BAND_CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+
+export function createBandCode() {
+  const bytes = new Uint8Array(5);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map((byte) => BAND_CODE_ALPHABET[byte % BAND_CODE_ALPHABET.length]).join("");
 }
 
 function normalizeSearchText(value: string) {

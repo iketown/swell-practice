@@ -27,6 +27,16 @@ const allParts = [...vocalParts, "guit_a", "guit_b", "bass", "keys"];
 export const sampleBundles: SongBundle[] = [
   {
     song: {
+      id: "demo-california-girls",
+      title: "California Girls",
+      slug: "california-girls",
+      sortTitle: "california girls",
+    },
+    parts: DEFAULT_PARTS.map((part) => ({ ...part, assetIds: [] })),
+    assets: [],
+  },
+  {
+    song: {
       id: "demo-i-get-around",
       title: "I Get Around",
       slug: "i-get-around",
