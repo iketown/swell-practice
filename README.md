@@ -49,7 +49,7 @@ That means Vercel/UI and Firebase rules both know who can administer the library
 
 ## Assignment Model
 
-- `members` stores the public name, display name, and slug for each person.
+- `members` stores the public name, display name, slug, and optional square headshot for each person. Headshots are cropped in the admin editor and stored at `members/{memberId}/headshot.jpg`.
 - `memberPrivate` stores admin-only email, phone, and notes under the same document ID.
 - `bands` stores a five-character code and an array of member IDs.
 - `memberSongDefaults` stores one default part array per member and song.

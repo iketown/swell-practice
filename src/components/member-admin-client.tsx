@@ -7,6 +7,8 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 
 import { AdminSectionNav } from "@/components/admin-section-nav";
 import { AppShell } from "@/components/app-shell";
+import { cropHeadshot, MemberHeadshotEditor, type PendingHeadshot } from "@/components/member-headshot-editor";
+import { MemberAvatar } from "@/components/member-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,10 +26,10 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useAdmin } from "@/hooks/use-admin";
-import { createMember, deleteMember, listMembers, updateMember } from "@/lib/assignments";
+import { createMember, deleteMember, listMembers, saveMemberHeadshot, updateMember } from "@/lib/assignments";
 import type { BandMember } from "@/lib/domain";
 
-type MemberInput = Omit<BandMember, "id" | "slug">;
+type MemberInput = Pick<BandMember, "firstName" | "lastName" | "displayName" | "email" | "phone" | "notes">;
 
 const emptyMember: MemberInput = {
   firstName: "",
@@ -48,6 +50,7 @@ export function MemberAdminClient() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingMember, setDeletingMember] = useState<BandMember | null>(null);
+  const [pendingHeadshot, setPendingHeadshot] = useState<PendingHeadshot | null>(null);
 
   useEffect(() => {
     if (!admin.loading && !admin.isAdmin) router.replace("/");
@@ -87,6 +90,13 @@ export function MemberAdminClient() {
       phone: member.phone ?? "",
       notes: member.notes ?? "",
     } : emptyMember);
+    setPendingHeadshot(null);
+    setError(null);
+  }
+
+  function closeForm() {
+    setEditingMember(null);
+    setPendingHeadshot(null);
     setError(null);
   }
 
@@ -98,12 +108,21 @@ export function MemberAdminClient() {
     event.preventDefault();
     setSaving(true);
     setError(null);
+    let savedMember: BandMember | null = editingMember === "new" ? null : editingMember;
     try {
-      if (editingMember === "new") await createMember(form);
-      else if (editingMember) await updateMember(editingMember, form);
-      setEditingMember(null);
+      if (editingMember === "new") {
+        savedMember = await createMember(form);
+        setEditingMember(savedMember);
+      } else if (editingMember) {
+        await updateMember(editingMember, form);
+      }
+      if (savedMember && pendingHeadshot) {
+        await saveMemberHeadshot(savedMember.id, await cropHeadshot(pendingHeadshot));
+      }
+      closeForm();
       await refresh();
     } catch (caught) {
+      if (savedMember) setEditingMember(savedMember);
       setError(caught instanceof Error ? caught.message : "Could not save this member.");
     } finally {
       setSaving(false);
@@ -145,16 +164,19 @@ export function MemberAdminClient() {
             <div className="divide-y rounded-lg border bg-card">
               {members.map((member) => (
                 <article key={member.id} className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-baseline gap-2">
-                      <h2 className="font-semibold">{member.displayName}</h2>
-                      <span className="text-sm text-muted-foreground">{member.firstName} {member.lastName}</span>
-                      <Badge variant="secondary">/{member.slug}</Badge>
-                    </div>
-                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                      {member.email ? <span className="inline-flex items-center gap-1"><MailIcon aria-hidden className="size-3.5" />{member.email}</span> : null}
-                      {member.phone ? <span className="inline-flex items-center gap-1"><PhoneIcon aria-hidden className="size-3.5" />{member.phone}</span> : null}
-                      {!member.email && !member.phone ? <span>No contact details yet</span> : null}
+                  <div className="flex min-w-0 items-center gap-3">
+                    <MemberAvatar displayName={member.displayName} photoUrl={member.photoUrl} className="size-12 text-sm" />
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-baseline gap-2">
+                        <h2 className="font-semibold">{member.displayName}</h2>
+                        <span className="text-sm text-muted-foreground">{member.firstName} {member.lastName}</span>
+                        <Badge variant="secondary">/{member.slug}</Badge>
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                        {member.email ? <span className="inline-flex items-center gap-1"><MailIcon aria-hidden className="size-3.5" />{member.email}</span> : null}
+                        {member.phone ? <span className="inline-flex items-center gap-1"><PhoneIcon aria-hidden className="size-3.5" />{member.phone}</span> : null}
+                        {!member.email && !member.phone ? <span>No contact details yet</span> : null}
+                      </div>
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -186,13 +208,20 @@ export function MemberAdminClient() {
         </CardContent>
       </Card>
 
-      <Dialog open={Boolean(editingMember)} onOpenChange={(open) => (!open && !saving ? setEditingMember(null) : undefined)}>
+      <Dialog open={Boolean(editingMember)} onOpenChange={(open) => (!open && !saving ? closeForm() : undefined)}>
         <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>{editingMember === "new" ? "Add member" : "Edit member"}</DialogTitle>
             <DialogDescription>Display name becomes the friendly member-page URL.</DialogDescription>
           </DialogHeader>
           <form onSubmit={save} className="flex flex-col gap-4">
+            <MemberHeadshotEditor
+              displayName={form.displayName || form.firstName}
+              photoUrl={editingMember === "new" ? undefined : editingMember?.photoUrl}
+              pendingHeadshot={pendingHeadshot}
+              onPendingHeadshotChange={setPendingHeadshot}
+              disabled={saving}
+            />
             <FieldGroup className="sm:grid sm:grid-cols-2">
               <Field>
                 <FieldLabel htmlFor="member-first-name">First name</FieldLabel>
@@ -221,7 +250,7 @@ export function MemberAdminClient() {
               </Field>
             </FieldGroup>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setEditingMember(null)} disabled={saving}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={closeForm} disabled={saving}>Cancel</Button>
               <Button type="submit" disabled={saving || !form.firstName.trim() || !form.lastName.trim() || !form.displayName.trim()}>
                 {saving ? "Saving..." : "Save member"}
               </Button>

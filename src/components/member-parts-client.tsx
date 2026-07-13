@@ -5,6 +5,7 @@ import { ArrowRightIcon, BookOpenCheckIcon, Layers3Icon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
+import { MemberAvatar } from "@/components/member-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -77,7 +78,10 @@ export function MemberPartsClient({ memberSlug }: { memberSlug: string }) {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="grid gap-1">
             <p className="swell-page-kicker">My parts</p>
-            <h1 className="swell-song-title">{data.member.displayName}</h1>
+            <div className="flex items-center gap-3">
+              <MemberAvatar displayName={data.member.displayName} photoUrl={data.member.photoUrl} className="size-14 text-base" />
+              <h1 className="swell-song-title">{data.member.displayName}</h1>
+            </div>
             <p className="text-sm text-muted-foreground sm:text-base">{assignedSongCount} songs with parts in this lineup</p>
           </div>
           <div className="flex min-w-64 flex-col gap-2">

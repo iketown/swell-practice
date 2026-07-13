@@ -14,6 +14,7 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
 import type {
   Band,
@@ -24,7 +25,7 @@ import type {
   SongAssignmentBundle,
 } from "@/lib/domain";
 import { createBandCode, samePartSlugs, slugify, sortPartSlugs } from "@/lib/domain";
-import { db, hasFirebaseConfig } from "@/lib/firebase";
+import { db, hasFirebaseConfig, storage } from "@/lib/firebase";
 import { getSongBundle, listSongs } from "@/lib/firestore";
 import {
   sampleBands,
@@ -105,10 +106,21 @@ function memberFromDoc(id: string, data: Record<string, unknown>): BandMember {
     lastName: String(data.lastName ?? ""),
     displayName: String(data.displayName ?? data.firstName ?? ""),
     slug: String(data.slug ?? id),
+    photoUrl: typeof data.photoUrl === "string" ? data.photoUrl : undefined,
+    photoStoragePath: typeof data.photoStoragePath === "string" ? data.photoStoragePath : undefined,
     email: typeof data.email === "string" ? data.email : undefined,
     phone: typeof data.phone === "string" ? data.phone : undefined,
     notes: typeof data.notes === "string" ? data.notes : undefined,
   };
+}
+
+function blobToDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Could not prepare this headshot."));
+    reader.readAsDataURL(blob);
+  });
 }
 
 function bandFromDoc(id: string, data: Record<string, unknown>): Band {
@@ -262,6 +274,30 @@ export async function updateMember(member: BandMember, input: Omit<BandMember, "
     updatedAt: serverTimestamp(),
   }, { merge: true });
   await batch.commit();
+}
+
+export async function saveMemberHeadshot(memberId: string, image: Blob) {
+  if (isDemoAssignments() || !storage) {
+    const photoUrl = await blobToDataUrl(image);
+    const photoStoragePath = `demo/members/${memberId}/headshot.jpg`;
+    const store = readDemoStore();
+    store.members = store.members.map((member) => (
+      member.id === memberId ? { ...member, photoUrl, photoStoragePath } : member
+    ));
+    writeDemoStore(store);
+    return { photoUrl, photoStoragePath };
+  }
+
+  const photoStoragePath = `members/${memberId}/headshot.jpg`;
+  const uploadRef = ref(storage, photoStoragePath);
+  await uploadBytes(uploadRef, image, { contentType: "image/jpeg" });
+  const photoUrl = await getDownloadURL(uploadRef);
+  await updateDoc(doc(requireDb(), "members", memberId), {
+    photoUrl,
+    photoStoragePath,
+    updatedAt: serverTimestamp(),
+  });
+  return { photoUrl, photoStoragePath };
 }
 
 export async function deleteMember(memberId: string) {

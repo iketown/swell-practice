@@ -5,6 +5,7 @@ import { ArrowRightIcon, UserRoundIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
+import { MemberAvatar } from "@/components/member-avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
@@ -40,9 +41,12 @@ export function MemberIndexClient() {
             <div className="grid gap-2 sm:grid-cols-2">
               {members.map((member) => (
                 <div key={member.id} className="flex items-center justify-between gap-3 rounded-lg border bg-card p-3">
-                  <div className="min-w-0">
-                    <h2 className="truncate font-semibold">{member.displayName}</h2>
-                    <p className="truncate text-sm text-muted-foreground">{member.firstName} {member.lastName}</p>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <MemberAvatar displayName={member.displayName} photoUrl={member.photoUrl} className="size-11" />
+                    <div className="min-w-0">
+                      <h2 className="truncate font-semibold">{member.displayName}</h2>
+                      <p className="truncate text-sm text-muted-foreground">{member.firstName} {member.lastName}</p>
+                    </div>
                   </div>
                   <Button render={<Link href={`/members/${member.slug}`} />} variant="secondary" size="sm" nativeButton={false}>
                     My parts

@@ -49,6 +49,8 @@ export interface BandMember {
   lastName: string;
   displayName: string;
   slug: string;
+  photoUrl?: string;
+  photoStoragePath?: string;
   email?: string;
   phone?: string;
   notes?: string;

@@ -6,6 +6,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { AdminSectionNav } from "@/components/admin-section-nav";
 import { AppShell } from "@/components/app-shell";
+import { MemberThumbnail } from "@/components/member-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -180,9 +181,10 @@ export function BandAdminClient() {
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2" aria-label={`${band.title} members`}>
-                    {band.memberIds.map((memberId) => (
-                      <Badge key={memberId} variant="secondary">{memberMap.get(memberId)?.displayName ?? "Unknown member"}</Badge>
-                    ))}
+                    {band.memberIds.map((memberId) => {
+                      const member = memberMap.get(memberId);
+                      return <MemberThumbnail key={memberId} displayName={member?.displayName ?? "Unknown member"} photoUrl={member?.photoUrl} />;
+                    })}
                   </div>
                 </article>
               ))}

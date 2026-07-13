@@ -169,6 +169,8 @@ Part pages group by song and show only assets assigned to that part for that son
   lastName: string;
   displayName: string;
   slug: string;
+  photoUrl?: string;
+  photoStoragePath?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -186,7 +188,7 @@ Part pages group by song and show only assets assigned to that part for that son
 }
 ```
 
-The public member document contains only the fields required for navigation and assignment views. Contact details and admin notes are isolated in an admin-only document because member pages are accessible by URL in v1.
+The public member document contains only the fields required for navigation and assignment views, including an optional square headshot. Contact details and admin notes are isolated in an admin-only document because member pages are accessible by URL in v1.
 
 ### `bands/{bandId}`
 
@@ -348,6 +350,7 @@ v1 decision:
 - Build passes locally.
 - The app can deploy to Vercel with Firebase environment variables.
 - Creating a member captures first name, last name, display name, email, phone, and notes.
+- An administrator can upload and crop a member headshot to a one-to-one square before saving. The processed JPEG is stored at `members/{memberId}/headshot.jpg` and its public URL is recorded on the member document.
 - Creating a band generates a unique five-character code and supports adding/removing members.
 - A first assignment becomes the member's default for that song.
 - Moving a part saves a band-only change immediately. Per-member and whole-band default actions promote those changes when the admin is ready.

@@ -28,5 +28,13 @@ service firebase.storage {
         && request.resource.size < 200 * 1024 * 1024;
       allow delete: if isAdmin();
     }
+
+    match /members/{memberId}/headshot.jpg {
+      allow read: if true;
+      allow create, update: if isAdmin()
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType == 'image/jpeg';
+      allow delete: if isAdmin();
+    }
   }
 }
