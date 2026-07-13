@@ -172,4 +172,8 @@
   .swell-audio-panel {
     @apply grid gap-1 rounded-md border bg-muted/45 p-2;
   }
+
+  .swell-video-button {
+    @apply transition-[background-color,transform] duration-200 hover:bg-accent active:translate-y-px;
+  }
 }

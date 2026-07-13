@@ -70,6 +70,9 @@ function assetFromDoc(id: string, data: Record<string, unknown>): SongAsset {
     size: Number(data.size ?? 0),
     storagePath: String(data.storagePath ?? ""),
     downloadUrl: typeof data.downloadUrl === "string" ? data.downloadUrl : undefined,
+    thumbnailStoragePath: typeof data.thumbnailStoragePath === "string" ? data.thumbnailStoragePath : undefined,
+    thumbnailUrl: typeof data.thumbnailUrl === "string" ? data.thumbnailUrl : undefined,
+    thumbnailTime: typeof data.thumbnailTime === "number" ? data.thumbnailTime : undefined,
     assignedPartSlugs: Array.isArray(data.assignedPartSlugs) ? data.assignedPartSlugs.map(String) : [],
     suggestedPartSlugs: Array.isArray(data.suggestedPartSlugs) ? data.suggestedPartSlugs.map(String) : [],
   };
@@ -315,4 +318,22 @@ export async function renameAsset(bundle: SongBundle, assetId: string, displayNa
     displayName,
     updatedAt: serverTimestamp(),
   });
+}
+
+export async function saveVideoThumbnail(bundle: SongBundle, asset: SongAsset, thumbnail: Blob, thumbnailTime: number) {
+  const { db, storage } = requireFirebase();
+  const thumbnailStoragePath = `songs/${bundle.song.slug}/thumbnails/${asset.id}.jpg`;
+  const thumbnailRef = ref(storage, thumbnailStoragePath);
+
+  await uploadBytes(thumbnailRef, thumbnail, { contentType: "image/jpeg" });
+  const thumbnailUrl = await getDownloadURL(thumbnailRef);
+
+  await updateDoc(doc(db, "songs", bundle.song.id, "assets", asset.id), {
+    thumbnailStoragePath,
+    thumbnailUrl,
+    thumbnailTime,
+    updatedAt: serverTimestamp(),
+  });
+
+  return { thumbnailStoragePath, thumbnailUrl, thumbnailTime };
 }

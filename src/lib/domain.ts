@@ -24,6 +24,9 @@ export interface SongAsset {
   size: number;
   storagePath: string;
   downloadUrl?: string;
+  thumbnailStoragePath?: string;
+  thumbnailUrl?: string;
+  thumbnailTime?: number;
   assignedPartSlugs: string[];
   suggestedPartSlugs: string[];
 }

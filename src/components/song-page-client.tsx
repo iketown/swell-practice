@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { CheckIcon, PencilIcon, UploadIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { CheckIcon, ImageIcon, PencilIcon, UploadIcon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 
 import { AppShell } from "@/components/app-shell";
@@ -24,7 +24,7 @@ import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAdmin } from "@/hooks/use-admin";
 import type { SongAsset, SongBundle } from "@/lib/domain";
-import { getSongBundle, saveAssetAssignments, uploadSongAsset } from "@/lib/firestore";
+import { getSongBundle, saveAssetAssignments, saveVideoThumbnail, uploadSongAsset } from "@/lib/firestore";
 
 export function SongPageClient({ slug }: { slug: string }) {
   const admin = useAdmin();
@@ -153,6 +153,9 @@ export function SongPageClient({ slug }: { slug: string }) {
             setEditingAsset(null);
             setBundle(await getSongBundle(slug));
           }}
+          onAssetUpdated={async () => {
+            setBundle(await getSongBundle(slug));
+          }}
         />
       ) : null}
     </AppShell>
@@ -207,7 +210,7 @@ function UploadPanel({ onDrop, uploading }: { onDrop: (files: File[]) => Promise
             <UploadIcon aria-hidden />
           </span>
           <div className="grid gap-1">
-            <p className="font-medium">{uploading ? "Uploading..." : isDragActive ? "Drop files here" : "Drop mp3s, PDFs, videos, or zips here"}</p>
+            <p className="font-medium">{uploading ? "Uploading..." : isDragActive ? "Drop files here" : "Drop MP3s, PDFs, MP4s, or ZIPs here"}</p>
             <p className="text-sm text-muted-foreground">Filenames like `voc_1`, `allvox`, `guit_a`, or `all` will suggest part assignments.</p>
           </div>
         </div>
@@ -221,11 +224,13 @@ function AssignmentDialog({
   asset,
   onClose,
   onSaved,
+  onAssetUpdated,
 }: {
   bundle: SongBundle;
   asset: SongAsset;
   onClose: () => void;
   onSaved: () => Promise<void>;
+  onAssetUpdated: () => Promise<void>;
 }) {
   const [selected, setSelected] = useState(() => new Set(asset.assignedPartSlugs));
   const [saving, setSaving] = useState(false);
@@ -234,7 +239,7 @@ function AssignmentDialog({
 
   return (
     <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Assign asset</DialogTitle>
           <DialogDescription>{asset.displayName || asset.filename}</DialogDescription>
@@ -263,6 +268,9 @@ function AssignmentDialog({
             </Field>
           ))}
         </FieldGroup>
+        {asset.fileType === "video" ? (
+          <VideoThumbnailEditor bundle={bundle} asset={asset} onAssetUpdated={onAssetUpdated} />
+        ) : null}
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancel
@@ -282,4 +290,116 @@ function AssignmentDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function VideoThumbnailEditor({
+  bundle,
+  asset,
+  onAssetUpdated,
+}: {
+  bundle: SongBundle;
+  asset: SongAsset;
+  onAssetUpdated: () => Promise<void>;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [thumbnailUrl, setThumbnailUrl] = useState(asset.thumbnailUrl);
+  const [frameTime, setFrameTime] = useState(asset.thumbnailTime ?? 0);
+  const [savedThumbnailTime, setSavedThumbnailTime] = useState(asset.thumbnailTime);
+  const [savingThumbnail, setSavingThumbnail] = useState(false);
+  const [thumbnailError, setThumbnailError] = useState<string | null>(null);
+  const playable = Boolean(asset.downloadUrl && asset.downloadUrl !== "#");
+
+  async function setThumbnail() {
+    const video = videoRef.current;
+    if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+      setThumbnailError("Wait for the video frame to load, then try again.");
+      return;
+    }
+
+    const canvas = document.createElement("canvas");
+    const width = video.videoWidth;
+    const height = video.videoHeight;
+    if (!width || !height) {
+      setThumbnailError("This video frame is not ready yet.");
+      return;
+    }
+
+    const maxWidth = 1280;
+    const scale = Math.min(1, maxWidth / width);
+    canvas.width = Math.round(width * scale);
+    canvas.height = Math.round(height * scale);
+    const context = canvas.getContext("2d");
+    if (!context) {
+      setThumbnailError("Your browser could not create a thumbnail from this video.");
+      return;
+    }
+
+    setSavingThumbnail(true);
+    setThumbnailError(null);
+
+    try {
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const thumbnail = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Could not create the thumbnail image."))), "image/jpeg", 0.88);
+      });
+      const saved = await saveVideoThumbnail(bundle, asset, thumbnail, video.currentTime);
+      setThumbnailUrl(saved.thumbnailUrl);
+      setFrameTime(saved.thumbnailTime);
+      setSavedThumbnailTime(saved.thumbnailTime);
+      await onAssetUpdated();
+    } catch (caught) {
+      setThumbnailError(caught instanceof Error ? caught.message : "Could not save the thumbnail.");
+    } finally {
+      setSavingThumbnail(false);
+    }
+  }
+
+  return (
+    <section className="flex flex-col gap-3 rounded-lg border bg-muted/35 p-3" aria-labelledby={`${asset.id}-thumbnail-title`}>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="grid gap-1">
+          <h3 id={`${asset.id}-thumbnail-title`} className="text-sm font-medium">Video thumbnail</h3>
+          <p className="text-sm text-muted-foreground">Scrub to the frame you want, then save it as this video&apos;s cover.</p>
+        </div>
+        {thumbnailUrl ? <Badge variant="secondary">Thumbnail set</Badge> : null}
+      </div>
+      {playable ? (
+        <video
+          ref={videoRef}
+          controls
+          playsInline
+          preload="metadata"
+          crossOrigin="anonymous"
+          src={asset.downloadUrl}
+          onSeeked={(event) => setFrameTime(event.currentTarget.currentTime)}
+          onLoadedData={(event) => setFrameTime(event.currentTarget.currentTime)}
+          className="aspect-video w-full rounded-md bg-foreground"
+        />
+      ) : (
+        <p className="text-sm text-muted-foreground">The uploaded video is unavailable, so a thumbnail cannot be selected.</p>
+      )}
+      {playable ? <p className="text-sm text-muted-foreground">Selected frame: {formatVideoTime(frameTime)}</p> : null}
+      {thumbnailUrl ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          {/* Firebase Storage thumbnail URLs are generated at runtime, so they cannot use Next's static image optimizer. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={thumbnailUrl} alt="Current video thumbnail" className="aspect-video w-24 rounded-sm object-cover" />
+          <span>{typeof savedThumbnailTime === "number" ? `Current cover: ${formatVideoTime(savedThumbnailTime)}` : "Current cover"}</span>
+        </div>
+      ) : null}
+      {thumbnailError ? <p className="text-sm text-destructive">{thumbnailError}</p> : null}
+      <div>
+        <Button type="button" variant="secondary" onClick={() => void setThumbnail()} disabled={!playable || savingThumbnail}>
+          <ImageIcon data-icon="inline-start" />
+          {savingThumbnail ? "Saving thumbnail..." : "Set thumbnail"}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+function formatVideoTime(time: number) {
+  const seconds = Math.max(0, Math.floor(time));
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}:${String(seconds % 60).padStart(2, "0")}`;
 }

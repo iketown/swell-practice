@@ -20,6 +20,14 @@ Create a Firebase web app and fill in the `NEXT_PUBLIC_FIREBASE_*` values. Enabl
 - Firebase Storage
 - Firebase Auth with Email/Password sign-in
 
+Video playback is streamed directly from Firebase Storage. Thumbnail capture uses a browser canvas, so apply the included CORS policy to the Storage bucket once after authenticating with Google Cloud:
+
+```bash
+gcloud storage buckets update gs://the-swell-live.firebasestorage.app --cors-file=storage.cors.json
+```
+
+The policy allows public `GET` and `HEAD` media requests from any origin, matching the app's public-read asset rules. It does not grant upload or delete access.
+
 Admin UI is gated two ways:
 
 - Create the two admin users in Firebase Authentication using email/password.
