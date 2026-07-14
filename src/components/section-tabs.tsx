@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { AdminLogin } from "@/components/admin-login";
 import { useAdmin } from "@/hooks/use-admin";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +12,15 @@ const baseTabs = [
   { href: "/parts", label: "Parts" },
   { href: "/members", label: "Members" },
 ] as const;
+
+function tabClassName(active: boolean) {
+  return cn(
+    "focus-visible:ring-ring rounded-md border px-4 py-2 text-sm font-semibold transition-[transform,background-color,color,border-color] duration-200 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60",
+    active
+      ? "border-foreground bg-foreground text-background"
+      : "border-border bg-card text-foreground hover:border-primary hover:bg-muted",
+  );
+}
 
 export function SectionTabs() {
   const admin = useAdmin();
@@ -27,12 +37,7 @@ export function SectionTabs() {
         return (
           <Link
             aria-current={active ? "page" : undefined}
-            className={cn(
-              "focus-visible:ring-ring rounded-md border px-4 py-2 text-sm font-semibold transition-[transform,background-color,color,border-color] duration-200 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 active:translate-y-px",
-              active
-                ? "border-foreground bg-foreground text-background"
-                : "border-border bg-card text-foreground hover:border-primary hover:bg-muted",
-            )}
+            className={tabClassName(active)}
             href={tab.href}
             key={tab.href}
           >
@@ -40,6 +45,10 @@ export function SectionTabs() {
           </Link>
         );
       })}
+      <AdminLogin
+        active={pathname === "/admin" || pathname.startsWith("/admin/")}
+        className={tabClassName(pathname === "/admin" || pathname.startsWith("/admin/"))}
+      />
     </nav>
   );
 }

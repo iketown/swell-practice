@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 
-import { AdminLogin } from "@/components/admin-login";
 import { SectionTabs } from "@/components/section-tabs";
 
 export function HomePageClient() {
@@ -21,8 +20,6 @@ export function HomePageClient() {
           <SectionTabs />
         </div>
       </main>
-
-      <AdminLogin />
     </div>
   );
 }

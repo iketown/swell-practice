@@ -1,15 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { LogInIcon, LogOutIcon } from "lucide-react";
+import { LogInIcon } from "lucide-react";
 import { FormEvent, useState } from "react";
 
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -17,7 +16,12 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui
 import { Input } from "@/components/ui/input";
 import { useAdmin } from "@/hooks/use-admin";
 
-export function AdminLogin() {
+type AdminLoginProps = {
+  active: boolean;
+  className: string;
+};
+
+export function AdminLogin({ active, className }: AdminLoginProps) {
   const admin = useAdmin();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,104 +45,68 @@ export function AdminLogin() {
     }
   }
 
+  const hasAdminSession = admin.isAdmin || Boolean(admin.user);
+
+  if (hasAdminSession) {
+    return (
+      <Link aria-current={active ? "page" : undefined} className={className} href="/admin">
+        Admin
+      </Link>
+    );
+  }
+
   return (
-    <div className="fixed bottom-16 left-4 z-40 sm:left-5">
+    <>
       <button
         type="button"
-        className={buttonVariants({ variant: admin.isAdmin ? "default" : "outline", size: "sm", className: "bg-card shadow-sm" })}
+        className={className}
+        disabled={admin.loading}
         onClick={() => setOpen(true)}
       >
-        admin
+        {admin.loading ? "Admin" : "Sign in"}
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
-          {!admin.hasFirebaseConfig ? (
-            <>
-              <DialogHeader>
-                <DialogTitle>Demo admin mode</DialogTitle>
-                <DialogDescription>
-                  Firebase is not configured. Admin screens are available with local demo data so the full workflow can be reviewed.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button render={<Link href="/admin" onClick={() => setOpen(false)} />} nativeButton={false}>
-                  Open admin
-                </Button>
-              </DialogFooter>
-            </>
-          ) : admin.loading ? (
-            <DialogHeader>
-              <DialogTitle>Admin</DialogTitle>
-              <DialogDescription>Checking your session...</DialogDescription>
-            </DialogHeader>
-          ) : admin.user ? (
-            <>
-              <DialogHeader>
-                <DialogTitle>Admin</DialogTitle>
-                <DialogDescription>
-                  Signed in as {admin.user.email}.{" "}
-                  {admin.isAdmin ? "Admin access is enabled." : "This email is not in the admin allowlist."}
-                </DialogDescription>
-              </DialogHeader>
-              {admin.needsConfig ? (
-                <p className="text-sm text-muted-foreground">Add NEXT_PUBLIC_ADMIN_EMAILS to enable admin controls.</p>
-              ) : null}
-              <DialogFooter>
-                {admin.isAdmin ? (
-                  <Button render={<Link href="/admin" onClick={() => setOpen(false)} />} nativeButton={false}>
-                    Open admin
-                  </Button>
-                ) : null}
-                <Button variant="outline" onClick={() => void admin.signOut()}>
-                  <LogOutIcon data-icon="inline-start" />
-                  Sign out
-                </Button>
-              </DialogFooter>
-            </>
-          ) : (
-            <>
-              <DialogHeader>
-                <DialogTitle>Admin sign in</DialogTitle>
-                <DialogDescription>Use one of the Firebase email/password admin accounts.</DialogDescription>
-              </DialogHeader>
-              <form onSubmit={onSubmit} className="flex flex-col gap-3">
-                <FieldGroup>
-                  <Field>
-                    <FieldLabel htmlFor="admin-email">Email</FieldLabel>
-                    <Input
-                      id="admin-email"
-                      type="email"
-                      autoComplete="email"
-                      value={email}
-                      onChange={(event) => setEmail(event.target.value)}
-                      required
-                    />
-                  </Field>
-                  <Field data-invalid={Boolean(error)}>
-                    <FieldLabel htmlFor="admin-password">Password</FieldLabel>
-                    <Input
-                      id="admin-password"
-                      type="password"
-                      autoComplete="current-password"
-                      value={password}
-                      onChange={(event) => setPassword(event.target.value)}
-                      aria-invalid={Boolean(error)}
-                      required
-                    />
-                    <FieldDescription>
-                      {error ?? "Admin pages stay protected; public parts pages do not require sign-in."}
-                    </FieldDescription>
-                  </Field>
-                </FieldGroup>
-                <Button type="submit" disabled={submitting || !email.trim() || !password}>
-                  <LogInIcon data-icon="inline-start" />
-                  {submitting ? "Signing in..." : "Sign in"}
-                </Button>
-              </form>
-            </>
-          )}
+          <DialogHeader>
+            <DialogTitle>Admin sign in</DialogTitle>
+            <DialogDescription>Use one of the Firebase email/password admin accounts.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={onSubmit} className="flex flex-col gap-3">
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="admin-email">Email</FieldLabel>
+                <Input
+                  id="admin-email"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
+                />
+              </Field>
+              <Field data-invalid={Boolean(error)}>
+                <FieldLabel htmlFor="admin-password">Password</FieldLabel>
+                <Input
+                  id="admin-password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  aria-invalid={Boolean(error)}
+                  required
+                />
+                <FieldDescription>
+                  {error ?? "Admin pages stay protected; public parts pages do not require sign-in."}
+                </FieldDescription>
+              </Field>
+            </FieldGroup>
+            <Button type="submit" disabled={submitting || !email.trim() || !password}>
+              <LogInIcon data-icon="inline-start" />
+              {submitting ? "Signing in..." : "Sign in"}
+            </Button>
+          </form>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

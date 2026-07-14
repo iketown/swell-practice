@@ -1,7 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import { AdminLogin } from "@/components/admin-login";
 import { SectionTabs } from "@/components/section-tabs";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -22,7 +21,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
-      <AdminLogin />
     </div>
   );
 }

@@ -1,14 +1,13 @@
 "use client";
 
-import Link from "next/link";
-import { ArrowRightIcon, BookOpenCheckIcon, Layers3Icon } from "lucide-react";
+import { BookOpenCheckIcon, Layers3Icon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
+import { AssetLinks } from "@/components/asset-links";
 import { MemberAvatar } from "@/components/member-avatar";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -101,36 +100,41 @@ export function MemberPartsClient({ memberSlug }: { memberSlug: string }) {
         </div>
       </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Set list</CardTitle>
-          <CardDescription>Open a song for charts, demos, and rehearsal files.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="divide-y rounded-lg border bg-card">
-            {data.rows.map((row) => (
-              <article key={row.song.id} className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="font-semibold">{row.song.title}</h2>
+      <section className="flex flex-col gap-4" aria-labelledby="member-set-list-title">
+        <header className="flex flex-col gap-1 px-1">
+          <h2 id="member-set-list-title" className="text-xl font-semibold">Set list</h2>
+          <p className="text-sm text-muted-foreground">Open a song to get the files for your assigned parts.</p>
+        </header>
+        <Accordion multiple>
+          {data.rows.map((row) => (
+            <AccordionItem key={row.song.id} value={row.song.id} disabled={!row.effectivePartSlugs.length}>
+              <AccordionTrigger>
+                <span className="flex min-w-0 flex-1 flex-col gap-2">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold">{row.song.title}</span>
                     {row.hasOverride ? <Badge variant="outline">Band change</Badge> : null}
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-2">
+                  </span>
+                  <span className="flex flex-wrap gap-2">
                     {row.effectivePartSlugs.length ? row.effectivePartSlugs.map((partSlug) => {
                       const changed = !row.defaultPartSlugs.includes(partSlug);
                       return <Badge key={partSlug} variant={changed ? "default" : "secondary"}>{partLabel(partSlug)}{changed ? " · Changed" : ""}</Badge>;
-                    }) : <span className="text-sm text-muted-foreground">No assignment for this song</span>}
+                    }) : <span className="text-sm font-normal text-muted-foreground">No assignment for this song</span>}
+                  </span>
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="border-t">
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="font-medium text-foreground">Learning materials</h3>
+                    <Badge variant="outline">{row.assets.length} {row.assets.length === 1 ? "file" : "files"}</Badge>
                   </div>
+                  <AssetLinks assets={row.assets} />
                 </div>
-                <Button render={<Link href={`/songs/${row.song.slug}`} />} variant="outline" size="sm" nativeButton={false}>
-                  Practice files
-                  <ArrowRightIcon data-icon="inline-end" />
-                </Button>
-              </article>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
+      </section>
 
       {!assignedSongCount ? (
         <Empty>

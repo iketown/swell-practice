@@ -22,6 +22,7 @@ import type {
   BandSongOverride,
   MemberSongDefault,
   Song,
+  SongAsset,
   SongAssignmentBundle,
 } from "@/lib/domain";
 import { createBandCode, samePartSlugs, slugify, sortPartSlugs } from "@/lib/domain";
@@ -53,6 +54,7 @@ export interface MemberSongAssignmentRow {
   defaultPartSlugs: string[];
   effectivePartSlugs: string[];
   hasOverride: boolean;
+  assets: SongAsset[];
 }
 
 export interface MemberAssignmentPageData {
@@ -562,20 +564,41 @@ export async function getMemberAssignmentPage(memberSlug: string, bandId?: strin
 
   const defaultMap = new Map(defaults.map((item) => [item.songId, item]));
   const overrideMap = new Map(overrides.map((item) => [item.songId, item]));
+  const rows = songs.map((song) => {
+    const defaultPartSlugs = defaultMap.get(song.id)?.partSlugs ?? [];
+    const override = overrideMap.get(song.id);
+    return {
+      song,
+      defaultPartSlugs,
+      effectivePartSlugs: override?.partSlugs ?? defaultPartSlugs,
+      hasOverride: Boolean(override),
+    };
+  });
+
+  const rowsWithAssets = await Promise.all(rows.map(async (row) => {
+    if (!row.effectivePartSlugs.length) return { ...row, assets: [] };
+
+    const bundle = isDemoAssignments() ? sampleSongBundle(row.song.slug) : await getSongBundle(row.song.slug);
+    if (!bundle) return { ...row, assets: [] };
+
+    const effectiveParts = new Set(row.effectivePartSlugs);
+    const assetIds = new Set(
+      bundle.parts
+        .filter((part) => effectiveParts.has(part.slug))
+        .flatMap((part) => part.assetIds),
+    );
+
+    return {
+      ...row,
+      assets: bundle.assets.filter((asset) => assetIds.has(asset.id)),
+    };
+  }));
+
   return {
     member,
     bands: memberBands,
     selectedBand,
-    rows: songs.map((song) => {
-      const defaultPartSlugs = defaultMap.get(song.id)?.partSlugs ?? [];
-      const override = overrideMap.get(song.id);
-      return {
-        song,
-        defaultPartSlugs,
-        effectivePartSlugs: override?.partSlugs ?? defaultPartSlugs,
-        hasOverride: Boolean(override),
-      };
-    }),
+    rows: rowsWithAssets,
   };
 }
 

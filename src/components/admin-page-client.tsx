@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ExternalLinkIcon, PencilIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
+import { ExternalLinkIcon, LogOutIcon, PencilIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
@@ -45,6 +45,7 @@ export function AdminPageClient() {
   const [deletingSong, setDeletingSong] = useState<Song | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [songQuery, setSongQuery] = useState("");
   const rankedSongs = rankSongsForQuery(songs, songQuery);
   const matchingSongCount = rankedSongs.filter((item) => item.matchesQuery).length;
@@ -141,6 +142,17 @@ export function AdminPageClient() {
       setDeleteError(caught instanceof Error ? caught.message : "Could not delete song.");
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function onSignOut() {
+    setSigningOut(true);
+
+    try {
+      await admin.signOut();
+      router.replace("/");
+    } finally {
+      setSigningOut(false);
     }
   }
 
@@ -285,6 +297,13 @@ export function AdminPageClient() {
           )}
         </CardContent>
       </Card>
+
+      <div className="flex justify-center py-4">
+        <Button variant="outline" onClick={() => void onSignOut()} disabled={signingOut}>
+          <LogOutIcon data-icon="inline-start" />
+          {signingOut ? "Signing out..." : "Sign out"}
+        </Button>
+      </div>
 
       <Dialog open={Boolean(editingSong)} onOpenChange={(open) => (!open && !editing ? setEditingSong(null) : undefined)}>
         <DialogContent>
