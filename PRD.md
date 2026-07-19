@@ -22,6 +22,7 @@ This is not the public marketing site and not the full band OS. It is a practica
 - Give every part a detail page at `/parts/[partSlug]`.
 - Upload audio, PDFs, videos, zip files, and related rehearsal files once.
 - Assign each uploaded asset to one or more parts for the song.
+- Let admins remove an asset from every assigned part and permanently delete its uploaded files.
 - Surface the same asset in multiple contexts without duplicate uploads.
 - Auto-create default parts for each new song.
 - Auto-suggest part assignments from filenames such as `voc_1`, `voc1`, `guit_a`, `guita`, `bass`, or `keys`.
@@ -238,6 +239,7 @@ songs/{songSlug}/{assetId}-{sanitizedFilename}
 ```
 
 Files are uploaded directly from the browser to Firebase Storage. The Firestore asset document stores the resulting storage path and metadata.
+Deleting an asset removes its primary file and generated video thumbnail from Storage, removes its ID from every part in the song, and deletes its asset document.
 
 ## 11. Assignment Rules
 

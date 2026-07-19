@@ -15,7 +15,7 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { deleteObject, getDownloadURL, ref, uploadBytes, uploadBytesResumable } from "firebase/storage";
 
 import {
   DEFAULT_PARTS,
@@ -23,6 +23,7 @@ import {
   inferPartSlugs,
   sanitizeFilename,
   slugify,
+  sortPartSlugs,
   sortTitle,
   type Song,
   type SongAsset,
@@ -242,17 +243,77 @@ export async function deleteSong(song: Song) {
   await batch.commit();
 }
 
-export async function uploadSongAsset(bundle: SongBundle, file: File) {
+export type SongAssetUploadProgress = {
+  bytesTransferred: number;
+  totalBytes: number;
+};
+
+export type SongAssetUploadOptions = {
+  onProgress?: (progress: SongAssetUploadProgress) => void;
+  signal?: AbortSignal;
+};
+
+export async function uploadSongAsset(
+  bundle: SongBundle,
+  file: File,
+  options: SongAssetUploadOptions = {},
+) {
   const { db, storage } = requireFirebase();
+  const { onProgress, signal } = options;
   const assetRef = doc(collection(db, "songs", bundle.song.id, "assets"));
-  const availablePartSlugs = bundle.parts.map((part) => part.slug);
+  const partBySlug = new Map(DEFAULT_PARTS.map((part) => [part.slug, part]));
+
+  for (const part of bundle.parts) {
+    partBySlug.set(part.slug, part);
+  }
+
+  const availablePartSlugs = [...partBySlug.keys()];
   const suggestedPartSlugs = inferPartSlugs(file.name, availablePartSlugs);
   const filename = sanitizeFilename(file.name);
   const storagePath = `songs/${bundle.song.slug}/${assetRef.id}-${filename}`;
   const uploadRef = ref(storage, storagePath);
 
-  await uploadBytes(uploadRef, file, { contentType: file.type || undefined });
+  const uploadTask = uploadBytesResumable(uploadRef, file, { contentType: file.type || undefined });
+  const cancelUpload = () => {
+    uploadTask.cancel();
+  };
+
+  if (signal?.aborted) cancelUpload();
+  signal?.addEventListener("abort", cancelUpload, { once: true });
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          onProgress?.({
+            bytesTransferred: snapshot.bytesTransferred,
+            totalBytes: snapshot.totalBytes,
+          });
+        },
+        reject,
+        resolve,
+      );
+    });
+  } finally {
+    signal?.removeEventListener("abort", cancelUpload);
+  }
+
+  const ensureNotCanceled = async () => {
+    if (!signal?.aborted) return;
+
+    try {
+      await deleteObject(uploadRef);
+    } catch (caught) {
+      if (!isMissingStorageObject(caught)) throw caught;
+    }
+
+    throw new DOMException("The upload was canceled.", "AbortError");
+  };
+
+  await ensureNotCanceled();
   const downloadUrl = await getDownloadURL(uploadRef);
+  await ensureNotCanceled();
 
   const asset: Omit<SongAsset, "id"> = {
     filename,
@@ -274,12 +335,24 @@ export async function uploadSongAsset(bundle: SongBundle, file: File) {
   });
 
   for (const partSlug of suggestedPartSlugs) {
-    batch.update(doc(db, "songs", bundle.song.id, "parts", partSlug), {
-      assetIds: arrayUnion(assetRef.id),
-      updatedAt: serverTimestamp(),
-    });
+    const part = partBySlug.get(partSlug);
+
+    if (!part) continue;
+
+    batch.set(
+      doc(db, "songs", bundle.song.id, "parts", partSlug),
+      {
+        slug: part.slug,
+        label: part.label,
+        sortOrder: part.sortOrder,
+        assetIds: arrayUnion(assetRef.id),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
   }
 
+  await ensureNotCanceled();
   await batch.commit();
   return assetRef.id;
 }
@@ -288,27 +361,98 @@ export async function saveAssetAssignments(bundle: SongBundle, assetId: string, 
   const { db } = requireFirebase();
   const current = bundle.assets.find((asset) => asset.id === assetId);
   const previous = new Set(current?.assignedPartSlugs ?? []);
-  const next = new Set(nextPartSlugs);
+  const partBySlug = new Map(DEFAULT_PARTS.map((part) => [part.slug, part]));
+
+  for (const part of bundle.parts) {
+    partBySlug.set(part.slug, part);
+  }
+
+  const assignmentParts = [...partBySlug.values()];
+  const sortedNextPartSlugs = sortPartSlugs(nextPartSlugs, assignmentParts);
+  const next = new Set(sortedNextPartSlugs);
   const assetRef = doc(db, "songs", bundle.song.id, "assets", assetId);
   const batch = writeBatch(db);
 
   batch.update(assetRef, {
-    assignedPartSlugs: [...next],
+    assignedPartSlugs: sortedNextPartSlugs,
     updatedAt: serverTimestamp(),
   });
 
-  for (const part of bundle.parts) {
+  for (const part of assignmentParts) {
     const partRef = doc(db, "songs", bundle.song.id, "parts", part.slug);
 
     if (next.has(part.slug) && !previous.has(part.slug)) {
-      batch.update(partRef, { assetIds: arrayUnion(assetId), updatedAt: serverTimestamp() });
+      batch.set(
+        partRef,
+        {
+          slug: part.slug,
+          label: part.label,
+          sortOrder: part.sortOrder,
+          assetIds: arrayUnion(assetId),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
     }
 
     if (!next.has(part.slug) && previous.has(part.slug)) {
-      batch.update(partRef, { assetIds: arrayRemove(assetId), updatedAt: serverTimestamp() });
+      batch.set(
+        partRef,
+        {
+          slug: part.slug,
+          label: part.label,
+          sortOrder: part.sortOrder,
+          assetIds: arrayRemove(assetId),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
     }
   }
 
+  await batch.commit();
+}
+
+function isMissingStorageObject(caught: unknown) {
+  return (
+    typeof caught === "object"
+    && caught !== null
+    && "code" in caught
+    && caught.code === "storage/object-not-found"
+  );
+}
+
+export async function deleteSongAsset(bundle: SongBundle, asset: SongAsset) {
+  const { db, storage } = requireFirebase();
+  const storagePaths = [
+    ...new Set(
+      [asset.storagePath, asset.thumbnailStoragePath].filter(
+        (storagePath): storagePath is string => Boolean(storagePath),
+      ),
+    ),
+  ];
+
+  // Keep the metadata available for a retry until every owned storage object is gone.
+  await Promise.all(
+    storagePaths.map(async (storagePath) => {
+      try {
+        await deleteObject(ref(storage, storagePath));
+      } catch (caught) {
+        if (!isMissingStorageObject(caught)) throw caught;
+      }
+    }),
+  );
+
+  const batch = writeBatch(db);
+
+  for (const part of bundle.parts) {
+    batch.update(doc(db, "songs", bundle.song.id, "parts", part.slug), {
+      assetIds: arrayRemove(asset.id),
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  batch.delete(doc(db, "songs", bundle.song.id, "assets", asset.id));
   await batch.commit();
 }
 

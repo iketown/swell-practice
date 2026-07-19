@@ -22,7 +22,7 @@ function asset(
 }
 
 const vocalParts = ["voc_1", "voc_2", "voc_3", "voc_4", "voc_5"];
-const allParts = [...vocalParts, "guit_a", "guit_b", "bass", "keys"];
+const allParts = [...vocalParts, "guit_a", "guit_b", "keys", "drums", "bass"];
 
 export const sampleBundles: SongBundle[] = [
   {

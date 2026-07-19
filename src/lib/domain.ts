@@ -98,8 +98,9 @@ export const DEFAULT_PART_SLUGS = [
   "voc_5",
   "guit_a",
   "guit_b",
-  "bass",
   "keys",
+  "drums",
+  "bass",
 ] as const;
 
 export const DEFAULT_PARTS: SongPart[] = DEFAULT_PART_SLUGS.map((slug, index) => ({
@@ -258,6 +259,9 @@ export function inferPartSlugs(filename: string, availablePartSlugs = DEFAULT_PA
   if (available.has("bass") && tokens.has("bass")) inferred.add("bass");
   if (available.has("keys") && (tokens.has("keys") || tokens.has("keyboards") || tokens.has("piano"))) {
     inferred.add("keys");
+  }
+  if (available.has("drums") && (tokens.has("drums") || tokens.has("drum") || tokens.has("kit"))) {
+    inferred.add("drums");
   }
 
   if (hasVocalGroupCue) {
