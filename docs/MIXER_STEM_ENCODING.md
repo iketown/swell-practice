@@ -9,7 +9,7 @@ original WAV or lossless masters elsewhere.
 | Stem type | Channels | MP3 setting |
 | --- | ---: | ---: |
 | Individual vocal or part | True mono | 128 kbps CBR |
-| Background mix or genuinely stereo stem | Stereo | 192 kbps CBR |
+| Background mix | Stereo | 192 kbps CBR |
 
 - Encode with LAME through FFmpeg.
 - Use `.mp3` files and strip unnecessary metadata.
@@ -42,11 +42,11 @@ batch with the same encoder keeps that behavior consistent across the stems.
 
 ## Channel Rules
 
-- Export isolated vocals and other single-source parts as actual mono files.
+- Deliver every isolated vocal or individual part as mono.
 - Do not export a mono signal as dual-mono stereo. It approximately doubles its
   encoded and decoded size without improving the mixer.
-- Keep the backing mix stereo.
-- Keep a part stereo only when its stereo image is intentional.
+- Keep the backing mix stereo and process it separately from the part stems.
+- The Finder Quick Action downmixes a stereo part export to mono.
 - Treat files with more than two channels as an export error; do not silently
   downmix them in the converter.
 
@@ -89,13 +89,13 @@ output. Use `-y` only when replacement is an explicit converter option.
 
 The folder converter should:
 
-1. Ask for a folder containing the source WAV stems.
+1. Ask for a folder containing the source WAV or AIFF part stems.
 2. Locate both `ffmpeg` and `ffprobe`. AppleScript applications do not always
    inherit the Terminal's `PATH`, so check common Homebrew locations such as
    `/opt/homebrew/bin` and `/usr/local/bin`, or store an explicitly selected
    executable path.
-3. Find `.wav` files case-insensitively without descending into the output
-   folder.
+3. Find `.wav`, `.wave`, `.aif`, `.aiff`, and `.aifc` files
+   case-insensitively without descending into the output folder.
 4. Inspect each file before conversion:
 
    ```bash
@@ -104,22 +104,41 @@ The folder converter should:
      -of csv=p=0 "input.wav"
    ```
 
-5. Confirm that every WAV in the folder uses the same sample rate. Stop and
-   report the mismatched files instead of silently making mixed-rate outputs.
+5. Confirm that every source file in the folder uses the same sample rate.
+   Stop and report the mismatched files instead of silently making mixed-rate
+   outputs.
 6. Use the detected batch sample rate when it is `44,100 Hz` or `48,000 Hz`.
    Ask before resampling any other rate.
-7. Choose `128 kbps / mono` when `ffprobe` reports one channel.
-8. Choose `192 kbps / stereo` when it reports two channels.
-9. Stop and report files with zero audio streams or more than two channels.
-10. Create a sibling output folder such as `web-mp3`.
-11. Preserve the source basename and change only the extension to `.mp3`.
-12. Quote every filesystem path. In AppleScript shell commands, use
+7. Encode every one- or two-channel part as `128 kbps / mono`, downmixing
+   stereo sources.
+8. Stop and report files with zero audio streams or more than two channels.
+9. Create a sibling output folder such as `web-mp3`.
+10. Preserve the source basename and change only the extension to `.mp3`.
+11. Quote every filesystem path. In AppleScript shell commands, use
     `quoted form of` for selected folders, input files, and output files.
-13. Refuse to overwrite existing files by default.
-14. Finish with a summary showing converted, skipped, and failed files.
+12. Refuse to overwrite existing files by default.
+13. Finish with a summary showing converted, skipped, and failed files.
 
-The converter should not infer mono or stereo from filenames. Channel count
-from `ffprobe` is the authoritative input.
+The part converter should not infer the part type from filenames. It
+deliberately outputs mono. Process the stereo backing mix separately with the
+stereo command above.
+
+## Finder Quick Action
+
+The installed **Convert to Stem MP3** Finder Quick Action prepares selected
+WAV or AIFF part files as mono web stems:
+
+- it accepts `.wav`, `.wave`, `.aif`, `.aiff`, and `.aifc`;
+- it creates each `.mp3` beside its source file;
+- it keeps the source file and refuses to overwrite an existing MP3;
+- it encodes every source as mono at 128 kbps, downmixing stereo inputs;
+- it validates the whole selection before conversion, including the shared
+  sample rate and one- or two-channel requirement; and
+- it reports completion or validation failures with a macOS notification or
+  alert.
+
+Its maintained source is in
+[`tools/stem-mp3-quick-action`](../tools/stem-mp3-quick-action/README.md).
 
 ## Pre-upload Check
 
@@ -127,7 +146,7 @@ Before uploading a song:
 
 - Play two or more converted stems together from the beginning and near the end.
 - Confirm that transients and vocals remain aligned.
-- Confirm that vocal files report mono and the background mix reports stereo.
+- Confirm that converted part files report mono.
 - Confirm that filenames remain readable and identify the part.
 - Confirm that every MP3 has the same intended total song length.
 
