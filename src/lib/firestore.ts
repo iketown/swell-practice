@@ -18,6 +18,7 @@ import {
 import { deleteObject, getDownloadURL, ref, uploadBytes, uploadBytesResumable } from "firebase/storage";
 
 import {
+  createDefaultSongMixerConfigurations,
   createDefaultSongMixerSettings,
   DEFAULT_PARTS,
   fileTypeFromFile,
@@ -32,6 +33,7 @@ import {
   type SongAnnotation,
   type SongBundle,
   type SongMixerBundle,
+  type SongMixerConfiguration,
   type SongMixerSettings,
   type SongMixerStateName,
   type SongMixerStateOverride,
@@ -102,6 +104,22 @@ function mixerTrackFromDoc(id: string, data: Record<string, unknown>, fallbackOr
     isBackgroundMix: data.isBackgroundMix === true,
     orderIndex: typeof data.orderIndex === "number" ? data.orderIndex : fallbackOrderIndex,
     stateOverrides: mixerStateOverridesFromData(data.stateOverrides),
+  };
+}
+
+function mixerConfigurationFromData(
+  value: unknown,
+  fallbackOrderIndex: number,
+): SongMixerConfiguration {
+  const data = objectValue(value);
+
+  return {
+    id: String(data.id ?? `mix-${fallbackOrderIndex + 1}`),
+    name: String(data.name ?? "Untitled Mix").trim() || "Untitled Mix",
+    trackIds: Array.isArray(data.trackIds)
+      ? [...new Set(data.trackIds.map(String))]
+      : [],
+    orderIndex: typeof data.orderIndex === "number" ? data.orderIndex : fallbackOrderIndex,
   };
 }
 
@@ -252,7 +270,13 @@ export async function getSongMixerBundle(slug: string): Promise<SongMixerBundle 
   if (!hasFirebaseConfig || !db) {
     const bundle = sampleSongBundle(slug);
     return bundle
-      ? { song: bundle.song, tracks: [], settings: createDefaultSongMixerSettings(), annotations: [] }
+      ? {
+          song: bundle.song,
+          tracks: [],
+          configurations: createDefaultSongMixerConfigurations([]),
+          settings: createDefaultSongMixerSettings(),
+          annotations: [],
+        }
       : null;
   }
 
@@ -274,10 +298,22 @@ export async function getSongMixerBundle(slug: string): Promise<SongMixerBundle 
     const tracks = tracksSnap.docs
       .map((snap, index) => mixerTrackFromDoc(snap.id, snap.data(), index))
       .sort((left, right) => left.orderIndex - right.orderIndex || left.displayName.localeCompare(right.displayName));
+    const trackIds = new Set(tracks.map((track) => track.id));
+    const songData = songSnap.data();
+    const savedConfigurations = (Array.isArray(songData.mixerMixes) ? songData.mixerMixes : [])
+      .map((value, index) => mixerConfigurationFromData(value, index))
+      .map((configuration) => ({
+        ...configuration,
+        trackIds: configuration.trackIds.filter((trackId) => trackIds.has(trackId)),
+      }))
+      .sort((left, right) => left.orderIndex - right.orderIndex || left.name.localeCompare(right.name));
 
     return {
       song: songFromDoc(songSnap.id, songSnap.data()),
       tracks,
+      configurations: savedConfigurations.length
+        ? savedConfigurations
+        : createDefaultSongMixerConfigurations(tracks),
       settings: mixerSettingsFromData(settingsSnap.exists() ? settingsSnap.data() : undefined),
       annotations: (annotationsSnap?.docs ?? [])
         .map((snap) => annotationFromDoc(snap.id, snap.data()))
@@ -419,10 +455,6 @@ export async function uploadSongMixerTrack(
   const { db, storage } = requireFirebase();
   const { onProgress, orderIndex = bundle.tracks.length, signal } = options;
 
-  if (bundle.tracks.length >= 8) {
-    throw new Error("This test mixer supports up to 8 tracks.");
-  }
-
   if (!file.name.toLowerCase().endsWith(".mp3") && file.type !== "audio/mpeg") {
     throw new Error("Mixer tracks must be MP3 files.");
   }
@@ -499,6 +531,7 @@ export async function uploadSongMixerTrack(
 export async function saveSongMixerConfiguration(
   bundle: SongMixerBundle,
   tracks: SongMixerTrack[],
+  configurations: SongMixerConfiguration[],
   settings: SongMixerSettings,
   saveGlobalSettings: boolean,
 ) {
@@ -513,6 +546,17 @@ export async function saveSongMixerConfiguration(
       stateOverrides: serializeMixerStateOverrides(track.stateOverrides),
       updatedAt: serverTimestamp(),
     });
+  });
+
+  const trackIds = new Set(tracks.map((track) => track.id));
+  batch.update(doc(db, "songs", bundle.song.id), {
+    mixerMixes: configurations.map((configuration, orderIndex) => ({
+      id: configuration.id,
+      name: configuration.name.trim(),
+      trackIds: configuration.trackIds.filter((trackId) => trackIds.has(trackId)),
+      orderIndex,
+    })),
+    updatedAt: serverTimestamp(),
   });
 
   if (saveGlobalSettings) {
@@ -644,6 +688,15 @@ export async function deleteSongMixerTrack(bundle: SongMixerBundle, track: SongM
 
   const batch = writeBatch(db);
   batch.delete(doc(db, "songs", bundle.song.id, "mixerTracks", track.id));
+  batch.update(doc(db, "songs", bundle.song.id), {
+    mixerMixes: bundle.configurations.map((configuration, orderIndex) => ({
+      id: configuration.id,
+      name: configuration.name,
+      trackIds: configuration.trackIds.filter((trackId) => trackId !== track.id),
+      orderIndex,
+    })),
+    updatedAt: serverTimestamp(),
+  });
   await batch.commit();
 }
 

@@ -27,6 +27,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   SONG_MIXER_MIXES,
   type SongAnnotation,
+  type SongMixerConfiguration,
   type SongMixerMixId,
   type SongMixerSettings,
   type SongMixerStateOverrides,
@@ -49,6 +50,7 @@ const SongMixerWaveform = dynamic(
 
 export function SongMixerPlayer({
   tracks,
+  configurations,
   settings,
   annotations,
   canSaveOverrides,
@@ -68,6 +70,7 @@ export function SongMixerPlayer({
   onAnnotationsChange,
 }: {
   tracks: SongMixerTrack[];
+  configurations: SongMixerConfiguration[];
   settings: SongMixerSettings;
   annotations: SongAnnotation[];
   canSaveOverrides: boolean;
@@ -88,16 +91,44 @@ export function SongMixerPlayer({
   ) => Promise<SongAnnotation[] | null>;
   onAnnotationsChange: (annotations: SongAnnotation[]) => void;
 }) {
-  const featureableTracks = useMemo(
-    () => tracks.filter((track) => !track.isBackgroundMix),
-    [tracks],
+  const [configurationId, setConfigurationId] = useState<string | null>(
+    configurations[0]?.id ?? null,
   );
-  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(
-    featureableTracks[0]?.id ?? null,
+  const effectiveConfigurationId = configurations.some(
+    (configuration) => configuration.id === configurationId,
+  )
+    ? configurationId
+    : configurations[0]?.id ?? null;
+  const activeConfiguration =
+    configurations.find((configuration) => configuration.id === effectiveConfigurationId)
+    ?? null;
+  const activeTrackIds = useMemo(
+    () => new Set(activeConfiguration?.trackIds ?? []),
+    [activeConfiguration?.trackIds],
+  );
+  const activeTracks = useMemo(
+    () => tracks.filter((track) => activeTrackIds.has(track.id)),
+    [activeTrackIds, tracks],
+  );
+  const featureableTracks = useMemo(
+    () => activeTracks.filter((track) => !track.isBackgroundMix),
+    [activeTracks],
+  );
+  const [selectedTrackIdsByConfiguration, setSelectedTrackIdsByConfiguration] = useState<
+    Record<string, string | null>
+  >(
+    effectiveConfigurationId
+      ? { [effectiveConfigurationId]: featureableTracks[0]?.id ?? null }
+      : {},
   );
   const [mixId, setMixId] = useState<SongMixerMixId>("listen");
-  const effectiveSelectedTrackId = featureableTracks.some((track) => track.id === selectedTrackId)
-    ? selectedTrackId
+  const requestedSelectedTrackId = effectiveConfigurationId
+    ? selectedTrackIdsByConfiguration[effectiveConfigurationId]
+    : null;
+  const effectiveSelectedTrackId = featureableTracks.some(
+    (track) => track.id === requestedSelectedTrackId,
+  )
+    ? requestedSelectedTrackId ?? null
     : featureableTracks[0]?.id ?? null;
   const overridesObject = useMemo(() => songOverridesObject(tracks), [tracks]);
   const overrideValueCount = useMemo(() => countOverrideValues(tracks), [tracks]);
@@ -112,6 +143,13 @@ export function SongMixerPlayer({
           : overrideSaveStatus === "saved"
             ? "Saved"
             : "Stored";
+  const setSelectedTrackId = (trackId: string | null) => {
+    if (!effectiveConfigurationId) return;
+    setSelectedTrackIdsByConfiguration((current) => ({
+      ...current,
+      [effectiveConfigurationId]: trackId,
+    }));
+  };
   const selectTrackFromWaveform = (trackId: string) => {
     if (mixId === "learn" && trackId === effectiveSelectedTrackId) {
       setMixId("listen");
@@ -124,9 +162,36 @@ export function SongMixerPlayer({
 
   const partAndMixControls = (
     <section
-      className="grid gap-3 border-t-2 bg-card p-3 sm:grid-cols-[minmax(13rem,0.7fr)_minmax(0,1fr)] sm:items-end sm:p-4"
-      aria-label="Part and mix"
+      className="grid gap-3 border-t-2 bg-card p-3 sm:grid-cols-[minmax(10rem,0.65fr)_minmax(12rem,0.8fr)_minmax(0,1.2fr)] sm:items-end sm:p-4"
+      aria-label="Player mix, selected part, and part mode"
     >
+      <div className="grid gap-1.5">
+        <Label htmlFor="selected-player-mix">Player mix</Label>
+        <Select
+          items={configurations.map((configuration) => ({
+            label: configuration.name,
+            value: configuration.id,
+          }))}
+          value={effectiveConfigurationId}
+          disabled={!configurations.length}
+          onValueChange={setConfigurationId}
+        >
+          <SelectTrigger id="selected-player-mix" className="h-11 w-full bg-background">
+            <SelectValue placeholder="No player mixes" />
+          </SelectTrigger>
+          <SelectContent align="start">
+            <SelectGroup>
+              {configurations.map((configuration) => (
+                <SelectItem key={configuration.id} value={configuration.id}>
+                  {configuration.name}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+        {manageStemsAction ? <div className="pt-1">{manageStemsAction}</div> : null}
+      </div>
+
       <div className="grid gap-1.5">
         <Label htmlFor="selected-mixer-stem">Selected part</Label>
         <Select
@@ -151,11 +216,10 @@ export function SongMixerPlayer({
             </SelectGroup>
           </SelectContent>
         </Select>
-        {manageStemsAction ? <div className="pt-1">{manageStemsAction}</div> : null}
       </div>
 
       <div className="grid min-w-0 gap-1.5">
-        <Label>Mix</Label>
+        <Label>Part mode</Label>
         <Tabs
           value={mixId}
           onValueChange={(value) => setMixId(value as SongMixerMixId)}
@@ -176,7 +240,7 @@ export function SongMixerPlayer({
       </div>
 
       {canSaveOverrides ? (
-        <Accordion defaultValue={[]} className="gap-0 sm:col-span-2">
+        <Accordion defaultValue={[]} className="gap-0 sm:col-span-3">
           <AccordionItem value="song-overrides" className="rounded-md border bg-secondary/35 shadow-none">
             <AccordionTrigger className="min-h-10 px-3 py-2 font-body hover:bg-secondary/55">
               <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
@@ -251,10 +315,30 @@ export function SongMixerPlayer({
     </section>
   );
 
+  if (!activeTracks.length) {
+    return (
+      <div>
+        {partAndMixControls}
+        <section className="grid min-h-48 place-items-center border-t-2 bg-secondary/25 p-6 text-center">
+          <div className="grid max-w-md gap-1">
+            <p className="font-semibold">No stems in {activeConfiguration?.name ?? "this mix"}</p>
+            <p className="text-sm text-muted-foreground">
+              {canSaveOverrides
+                ? "Open Manage stems, choose Mixes, and add the MP3s this mix should load."
+                : "An administrator has not added any available stems to this mix yet."}
+            </p>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <SongMixerWaveform
-      key={tracks.map((track) => track.id).join(":")}
-      tracks={tracks}
+      key={`${effectiveConfigurationId ?? "no-mix"}:${activeTracks
+        .map((track) => track.id)
+        .join(":")}`}
+      tracks={activeTracks}
       settings={settings}
       annotations={annotations}
       partAndMixControls={partAndMixControls}

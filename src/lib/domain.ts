@@ -101,6 +101,18 @@ export interface SongMixerTrack {
   stateOverrides: SongMixerStateOverrides;
 }
 
+export interface SongMixerConfiguration {
+  id: string;
+  name: string;
+  trackIds: string[];
+  orderIndex: number;
+}
+
+export const DEFAULT_SONG_MIXER_CONFIGURATION_IDS = {
+  vocals: "vocals-mix",
+  instruments: "instrument-mix",
+} as const;
+
 export interface SongAnnotation {
   id: string;
   title: string;
@@ -111,6 +123,7 @@ export interface SongAnnotation {
 export interface SongMixerBundle {
   song: Song;
   tracks: SongMixerTrack[];
+  configurations: SongMixerConfiguration[];
   settings: SongMixerSettings;
   annotations: SongAnnotation[];
 }
@@ -151,6 +164,88 @@ export function resolveSongMixerTrackState(
     ...settings.states[stateName],
     ...track.stateOverrides[stateName],
   };
+}
+
+export function createDefaultSongMixerConfigurations(
+  tracks: readonly SongMixerTrack[],
+): SongMixerConfiguration[] {
+  const vocalsTrackIds: string[] = [];
+  const instrumentTrackIds: string[] = [];
+
+  for (const track of tracks) {
+    const sourceName = `${track.displayName} ${track.filename}`;
+    const normalized = normalizeMixerStemName(sourceName);
+    const inferredParts = new Set(inferPartSlugs(sourceName));
+
+    if (isInstrumentPremixName(normalized)) {
+      vocalsTrackIds.push(track.id);
+      continue;
+    }
+
+    if (isVocalPremixName(normalized)) {
+      instrumentTrackIds.push(track.id);
+      continue;
+    }
+
+    if (track.isBackgroundMix) {
+      vocalsTrackIds.push(track.id);
+      continue;
+    }
+
+    if ([...inferredParts].some((partSlug) => partSlug.startsWith("voc_"))) {
+      vocalsTrackIds.push(track.id);
+    }
+
+    if (
+      inferredParts.has("guit_a")
+      || inferredParts.has("guit_b")
+      || inferredParts.has("keys")
+      || inferredParts.has("bass")
+      || inferredParts.has("drums")
+      || isNumberedGuitarName(normalized)
+    ) {
+      instrumentTrackIds.push(track.id);
+    }
+  }
+
+  if (!vocalsTrackIds.length && !instrumentTrackIds.length && tracks.length) {
+    vocalsTrackIds.push(...tracks.map((track) => track.id));
+  }
+
+  return [
+    {
+      id: DEFAULT_SONG_MIXER_CONFIGURATION_IDS.vocals,
+      name: "Vocals Mix",
+      trackIds: vocalsTrackIds,
+      orderIndex: 0,
+    },
+    {
+      id: DEFAULT_SONG_MIXER_CONFIGURATION_IDS.instruments,
+      name: "Instrument Mix",
+      trackIds: instrumentTrackIds,
+      orderIndex: 1,
+    },
+  ];
+}
+
+function normalizeMixerStemName(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/\.[a-z0-9]+/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function isInstrumentPremixName(normalized: string) {
+  return /\b(?:inst|instrument|instrumental)\s*(?:pre\s*)?mix\b/.test(normalized);
+}
+
+function isVocalPremixName(normalized: string) {
+  return /\b(?:vox|voc|vocal|vocals)\s*(?:pre\s*)?mix\b/.test(normalized);
+}
+
+function isNumberedGuitarName(normalized: string) {
+  return /\b(?:guit|guitar|gtr)\s*[12ab]\b/.test(normalized);
 }
 
 export interface PartSongRow {

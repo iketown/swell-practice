@@ -20,6 +20,7 @@ import { useAdmin } from "@/hooks/use-admin";
 import type {
   SongAnnotation,
   SongMixerBundle,
+  SongMixerConfiguration,
   SongMixerSettings,
   SongMixerStateOverrides,
   SongMixerTrack,
@@ -37,8 +38,6 @@ import {
   uploadSongMixerTrack,
   type SongAssetUploadProgress,
 } from "@/lib/firestore";
-
-const MAX_MIXER_TRACKS = 8;
 
 type UploadItem = {
   id: string;
@@ -120,22 +119,7 @@ export function SongPlayerPageClient({ slug }: { slug: string }) {
     async (files: File[]) => {
       if (!bundle || !files.length) return;
 
-      const activeUploadCount = uploadItems.filter((item) => item.status === "uploading").length;
-      const availableSlots = Math.max(0, MAX_MIXER_TRACKS - bundle.tracks.length - activeUploadCount);
-      const acceptedFiles = files.slice(0, availableSlots);
-
-      if (!availableSlots) {
-        toast.error("This mixer is full", { description: "Remove a track before adding another MP3." });
-        return;
-      }
-
-      if (files.length > acceptedFiles.length) {
-        toast.info(`Only ${availableSlots} track${availableSlots === 1 ? "" : "s"} added`, {
-          description: "The test mixer supports up to 8 tracks.",
-        });
-      }
-
-      const queuedUploads = acceptedFiles.map((file) => {
+      const queuedUploads = files.map((file) => {
         const item: UploadItem = {
           id: crypto.randomUUID(),
           filename: file.name,
@@ -187,7 +171,7 @@ export function SongPlayerPageClient({ slug }: { slug: string }) {
 
       await refresh();
     },
-    [bundle, refresh, uploadItems],
+    [bundle, refresh],
   );
 
   const deleteTrack = useCallback(
@@ -358,12 +342,22 @@ export function SongPlayerPageClient({ slug }: { slug: string }) {
   );
 
   const saveMixerConfiguration = useCallback(
-    async (tracks: SongMixerTrack[], settings: SongMixerSettings) => {
+    async (
+      tracks: SongMixerTrack[],
+      configurations: SongMixerConfiguration[],
+      settings: SongMixerSettings,
+    ) => {
       if (!bundle) return false;
 
       try {
         const settingsChanged = JSON.stringify(settings) !== JSON.stringify(bundle.settings);
-        await saveSongMixerConfiguration(bundle, tracks, settings, settingsChanged);
+        await saveSongMixerConfiguration(
+          bundle,
+          tracks,
+          configurations,
+          settings,
+          settingsChanged,
+        );
         toast.success("Mixer settings updated");
         await refresh();
         return true;
@@ -520,6 +514,7 @@ export function SongPlayerPageClient({ slug }: { slug: string }) {
   const manageStemsAction = showAdminControls && bundle.tracks.length ? (
     <StemManagerDialog
       tracks={bundle.tracks}
+      configurations={bundle.configurations}
       settings={bundle.settings}
       deletingTrackId={deletingTrackId}
       onDeleteTrack={deleteTrack}
@@ -564,14 +559,13 @@ export function SongPlayerPageClient({ slug }: { slug: string }) {
             </ToggleGroup>
           ) : null}
           <Badge variant="secondary" className="w-fit">
-            {trackCount} / {MAX_MIXER_TRACKS} uploaded
+            {trackCount} stem{trackCount === 1 ? "" : "s"} uploaded
           </Badge>
         </div>
       </header>
 
       {showAdminControls ? (
         <MixerUploadPanel
-          disabled={trackCount >= MAX_MIXER_TRACKS}
           onDrop={onDrop}
           onCancel={cancelUpload}
           uploadItems={uploadItems}
@@ -583,6 +577,7 @@ export function SongPlayerPageClient({ slug }: { slug: string }) {
           <CardContent className="p-0">
             <SongMixerPlayer
               tracks={visibleTracks}
+              configurations={bundle.configurations}
               settings={bundle.settings}
               annotations={bundle.annotations}
               canSaveOverrides={showAdminControls}
@@ -613,11 +608,11 @@ export function SongPlayerPageClient({ slug }: { slug: string }) {
             <EmptyDescription>
               {bundle.tracks.length
                 ? showAdminControls
-                  ? "Open Manage stems and check Show next to the MP3s you want in this mixer."
+                  ? "Open Manage stems and make at least one MP3 available."
                   : "An administrator has hidden every uploaded stem from the mixer."
                 : showAdminControls
-                  ? "Upload up to eight mono or stereo MP3 stems to draw their waveforms and build this song’s test mix."
-                : "An administrator has not added mixer stems for this song yet."}
+                  ? "Upload mono or stereo MP3 stems, then organize them into focused player mixes."
+                  : "An administrator has not added mixer stems for this song yet."}
             </EmptyDescription>
           </EmptyHeader>
           {manageStemsAction ? <EmptyContent>{manageStemsAction}</EmptyContent> : null}
@@ -648,12 +643,10 @@ function sortSongAnnotations(annotations: SongAnnotation[]) {
 }
 
 function MixerUploadPanel({
-  disabled,
   onDrop,
   onCancel,
   uploadItems,
 }: {
-  disabled: boolean;
   onDrop: (files: File[]) => Promise<void>;
   onCancel: (id: string) => void;
   uploadItems: UploadItem[];
@@ -663,7 +656,6 @@ function MixerUploadPanel({
       "audio/mpeg": [".mp3"],
       "audio/mp3": [".mp3"],
     },
-    disabled,
     multiple: true,
     onDropAccepted: (files) => void onDrop(files),
     onDropRejected: (rejections) => {
@@ -685,7 +677,7 @@ function MixerUploadPanel({
           {...getRootProps()}
           className={[
             "flex min-h-28 flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed bg-secondary/55 p-5 text-center transition-colors",
-            disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-accent",
+            "cursor-pointer hover:bg-accent",
             isDragActive ? "border-primary bg-accent" : "",
           ].join(" ")}
         >
@@ -695,9 +687,11 @@ function MixerUploadPanel({
           </span>
           <div className="grid gap-0.5">
             <p className="font-medium">
-              {disabled ? "Eight-track limit reached" : isDragActive ? "Drop MP3 stems here" : "Drop MP3 stems or click to choose"}
+              {isDragActive ? "Drop MP3 stems here" : "Drop MP3 stems or click to choose"}
             </p>
-            <p className="text-sm text-muted-foreground">Each file becomes one independent mixer track.</p>
+            <p className="text-sm text-muted-foreground">
+              Each file becomes an available stem that you can add to one or more mixes.
+            </p>
           </div>
         </div>
 

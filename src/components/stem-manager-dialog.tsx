@@ -36,10 +36,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Field, FieldLabel } from "@/components/ui/field";
+import { StemMixConfigEditor } from "@/components/stem-mix-config-editor";
 import { StemMixStateEditor } from "@/components/stem-mix-state-editor";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import type {
+  SongMixerConfiguration,
   SongMixerSettings,
   SongMixerStateOverrides,
   SongMixerTrack,
@@ -47,29 +49,45 @@ import type {
 
 export function StemManagerDialog({
   tracks,
+  configurations,
   settings,
   deletingTrackId,
   onDeleteTrack,
   onSave,
 }: {
   tracks: SongMixerTrack[];
+  configurations: SongMixerConfiguration[];
   settings: SongMixerSettings;
   deletingTrackId: string | null;
   onDeleteTrack: (track: SongMixerTrack) => Promise<boolean>;
-  onSave: (tracks: SongMixerTrack[], settings: SongMixerSettings) => Promise<boolean>;
+  onSave: (
+    tracks: SongMixerTrack[],
+    configurations: SongMixerConfiguration[],
+    settings: SongMixerSettings,
+  ) => Promise<boolean>;
 }) {
   const [open, setOpen] = useState(false);
   const [draftTracks, setDraftTracks] = useState(tracks);
+  const [draftConfigurations, setDraftConfigurations] = useState(configurations);
   const [draftSettings, setDraftSettings] = useState(settings);
   const [activeTab, setActiveTab] = useState("stems");
   const [overrideTrackId, setOverrideTrackId] = useState<string | null>(tracks[0]?.id ?? null);
   const [draggedTrackId, setDraggedTrackId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [announcement, setAnnouncement] = useState("");
-  const shownCount = draftTracks.filter((track) => track.shown).length;
+  const configurationsAreValid =
+    draftConfigurations.length > 0
+    && draftConfigurations.every((configuration) => configuration.name.trim())
+    && new Set(
+      draftConfigurations.map((configuration) =>
+        configuration.name.trim().toLocaleLowerCase(),
+      ),
+    ).size === draftConfigurations.length;
   const isDirty = useMemo(
-    () => mixerConfigurationKey(draftTracks, draftSettings) !== mixerConfigurationKey(tracks, settings),
-    [draftSettings, draftTracks, settings, tracks],
+    () =>
+      mixerConfigurationKey(draftTracks, draftConfigurations, draftSettings)
+      !== mixerConfigurationKey(tracks, configurations, settings),
+    [configurations, draftConfigurations, draftSettings, draftTracks, settings, tracks],
   );
 
   const setDialogOpen = (nextOpen: boolean) => {
@@ -78,6 +96,7 @@ export function StemManagerDialog({
 
     if (nextOpen) {
       setDraftTracks(tracks);
+      setDraftConfigurations(configurations);
       setDraftSettings(settings);
       setActiveTab("stems");
       setOverrideTrackId(tracks[0]?.id ?? null);
@@ -127,6 +146,12 @@ export function StemManagerDialog({
     if (!deleted) return;
 
     setDraftTracks((current) => current.filter((currentTrack) => currentTrack.id !== track.id));
+    setDraftConfigurations((current) =>
+      current.map((configuration) => ({
+        ...configuration,
+        trackIds: configuration.trackIds.filter((trackId) => trackId !== track.id),
+      })),
+    );
     if (overrideTrackId === track.id) {
       setOverrideTrackId(draftTracks.find((currentTrack) => currentTrack.id !== track.id)?.id ?? null);
     }
@@ -146,6 +171,13 @@ export function StemManagerDialog({
         draftTracks.map((track, orderIndex) => ({
           ...track,
           orderIndex,
+        })),
+        draftConfigurations.map((configuration, orderIndex) => ({
+          ...configuration,
+          orderIndex,
+          trackIds: draftTracks.flatMap((track) =>
+            configuration.trackIds.includes(track.id) ? [track.id] : [],
+          ),
         })),
         draftSettings,
       );
@@ -171,12 +203,12 @@ export function StemManagerDialog({
           <div className="flex flex-wrap items-center gap-2">
             <DialogTitle>Stem manager</DialogTitle>
             <Badge variant="secondary">
-              {shownCount} shown · {draftTracks.length} uploaded
+              {draftConfigurations.length} mix{draftConfigurations.length === 1 ? "" : "es"} ·{" "}
+              {draftTracks.length} stem{draftTracks.length === 1 ? "" : "s"}
             </Badge>
           </div>
           <DialogDescription>
-            Choose and order player stems. Mark backing tracks as BG mix so they stay out of the
-            selected-part menu. Deleting a stem removes its MP3 permanently.
+            Upload stems once, then choose which stems load in each player mix.
           </DialogDescription>
         </DialogHeader>
 
@@ -189,6 +221,9 @@ export function StemManagerDialog({
             <TabsList className="h-9">
               <TabsTrigger value="stems" className="px-4 py-1.5">
                 Stems
+              </TabsTrigger>
+              <TabsTrigger value="mixes" className="px-4 py-1.5">
+                Mixes
               </TabsTrigger>
               <TabsTrigger value="mix-states" className="px-4 py-1.5">
                 Mix states
@@ -266,7 +301,7 @@ export function StemManagerDialog({
                           checked={track.shown}
                           onCheckedChange={(checked) => updateShown(track.id, checked)}
                         />
-                        <FieldLabel htmlFor={`show-${track.id}`}>Show</FieldLabel>
+                        <FieldLabel htmlFor={`show-${track.id}`}>Available</FieldLabel>
                       </Field>
                       <Button
                         type="button"
@@ -334,6 +369,14 @@ export function StemManagerDialog({
             </p>
           </TabsContent>
 
+          <TabsContent value="mixes" className="min-h-0 overflow-y-auto p-4">
+            <StemMixConfigEditor
+              configurations={draftConfigurations}
+              tracks={draftTracks}
+              onChange={setDraftConfigurations}
+            />
+          </TabsContent>
+
           <TabsContent value="mix-states" className="min-h-0 overflow-y-auto p-4">
             <StemMixStateEditor
               settings={draftSettings}
@@ -348,7 +391,10 @@ export function StemManagerDialog({
 
         <DialogFooter className="mx-0 mb-0 rounded-none">
           <DialogClose render={<Button variant="outline" disabled={saving} />}>Cancel</DialogClose>
-          <Button disabled={!isDirty || saving} onClick={() => void save()}>
+          <Button
+            disabled={!isDirty || !configurationsAreValid || saving}
+            onClick={() => void save()}
+          >
             {saving ? <LoaderCircleIcon data-icon="inline-start" className="animate-spin" aria-hidden /> : null}
             Save mixer
           </Button>
@@ -358,13 +404,22 @@ export function StemManagerDialog({
   );
 }
 
-function mixerConfigurationKey(tracks: SongMixerTrack[], settings: SongMixerSettings) {
+function mixerConfigurationKey(
+  tracks: SongMixerTrack[],
+  configurations: SongMixerConfiguration[],
+  settings: SongMixerSettings,
+) {
   return JSON.stringify({
     tracks: tracks.map((track) => ({
       id: track.id,
       shown: track.shown,
       isBackgroundMix: track.isBackgroundMix,
       stateOverrides: track.stateOverrides,
+    })),
+    configurations: configurations.map((configuration) => ({
+      id: configuration.id,
+      name: configuration.name,
+      trackIds: configuration.trackIds,
     })),
     settings,
   });
