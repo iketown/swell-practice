@@ -12,6 +12,13 @@ pnpm dev
 
 Without Firebase env vars, the site renders writable local demo data so routes can be reviewed immediately. In a configured workspace, append `?demo=1` to an admin or assignment URL to review the sample member/band workflow without reading or writing Firebase.
 
+## Mixer Stem Encoding
+
+Use [docs/MIXER_STEM_ENCODING.md](docs/MIXER_STEM_ENCODING.md) when exporting
+and batch-converting WAV stems for the song mixer. It defines the house MP3
+presets, synchronization rules, FFmpeg commands, and AppleScript converter
+requirements.
+
 ## Firebase
 
 Create a Firebase web app and fill in the `NEXT_PUBLIC_FIREBASE_*` values. Enable:

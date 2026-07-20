@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CheckIcon, ClipboardListIcon, FileIcon, ImageIcon, Trash2Icon, UploadIcon } from "lucide-react";
+import { AudioLinesIcon, CheckIcon, ClipboardListIcon, FileIcon, ImageIcon, Trash2Icon, UploadIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
@@ -185,12 +185,18 @@ export function SongPageClient({ slug }: { slug: string }) {
     <AppShell>
       <header className="flex flex-col gap-3 py-1 sm:flex-row sm:items-end sm:justify-between sm:py-2">
         <h1 className="swell-song-title">{bundle.song.title}</h1>
-        {admin.isAdmin ? (
-          <Button render={<Link href={`/assignments/${bundle.song.slug}`} />} variant="secondary" nativeButton={false}>
-            <ClipboardListIcon data-icon="inline-start" />
-            Assign members
+        <div className="flex flex-wrap gap-2">
+          <Button render={<Link href={`/songs/${bundle.song.slug}/player`} />} variant="secondary" nativeButton={false}>
+            <AudioLinesIcon data-icon="inline-start" />
+            Test mixer
           </Button>
-        ) : null}
+          {admin.isAdmin ? (
+            <Button render={<Link href={`/assignments/${bundle.song.slug}`} />} variant="secondary" nativeButton={false}>
+              <ClipboardListIcon data-icon="inline-start" />
+              Assign members
+            </Button>
+          ) : null}
+        </div>
       </header>
 
       {admin.isAdmin ? <UploadPanel onDrop={onDrop} onCancel={cancelUpload} uploadItems={uploadItems} /> : null}

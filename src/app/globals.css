@@ -96,6 +96,19 @@
   --swell-gold: oklch(0.81 0.148 78.6);
   --swell-info: oklch(0.819 0.069 214.8);
   --swell-espresso: oklch(0.334 0.036 35.2);
+
+  /* Reusable part palette: change these five source colors to retheme every part view. */
+  --swell-part-1: #fc440f; /* red */
+  --swell-part-2: #ffd900; /* yellow / orange */
+  --swell-part-3: #9bc53d; /* green */
+  --swell-part-4: #5bc0eb; /* blue */
+  --swell-part-5: #592e83; /* purple */
+  --swell-part-muted-neutral: oklch(0.7 0.012 88);
+  --swell-part-1-muted: color-mix(in oklch, var(--swell-part-1) 38%, var(--swell-part-muted-neutral));
+  --swell-part-2-muted: color-mix(in oklch, var(--swell-part-2) 38%, var(--swell-part-muted-neutral));
+  --swell-part-3-muted: color-mix(in oklch, var(--swell-part-3) 38%, var(--swell-part-muted-neutral));
+  --swell-part-4-muted: color-mix(in oklch, var(--swell-part-4) 38%, var(--swell-part-muted-neutral));
+  --swell-part-5-muted: color-mix(in oklch, var(--swell-part-5) 38%, var(--swell-part-muted-neutral));
 }
 
 .dark {
@@ -200,5 +213,73 @@
 
   .swell-video-button {
     @apply transition-[background-color,transform] duration-200 hover:bg-accent active:translate-y-px;
+  }
+
+  .swell-mixer-range {
+    @apply h-2 cursor-pointer appearance-none rounded-full bg-border accent-primary disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .swell-mixer-range::-webkit-slider-thumb {
+    @apply size-4 appearance-none rounded-full border-2 border-card bg-primary shadow-sm;
+  }
+
+  .swell-mixer-range::-moz-range-thumb {
+    @apply size-4 rounded-full border-2 border-card bg-primary shadow-sm;
+  }
+
+  .swell-mixer-waveform [data-mixer-track-row],
+  .swell-mixer-waveform [data-mixer-control-row] {
+    transition: height 180ms ease;
+  }
+
+  .swell-mixer-waveform [data-mixer-wave-content] {
+    transition: filter 180ms ease, transform 180ms ease;
+  }
+
+  .swell-mixer-waveform [data-mixer-part-color="1"] {
+    --swell-part-wave-filter: url("#swell-part-1-wave-filter");
+    --swell-part-wave-muted-filter: url("#swell-part-1-muted-wave-filter");
+  }
+
+  .swell-mixer-waveform [data-mixer-part-color="2"] {
+    --swell-part-wave-filter: url("#swell-part-2-wave-filter");
+    --swell-part-wave-muted-filter: url("#swell-part-2-muted-wave-filter");
+  }
+
+  .swell-mixer-waveform [data-mixer-part-color="3"] {
+    --swell-part-wave-filter: url("#swell-part-3-wave-filter");
+    --swell-part-wave-muted-filter: url("#swell-part-3-muted-wave-filter");
+  }
+
+  .swell-mixer-waveform [data-mixer-part-color="4"] {
+    --swell-part-wave-filter: url("#swell-part-4-wave-filter");
+    --swell-part-wave-muted-filter: url("#swell-part-4-muted-wave-filter");
+  }
+
+  .swell-mixer-waveform [data-mixer-part-color="5"] {
+    --swell-part-wave-filter: url("#swell-part-5-wave-filter");
+    --swell-part-wave-muted-filter: url("#swell-part-5-muted-wave-filter");
+  }
+
+  .swell-mixer-waveform [data-mixer-track-kind="part"][data-mixer-part-emphasis="selected"] canvas {
+    filter: var(--swell-part-wave-filter);
+    opacity: 1;
+  }
+
+  .swell-mixer-waveform [data-mixer-track-kind="part"][data-mixer-part-emphasis="muted"] canvas {
+    filter: var(--swell-part-wave-muted-filter);
+    opacity: 0.56;
+  }
+
+  .swell-mixer-waveform [data-mixer-track-kind="background"] {
+    filter: invert(1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .swell-mixer-waveform [data-mixer-track-row],
+    .swell-mixer-waveform [data-mixer-control-row],
+    .swell-mixer-waveform [data-mixer-wave-content] {
+      transition: none;
+    }
   }
 }

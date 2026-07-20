@@ -4,3 +4,6 @@ allowBuilds:
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
+overrides:
+  "@dnd-kit/abstract": 0.3.2
+  "@dnd-kit/dom": 0.3.2

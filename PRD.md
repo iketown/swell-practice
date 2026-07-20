@@ -19,6 +19,7 @@ This is not the public marketing site and not the full band OS. It is a practica
 
 - List every song on the front page.
 - Give every song a detail page at `/songs/[songSlug]`.
+- Give every song a separate test mixer at `/songs/[songSlug]/player`.
 - Give every part a detail page at `/parts/[partSlug]`.
 - Upload audio, PDFs, videos, zip files, and related rehearsal files once.
 - Assign each uploaded asset to one or more parts for the song.
@@ -39,7 +40,7 @@ This is not the public marketing site and not the full band OS. It is a practica
 - No complex role hierarchy beyond admin vs viewer.
 - No login-specific personalization; member pages are shareable read-only URLs.
 - No duplicate file uploads for the same chart/demo when one asset belongs to many parts.
-- No custom audio editor, waveform editor, or PDF annotation tools.
+- No waveform editing, stem trimming, mix exporting, or PDF annotation tools.
 
 ## 5. Routes
 
@@ -47,6 +48,7 @@ This is not the public marketing site and not the full band OS. It is a practica
 | --- | --- |
 | `/` | Song index with quick links to songs and common parts. |
 | `/songs/[songSlug]` | Song page showing all parts and their assigned assets. Admins can upload files and edit assignments here. |
+| `/songs/[songSlug]/player` | Song-scoped test mixer for up to eight isolated mono or stereo MP3 stems, kept separate from rehearsal assets. |
 | `/parts/[partSlug]` | Part page showing every song that has assets assigned to that part. |
 | `/admin/songs/new` | Create a new song. |
 | `/admin` | Lightweight admin index with create-song action and song list. |
@@ -162,6 +164,64 @@ Part pages group by song and show only assets assigned to that part for that son
 }
 ```
 
+### `songs/{songId}/mixerTracks/{trackId}`
+
+```ts
+{
+  filename: string;
+  displayName: string;
+  contentType: "audio/mpeg";
+  size: number;
+  storagePath: string;
+  downloadUrl: string;
+  shown: boolean;
+  isBackgroundMix: boolean;
+  orderIndex: number;
+  stateOverrides: Partial<Record<
+    "featured" | "unfeatured" | "default" | "muted",
+    Partial<{
+      volume: number; // 0–100
+      pan: number; // -100 left to +100 right
+      muted: boolean;
+      scale: number; // waveform row-height multiplier
+    }>
+  >>;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+```
+
+Mixer tracks are intentionally not referenced by song parts and never appear on `/songs/[songSlug]` or `/parts/[partSlug]`. They are isolated stems for synchronized test playback only. Admins can choose which uploaded tracks are shown, mark backing tracks as background mixes, drag tracks into playback order, or permanently delete them from the project. A background-mix track remains audible and configurable but is excluded from the player’s selected-part menu, so it can never receive the selected stem’s `featured` or `muted` state.
+
+### `songs/global-mixer-defaults/mixerSettings/main`
+
+```ts
+{
+  states: Record<
+    "featured" | "unfeatured" | "default" | "muted",
+    {
+      volume: number; // 0–100
+      pan: number; // -100 left to +100 right
+      muted: boolean;
+      scale: number; // waveform row-height multiplier
+    }
+  >;
+  updatedAt: Timestamp;
+}
+```
+
+The mixer derives reusable custom mixes from these four states rather than storing a separate mix for every stem:
+
+- `Learn Part`: selected stem = `featured`; all other stems = `unfeatured`.
+- `Practice Part`: selected stem = `muted`; all other stems = `default`.
+- `Listen`: all stems = `default`; the selected stem is ignored.
+
+The app-wide default state values are featured `{ volume: 70, pan: -50, muted: false, scale: 2 }`, unfeatured `{ volume: 10, pan: 50, muted: false, scale: 1 }`, default `{ volume: 40, pan: 0, muted: false, scale: 1 }`, and muted `{ volume: 40, pan: 0, muted: true, scale: 1 }`. Scale controls actual waveform row height: a collapsed mono row at scale `1` is a compact 52px strip, and the standard featured row at scale `2` is 104px. The code defaults are used when the dedicated app-wide `songs/global-mixer-defaults/mixerSettings/main` document does not exist. Saving app-wide stem states writes that single document, while each actual song stores only sparse per-stem state overrides. A sparse track override replaces only the supplied fields and inherits every other value from the corresponding app-wide state.
+
+The selected-part control also establishes the player’s visual focus independently of the active audio mix: the selected part is at least 2x height and uses its fully saturated part color, while the other selectable parts stay compact and use desaturated versions of their colors. Parts 1–5 use red, yellow/orange, green, blue, and purple respectively. These reusable source colors and their derived muted variants live as CSS custom properties in `src/app/globals.css`. A part can be selected from either the player-level dropdown or the `Select →` action in its waveform row; both controls update the same selected-part state. A background mix always remains light grey on black, has no row-level selection action, is never color-emphasized, and is excluded from selected-part behavior. Clicking or dragging on a waveform seeks or selects a time range only; it does not change the selected part.
+
+For administrators, changing volume, pan, or mute in a stem’s live accordion writes to that stem’s currently active state. For example, changing `voc_1` while `voc_2` is selected in `Learn Part` writes only `voc_1.stateOverrides.unfeatured.volume`. Returning a control to the inherited state value removes that field from the stored override instead of preserving a redundant value. Changes are applied optimistically without rebuilding or interrupting the live audio engine. The `Save moves to overrides` switch defaults off, so changes remain a local draft until `Save overrides` is clicked. `Revert to saved` restores the last loaded or successfully saved snapshot. Turning automatic saving on persists each subsequent change after a short debounce and immediately saves an existing dirty draft. Viewers may adjust playback for their current session but cannot change stored overrides.
+
 ### `members/{memberId}`
 
 ```ts
@@ -236,7 +296,10 @@ This nested structure keeps song pages simple and makes all assets song-scoped. 
 
 ```text
 songs/{songSlug}/{assetId}-{sanitizedFilename}
+songs/{songSlug}/mixer/{trackId}-{sanitizedFilename}
 ```
+
+New mixer MP3 uploads set a one-year immutable browser cache policy because each upload receives a unique track-prefixed storage path. Repeat visits may reuse the cached audio bytes instead of downloading the same stems again.
 
 Files are uploaded directly from the browser to Firebase Storage. The Firestore asset document stores the resulting storage path and metadata.
 Deleting an asset removes its primary file and generated video thumbnail from Storage, removes its ID from every part in the song, and deletes its asset document.
@@ -292,6 +355,13 @@ v1 decision:
 - Keep the design quiet and utilitarian: compact lists, tables, simple controls, and strong mobile readability.
 - Song index should make songs and parts scannable.
 - Song page should show parts as rows with assigned asset chips/links.
+- Test mixer should draw a waveform for each stem and provide synchronized transport, timeline seeking, per-track volume, and per-track pan. While the pointer is over the waveform area, Space toggles play and pause without intercepting keyboard input from mixer controls or form fields.
+- Mixer MP3s should download and decode concurrently, revealing each completed waveform instead of withholding all rows until the slowest stem finishes. Until playback is ready, the player should show a waveform-shaped placeholder and visible loaded/total progress with copy that distinguishes loading and decoding from waveform drawing.
+- Test mixer should offer `Learn Part`, `Practice Part`, and `Listen` modes plus a remembered selected-stem control. Switching either control applies the derived state policy immediately without reloading the audio. In `Practice Part`, the selected stem exposes a session-only `Unmute`/`Mute` action in its accordion header so a member can check the part without expanding controls or changing saved song overrides.
+- Per-track volume, pan, mute, and solo controls should live in collapsed-by-default accordions. The player should provide open-all and close-all actions, while collapsed tracks remain exactly as tall as their waveform rows without blank spacing between waveforms.
+- Waveform state scale controls actual row height. The standard `featured` scale is `2` and the standard `unfeatured` scale is `1`, making the selected Learn Part stem exactly twice as tall as the other mono stems. Opening controls may temporarily raise that row to a 104px minimum so the controls never overlap; closing it restores the compact mix-defined height.
+- The player should expose a compact JSON inspector containing only the song’s saved per-stem exceptions, keyed by readable stem name and state. It should update immediately as an administrator changes a live stem control and show Saving, Saved, or failure feedback.
+- Admin-only stem manager should control which uploaded stems are shown or marked as background mixes, allow drag ordering with keyboard/touch button alternatives, edit the four global mixer states and sparse per-stem overrides, and confirm before permanently deleting an MP3.
 - Part page should group rows by song.
 - Admin upload area should live on the song page and support drag-and-drop.
 - Admin assignment editing should be possible immediately after upload and later from the asset row.
@@ -344,6 +414,13 @@ v1 decision:
 
 - Visiting `/` shows a list of songs.
 - Visiting `/songs/i-get-around` shows the song title, default parts, and assigned files.
+- Visiting `/songs/i-get-around/player` shows only that song's mixer stems and supports synchronized playback for up to eight tracks.
+- An admin can hide a mixer stem without deleting it, reorder mixer stems, or permanently remove a stem without changing rehearsal assets.
+- An admin can mark a stem as `BG mix`; it remains in playback and override editing but cannot appear in the selected-part menu or become the selected Learn/Practice stem.
+- Selecting a stem and `Learn Part` applies `featured` to that stem and `unfeatured` to the rest; `Practice Part` applies `muted` to the selected stem and `default` to the rest; `Listen` applies `default` to every stem.
+- An admin can change a global stem state once and optionally override individual state fields for a specific stem; unspecified override fields continue to inherit the global value.
+- An admin changing a live stem’s volume, pan, or mute stores that field under the stem’s currently effective state, while moving it back to the inherited value clears that field. Reloading the song restores the saved effective levels for every viewer.
+- The song overrides inspector displays the same sparse override object that the player is currently using.
 - Visiting `/parts/voc_1` shows all songs with files assigned to `voc_1`.
 - Creating a song creates all default parts.
 - Uploading `IGA_voc1.mp3` suggests assignment to `voc_1`.

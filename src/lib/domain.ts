@@ -37,6 +37,114 @@ export interface SongBundle {
   assets: SongAsset[];
 }
 
+export const SONG_MIXER_STATE_NAMES = ["featured", "unfeatured", "default", "muted"] as const;
+export type SongMixerStateName = (typeof SONG_MIXER_STATE_NAMES)[number];
+
+export type SongMixerStateValues = {
+  volume: number;
+  pan: number;
+  muted: boolean;
+  scale: number;
+};
+
+export type SongMixerStateOverride = Partial<SongMixerStateValues>;
+export type SongMixerStateOverrides = Partial<Record<SongMixerStateName, SongMixerStateOverride>>;
+
+export interface SongMixerSettings {
+  states: Record<SongMixerStateName, SongMixerStateValues>;
+}
+
+export type SongMixerMixId = "learn" | "practice" | "listen";
+
+export const SONG_MIXER_MIXES: ReadonlyArray<{
+  id: SongMixerMixId;
+  label: string;
+  description: string;
+}> = [
+  {
+    id: "learn",
+    label: "Learn Part",
+    description: "Feature the selected part and move the other stems into the background.",
+  },
+  {
+    id: "practice",
+    label: "Practice Part",
+    description: "Mute the selected part and play the other stems at their default balance.",
+  },
+  {
+    id: "listen",
+    label: "Listen",
+    description: "Play every stem at its default balance.",
+  },
+];
+
+export const DEFAULT_SONG_MIXER_SETTINGS: SongMixerSettings = {
+  states: {
+    featured: { volume: 70, pan: -50, muted: false, scale: 2 },
+    unfeatured: { volume: 10, pan: 50, muted: false, scale: 1 },
+    default: { volume: 40, pan: 0, muted: false, scale: 1 },
+    muted: { volume: 70, pan: 0, muted: true, scale: 1 },
+  },
+};
+
+export interface SongMixerTrack {
+  id: string;
+  filename: string;
+  displayName: string;
+  contentType: string;
+  size: number;
+  storagePath: string;
+  downloadUrl?: string;
+  shown: boolean;
+  isBackgroundMix: boolean;
+  orderIndex: number;
+  stateOverrides: SongMixerStateOverrides;
+}
+
+export interface SongMixerBundle {
+  song: Song;
+  tracks: SongMixerTrack[];
+  settings: SongMixerSettings;
+}
+
+export function createDefaultSongMixerSettings(): SongMixerSettings {
+  return {
+    states: Object.fromEntries(
+      SONG_MIXER_STATE_NAMES.map((stateName) => [
+        stateName,
+        { ...DEFAULT_SONG_MIXER_SETTINGS.states[stateName] },
+      ]),
+    ) as SongMixerSettings["states"],
+  };
+}
+
+export function mixerStateForTrack(
+  mixId: SongMixerMixId,
+  trackId: string,
+  selectedTrackId: string | null,
+): SongMixerStateName {
+  if (mixId === "learn") {
+    return trackId === selectedTrackId ? "featured" : "unfeatured";
+  }
+
+  if (mixId === "practice") {
+    return trackId === selectedTrackId ? "muted" : "default";
+  }
+
+  return "default";
+}
+
+export function resolveSongMixerTrackState(
+  settings: SongMixerSettings,
+  track: SongMixerTrack,
+  stateName: SongMixerStateName,
+): SongMixerStateValues {
+  return {
+    ...settings.states[stateName],
+    ...track.stateOverrides[stateName],
+  };
+}
+
 export interface PartSongRow {
   song: Song;
   part: SongPart;
