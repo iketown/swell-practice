@@ -40,7 +40,7 @@ This is not the public marketing site and not the full band OS. It is a practica
 - No complex role hierarchy beyond admin vs viewer.
 - No login-specific personalization; member pages are shareable read-only URLs.
 - No duplicate file uploads for the same chart/demo when one asset belongs to many parts.
-- No waveform editing, stem trimming, mix exporting, or PDF annotation tools.
+- No stem trimming, mix exporting, or PDF annotation tools. Waveform editing is limited to song-section annotation boundaries.
 
 ## 5. Routes
 
@@ -190,6 +190,20 @@ Part pages group by song and show only assets assigned to that part for that son
   updatedAt: Timestamp;
 }
 ```
+
+### `songs/{songId}/annotations/{annotationId}`
+
+```ts
+{
+  title: string;
+  start: number; // seconds from the shared song start
+  end: number; // seconds from the shared song start
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+```
+
+Annotations label shared sections of the synchronized mixer timeline. Sections may touch but may not overlap. Administrators can create, edit, resize, and delete them. Viewers can see the same sections and seek to a section start, but cannot change boundaries or stored annotation data. Annotation playback behavior is session-only for both administrators and viewers: `NORMAL` continues through the selected annotation's end, `LOOP` returns to its start after playback crosses its end, and `STOP` pauses at its end. LOOP and STOP arm only while playback is inside the selected annotation, so starting or seeking after that annotation remains unrestricted.
 
 Mixer tracks are intentionally not referenced by song parts and never appear on `/songs/[songSlug]` or `/parts/[partSlug]`. They are isolated stems for synchronized test playback only. Admins can choose which uploaded tracks are shown, mark backing tracks as background mixes, drag tracks into playback order, or permanently delete them from the project. A background-mix track remains audible and configurable but is excluded from the player’s selected-part menu, so it can never receive the selected stem’s `featured` or `muted` state.
 
@@ -355,13 +369,18 @@ v1 decision:
 - Keep the design quiet and utilitarian: compact lists, tables, simple controls, and strong mobile readability.
 - Song index should make songs and parts scannable.
 - Song page should show parts as rows with assigned asset chips/links.
-- Test mixer should draw a waveform for each stem and provide synchronized transport, timeline seeking, per-track volume, and per-track pan. While the pointer is over the waveform area, Space toggles play and pause without intercepting keyboard input from mixer controls or form fields.
+- Test mixer should draw a waveform for each stem and provide synchronized transport, timeline seeking, per-track volume, and per-track pan. Space toggles play and pause from anywhere in the mixer UI, including after a section or transport button receives focus, without intercepting spaces typed into text fields or other editing controls.
+- The mixer timescale should support an Ableton-style mouse gesture: dragging up zooms out and dragging down zooms in around the grabbed timeline point, while dragging left moves the waveform viewport later and dragging right moves it earlier. The visible zoom buttons and horizontal scrollbar remain available as direct alternatives.
 - Mixer MP3s should download and decode concurrently, revealing each completed waveform instead of withholding all rows until the slowest stem finishes. Until playback is ready, the player should show a waveform-shaped placeholder and visible loaded/total progress with copy that distinguishes loading and decoding from waveform drawing.
 - Test mixer should offer `Learn Part`, `Practice Part`, and `Listen` modes plus a remembered selected-stem control. Switching either control applies the derived state policy immediately without reloading the audio. In `Practice Part`, the selected stem exposes a session-only `Unmute`/`Mute` action in its accordion header so a member can check the part without expanding controls or changing saved song overrides.
 - Per-track volume, pan, mute, and solo controls should live in collapsed-by-default accordions. The player should provide open-all and close-all actions, while collapsed tracks remain exactly as tall as their waveform rows without blank spacing between waveforms.
 - Waveform state scale controls actual row height. The standard `featured` scale is `2` and the standard `unfeatured` scale is `1`, making the selected Learn Part stem exactly twice as tall as the other mono stems. Opening controls may temporarily raise that row to a 104px minimum so the controls never overlap; closing it restores the compact mix-defined height.
 - The player should expose a compact JSON inspector containing only the song’s saved per-stem exceptions, keyed by readable stem name and state. It should update immediately as an administrator changes a live stem control and show Saving, Saved, or failure feedback.
 - Admin-only stem manager should control which uploaded stems are shown or marked as background mixes, allow drag ordering with keyboard/touch button alternatives, edit the four global mixer states and sparse per-stem overrides, and confirm before permanently deleting an MP3.
+- Admin view should provide a collapsed annotation editor with a title, playhead-to-start/end actions, manual time inputs, save/delete actions, and draggable timeline handles. The shared annotation lane sits directly below the timescale and above every waveform row, leaving the horizontal scrollbar at the bottom. Dragging a start boundary into the previous annotation moves that previous annotation's end to the same time; dragging an end boundary into the next annotation moves that next annotation's start to the same time. Each annotation retains the minimum duration and overlaps remain impossible.
+- The admin annotation editor should accept Standard MIDI files containing named marker events, show the extracted section titles and tempo-aware time ranges before saving, and require explicit confirmation before atomically replacing any current annotations. Markers that share a start time should continue into the preview as red conflicts with individual remove actions; import remains disabled only until each conflict is resolved.
+- User view should show annotations as compact outlined buttons that contain only the section title and seek to each section's start time. The active section uses the primary blue button treatment and follows the playhead as playback enters each annotation range. In both user and admin views, clicking a section fits it to roughly 60% of the waveform viewport and centers it with roughly 20% space on each side; sections at the start or end clamp to the available timeline. Clicking a section while playback is running seeks to its start without pausing and keeps that section framed until playback leaves it. Timeline annotation handles are read-only outside admin view.
+- Both user and admin player views should show one row of `NORMAL`, `LOOP`, and `STOP` radio controls for the selected annotation. `NORMAL` is the session default. LOOP and STOP react only to ordinary playback crossing the selected annotation's end; a seek or fresh playback start beyond that end must remain playable.
 - Part page should group rows by song.
 - Admin upload area should live on the song page and support drag-and-drop.
 - Admin assignment editing should be possible immediately after upload and later from the asset row.
@@ -417,6 +436,11 @@ v1 decision:
 - Visiting `/songs/i-get-around/player` shows only that song's mixer stems and supports synchronized playback for up to eight tracks.
 - An admin can hide a mixer stem without deleting it, reorder mixer stems, or permanently remove a stem without changing rehearsal assets.
 - An admin can mark a stem as `BG mix`; it remains in playback and override editing but cannot appear in the selected-part menu or become the selected Learn/Practice stem.
+- An admin can create, update, resize, and delete non-overlapping song annotations, while a viewer can use annotation buttons to seek without editing them.
+- A viewer or administrator can choose NORMAL, LOOP, or STOP for selected-annotation playback. NORMAL plays through, LOOP returns to the annotation start, and STOP pauses at its end without blocking playback that starts or seeks beyond it.
+- Space toggles play and pause throughout the mixer UI, resumes from the paused position, and does not replace spaces typed into annotation fields. Clicking a section during playback seeks to its start and continues playing.
+- Clicking any song-section button in user or admin view selects a supported zoom level that places the section near the middle 60% of the visible timeline and centers the section whenever the song boundaries allow it.
+- An admin can preview named MIDI markers as contiguous annotations, remove conflicting markers directly from the preview, and import the resolved set; saving requires an overwrite confirmation whenever the song already has annotations.
 - Selecting a stem and `Learn Part` applies `featured` to that stem and `unfeatured` to the rest; `Practice Part` applies `muted` to the selected stem and `default` to the rest; `Listen` applies `default` to every stem.
 - An admin can change a global stem state once and optionally override individual state fields for a specific stem; unspecified override fields continue to inherit the global value.
 - An admin changing a live stem’s volume, pan, or mute stores that field under the stem’s currently effective state, while moving it back to the inherited value clears that field. Reloading the song restores the saved effective levels for every viewer.

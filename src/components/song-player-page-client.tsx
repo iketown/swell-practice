@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeftIcon, FileAudioIcon, InfoIcon, UploadIcon, XIcon } from "lucide-react";
+import { ArrowLeftIcon, FileAudioIcon, UploadIcon, XIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
@@ -18,17 +18,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAdmin } from "@/hooks/use-admin";
 import type {
+  SongAnnotation,
   SongMixerBundle,
   SongMixerSettings,
   SongMixerStateOverrides,
   SongMixerTrack,
 } from "@/lib/domain";
 import {
+  createSongAnnotation,
+  deleteSongAnnotation,
   deleteSongMixerTrack,
   getSongMixerBundle,
+  replaceSongAnnotations,
   saveSongMixerConfiguration,
   saveSongMixerTrackOverrides,
   saveSongMixerTrackOverridesBatch,
+  updateSongAnnotation,
   uploadSongMixerTrack,
   type SongAssetUploadProgress,
 } from "@/lib/firestore";
@@ -58,12 +63,15 @@ export function SongPlayerPageClient({ slug }: { slug: string }) {
   const [overrideSaveStatus, setOverrideSaveStatus] = useState<OverrideSaveStatus>("idle");
   const [savedTrackOverrides, setSavedTrackOverrides] = useState<SavedTrackOverrides>({});
   const uploadControllers = useRef(new Map<string, AbortController>());
+  const annotationSaveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const annotationDraftRef = useRef<SongAnnotation[]>([]);
   const overrideSaveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const overrideSaveVersions = useRef(new Map<string, number>());
 
   const refresh = useCallback(async () => {
     const next = await getSongMixerBundle(slug);
     setBundle(next);
+    annotationDraftRef.current = next?.annotations ?? [];
     setSavedTrackOverrides(savedOverridesFromBundle(next));
     setOverrideSaveStatus("idle");
   }, [slug]);
@@ -75,6 +83,7 @@ export function SongPlayerPageClient({ slug }: { slug: string }) {
       .then((next) => {
         if (!active) return;
         setBundle(next);
+        annotationDraftRef.current = next?.annotations ?? [];
         setSavedTrackOverrides(savedOverridesFromBundle(next));
       })
       .finally(() => {
@@ -88,11 +97,14 @@ export function SongPlayerPageClient({ slug }: { slug: string }) {
 
   useEffect(() => {
     const controllers = uploadControllers.current;
+    const annotationTimers = annotationSaveTimers.current;
     const timers = overrideSaveTimers.current;
 
     return () => {
       controllers.forEach((controller) => controller.abort());
       controllers.clear();
+      annotationTimers.forEach((timer) => clearTimeout(timer));
+      annotationTimers.clear();
       timers.forEach((timer) => clearTimeout(timer));
       timers.clear();
     };
@@ -198,6 +210,151 @@ export function SongPlayerPageClient({ slug }: { slug: string }) {
       }
     },
     [bundle, refresh],
+  );
+
+  const createAnnotation = useCallback(
+    async (annotation: Omit<SongAnnotation, "id">) => {
+      if (!bundle || !admin.isAdmin) return null;
+
+      try {
+        const created = await createSongAnnotation(bundle, annotation);
+        const nextAnnotations = sortSongAnnotations([...annotationDraftRef.current, created]);
+        annotationDraftRef.current = nextAnnotations;
+        setBundle((current) => current ? { ...current, annotations: nextAnnotations } : current);
+        toast.success(`${created.title} annotation created`);
+        return created;
+      } catch (caught) {
+        toast.error("Annotation could not be created", {
+          description: caught instanceof Error ? caught.message : "Please try again.",
+        });
+        return null;
+      }
+    },
+    [admin.isAdmin, bundle],
+  );
+
+  const updateAnnotation = useCallback(
+    async (annotation: SongAnnotation) => {
+      if (!bundle || !admin.isAdmin) return false;
+
+      const pendingTimer = annotationSaveTimers.current.get(annotation.id);
+      if (pendingTimer) clearTimeout(pendingTimer);
+      annotationSaveTimers.current.delete(annotation.id);
+
+      try {
+        await updateSongAnnotation(bundle, annotation);
+        const nextAnnotations = sortSongAnnotations(
+          annotationDraftRef.current.map((current) =>
+            current.id === annotation.id ? annotation : current,
+          ),
+        );
+        annotationDraftRef.current = nextAnnotations;
+        setBundle((current) => current ? { ...current, annotations: nextAnnotations } : current);
+        toast.success("Annotation saved");
+        return true;
+      } catch (caught) {
+        toast.error("Annotation could not be saved", {
+          description: caught instanceof Error ? caught.message : "Please try again.",
+        });
+        return false;
+      }
+    },
+    [admin.isAdmin, bundle],
+  );
+
+  const deleteAnnotation = useCallback(
+    async (annotation: SongAnnotation) => {
+      if (!bundle || !admin.isAdmin) return false;
+
+      const pendingTimer = annotationSaveTimers.current.get(annotation.id);
+      if (pendingTimer) clearTimeout(pendingTimer);
+      annotationSaveTimers.current.delete(annotation.id);
+
+      try {
+        await deleteSongAnnotation(bundle, annotation.id);
+        const nextAnnotations = annotationDraftRef.current.filter(
+          (current) => current.id !== annotation.id,
+        );
+        annotationDraftRef.current = nextAnnotations;
+        setBundle((current) => current ? { ...current, annotations: nextAnnotations } : current);
+        toast.success(`${annotation.title} annotation deleted`);
+        return true;
+      } catch (caught) {
+        toast.error("Annotation could not be deleted", {
+          description: caught instanceof Error ? caught.message : "Please try again.",
+        });
+        return false;
+      }
+    },
+    [admin.isAdmin, bundle],
+  );
+
+  const importAnnotations = useCallback(
+    async (annotations: Array<Omit<SongAnnotation, "id">>) => {
+      if (!bundle || !admin.isAdmin) return null;
+
+      annotationSaveTimers.current.forEach((timer) => clearTimeout(timer));
+      annotationSaveTimers.current.clear();
+
+      try {
+        const replacements = await replaceSongAnnotations(bundle, annotations);
+        const nextAnnotations = sortSongAnnotations(replacements);
+        annotationDraftRef.current = nextAnnotations;
+        setBundle((current) => current ? { ...current, annotations: nextAnnotations } : current);
+        toast.success(
+          `${nextAnnotations.length} annotation${nextAnnotations.length === 1 ? "" : "s"} imported from MIDI`,
+        );
+        return nextAnnotations;
+      } catch (caught) {
+        toast.error("MIDI annotations could not be saved", {
+          description: caught instanceof Error ? caught.message : "Please try again.",
+        });
+        return null;
+      }
+    },
+    [admin.isAdmin, bundle],
+  );
+
+  const changeAnnotationBoundaries = useCallback(
+    (annotations: SongAnnotation[]) => {
+      if (!bundle || !admin.isAdmin) return;
+
+      const previousById = new Map(
+        annotationDraftRef.current.map((annotation) => [annotation.id, annotation]),
+      );
+      const nextAnnotations = sortSongAnnotations(annotations);
+      annotationDraftRef.current = nextAnnotations;
+      setBundle((current) => current ? { ...current, annotations: nextAnnotations } : current);
+
+      nextAnnotations.forEach((annotation) => {
+        const previous = previousById.get(annotation.id);
+        if (
+          !previous
+          || (previous.start === annotation.start && previous.end === annotation.end)
+        ) {
+          return;
+        }
+
+        const pendingTimer = annotationSaveTimers.current.get(annotation.id);
+        if (pendingTimer) clearTimeout(pendingTimer);
+
+        const timer = setTimeout(async () => {
+          annotationSaveTimers.current.delete(annotation.id);
+
+          try {
+            await updateSongAnnotation(bundle, annotation);
+          } catch (caught) {
+            toast.error("Dragged annotation could not be saved", {
+              description: caught instanceof Error ? caught.message : "Please try again.",
+            });
+            await refresh();
+          }
+        }, 450);
+
+        annotationSaveTimers.current.set(annotation.id, timer);
+      });
+    },
+    [admin.isAdmin, bundle, refresh],
   );
 
   const saveMixerConfiguration = useCallback(
@@ -412,14 +569,6 @@ export function SongPlayerPageClient({ slug }: { slug: string }) {
         </div>
       </header>
 
-      <div className="flex items-start gap-2 rounded-md border bg-secondary/75 px-3 py-2.5 text-sm">
-        <InfoIcon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-        <p>
-          Mixer stems live separately from the rehearsal files on the song and parts pages. Adding or deleting a
-          track here will not change those files.
-        </p>
-      </div>
-
       {showAdminControls ? (
         <MixerUploadPanel
           disabled={trackCount >= MAX_MIXER_TRACKS}
@@ -431,18 +580,13 @@ export function SongPlayerPageClient({ slug }: { slug: string }) {
 
       {visibleTracks.length ? (
         <Card className="gap-0 py-0">
-          <CardHeader className="border-b py-3">
-            <CardTitle>Multitrack player</CardTitle>
-            <CardDescription>
-              Open a stem to adjust volume, pan, mute, and solo. The timeline and waveforms scroll horizontally
-              when zoomed.
-            </CardDescription>
-          </CardHeader>
           <CardContent className="p-0">
             <SongMixerPlayer
               tracks={visibleTracks}
               settings={bundle.settings}
+              annotations={bundle.annotations}
               canSaveOverrides={showAdminControls}
+              canEditAnnotations={showAdminControls}
               autoSaveOverrides={autoSaveOverrides}
               hasUnsavedOverrideChanges={hasUnsavedOverrideChanges}
               overrideSaveStatus={overrideSaveStatus}
@@ -451,6 +595,11 @@ export function SongPlayerPageClient({ slug }: { slug: string }) {
               onSaveOverrides={() => void saveDraftOverrides()}
               onRevertOverrides={revertDraftOverrides}
               onTrackOverridesChange={saveTrackOverrides}
+              onCreateAnnotation={createAnnotation}
+              onUpdateAnnotation={updateAnnotation}
+              onDeleteAnnotation={deleteAnnotation}
+              onImportAnnotations={importAnnotations}
+              onAnnotationsChange={changeAnnotationBoundaries}
             />
           </CardContent>
         </Card>
@@ -490,6 +639,12 @@ function overridesFromTracks(tracks: SongMixerTrack[]): SavedTrackOverrides {
 
 function overridesKey(overrides: SongMixerStateOverrides) {
   return JSON.stringify(overrides);
+}
+
+function sortSongAnnotations(annotations: SongAnnotation[]) {
+  return [...annotations].sort(
+    (left, right) => left.start - right.start || left.end - right.end,
+  );
 }
 
 function MixerUploadPanel({

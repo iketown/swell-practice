@@ -2,11 +2,13 @@
 
 import {
   ArrowRightIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  FileMusicIcon,
   PauseIcon,
   PlayIcon,
-  RotateCcwIcon,
-  ZoomInIcon,
-  ZoomOutIcon,
+  PlusIcon,
+  XIcon,
 } from "lucide-react";
 import {
   Fragment,
@@ -16,17 +18,29 @@ import {
   useMemo,
   useRef,
   useState,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
   type RefObject,
 } from "react";
 import {
-  Waveform,
+  DragDropProvider,
+  type DragEndEvent,
+  type DragMoveEvent,
+  type DragStartEvent,
+} from "@dnd-kit/react";
+import {
+  noDropAnimationPlugins,
+  PlaylistVisualization,
   WaveformPlaylistProvider,
+  type AnnotationData,
   usePlaybackAnimation,
   usePlaylistControls,
   usePlaylistData,
   usePlaylistState,
+  useDragSensors,
 } from "@waveform-playlist/browser";
 import { useAudioTracks, type AudioTrackConfig } from "@waveform-playlist/browser/tone";
+import { AnnotationProvider } from "@waveform-playlist/annotations";
 
 import {
   Accordion,
@@ -34,15 +48,41 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import {
   Progress,
   ProgressLabel,
 } from "@/components/ui/progress";
+import {
+  RadioGroup,
+  RadioGroupItem,
+} from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   mixerStateForTrack,
   resolveSongMixerTrackState,
+  type SongAnnotation,
   type SongMixerMixId,
   type SongMixerSettings,
   type SongMixerStateName,
@@ -51,12 +91,43 @@ import {
   type SongMixerStateValues,
   type SongMixerTrack,
 } from "@/lib/domain";
+import {
+  buildMidiAnnotationExtraction,
+  extractAnnotationsFromMidi,
+  type MidiAnnotationExtraction,
+} from "@/lib/midi-annotations";
+import { resizeAnnotationBoundary } from "@/lib/annotation-boundaries";
+import {
+  advanceAnnotationPlayback,
+  createAnnotationPlaybackBoundaryState,
+  type AnnotationPlaybackMode,
+} from "@/lib/annotation-playback";
 import { cn } from "@/lib/utils";
 
 const BASE_WAVE_HEIGHT = 52;
 const MIN_EXPANDED_TRACK_HEIGHT = 104;
 const SELECTED_PART_SCALE = 2;
 const PART_COLOR_COUNT = 5;
+const DEFAULT_ANNOTATION_DURATION = 3;
+const MIN_ANNOTATION_DURATION = 0.1;
+const MIXER_ZOOM_LEVELS = [
+  256,
+  320,
+  400,
+  512,
+  640,
+  800,
+  1024,
+  1280,
+  1600,
+  2048,
+  2560,
+  3200,
+  4096,
+];
+const SELECTED_ANNOTATION_VIEWPORT_FILL = 0.6;
+const TIMELINE_ZOOM_DRAG_STEP = 36;
+const TIMELINE_PAN_MULTIPLIER = 2;
 
 type LoadedPlaylistTrack = ReturnType<typeof useAudioTracks>["tracks"][number];
 
@@ -79,22 +150,48 @@ const MIXER_THEME = {
   selectedWaveOutlineColor: "#FFFEFA",
   selectedTrackBackground: "#FFFEFA",
   selectedTrackControlsBackground: "#F3E9D6",
+  annotationBoxBackground: "rgba(255, 252, 244, 0.94)",
+  annotationBoxActiveBackground: "rgba(143, 208, 224, 0.96)",
+  annotationBoxHoverBackground: "rgba(255, 254, 250, 0.99)",
+  annotationBoxBorder: "#FF7350",
+  annotationBoxActiveBorder: "#32758A",
+  annotationLabelColor: "#2C2A28",
+  annotationResizeHandleColor: "rgba(50, 117, 138, 0.55)",
+  annotationResizeHandleActiveColor: "rgba(50, 117, 138, 0.95)",
 };
 
 export function SongMixerWaveform({
   tracks: mixerTracks,
   settings,
+  annotations,
+  partAndMixControls,
   mixId,
   selectedTrackId,
   onSelectedTrackChange,
   onTrackOverridesChange,
+  canEditAnnotations,
+  onCreateAnnotation,
+  onUpdateAnnotation,
+  onDeleteAnnotation,
+  onImportAnnotations,
+  onAnnotationsChange,
 }: {
   tracks: SongMixerTrack[];
   settings: SongMixerSettings;
+  annotations: SongAnnotation[];
+  partAndMixControls: ReactNode;
   mixId: SongMixerMixId;
   selectedTrackId: string | null;
   onSelectedTrackChange: (trackId: string) => void;
   onTrackOverridesChange?: (trackId: string, stateOverrides: SongMixerStateOverrides) => void;
+  canEditAnnotations: boolean;
+  onCreateAnnotation: (annotation: Omit<SongAnnotation, "id">) => Promise<SongAnnotation | null>;
+  onUpdateAnnotation: (annotation: SongAnnotation) => Promise<boolean>;
+  onDeleteAnnotation: (annotation: SongAnnotation) => Promise<boolean>;
+  onImportAnnotations: (
+    annotations: Array<Omit<SongAnnotation, "id">>,
+  ) => Promise<SongAnnotation[] | null>;
+  onAnnotationsChange: (annotations: SongAnnotation[]) => void;
 }) {
   const configSignature = JSON.stringify(
     mixerTracks.map((track) => [track.id, track.downloadUrl]),
@@ -122,8 +219,9 @@ export function SongMixerWaveform({
   );
   const [engineError, setEngineError] = useState<string | null>(null);
   const [expandedTrackIds, setExpandedTrackIds] = useState<string[]>([]);
+  const [annotationPlaybackMode, setAnnotationPlaybackMode] =
+    useState<AnnotationPlaybackMode>("normal");
   const waveformRootRef = useRef<HTMLDivElement>(null);
-  const pointerOverWaveformRef = useRef(false);
   const handleTrackLoaded = useCallback(
     (trackId: string, sourceUrl: string | undefined, track: LoadedPlaylistTrack) => {
       setLoadedTracksById((current) => {
@@ -221,6 +319,33 @@ export function SongMixerWaveform({
       }),
     [loadedMixerTracks, mixId, selectedTrackId, settings],
   );
+  const playlistAnnotations = useMemo<AnnotationData[]>(
+    () => annotations.map((annotation) => ({
+      id: annotation.id,
+      start: annotation.start,
+      end: annotation.end,
+      lines: [annotation.title],
+    })),
+    [annotations],
+  );
+  const handleAnnotationsChange = useCallback(
+    (updatedAnnotations: AnnotationData[]) => {
+      if (!canEditAnnotations) return;
+
+      const nextAnnotations = updatedAnnotations
+        .map((annotation) => ({
+          id: annotation.id,
+          title: annotation.lines[0]?.trim() || "Untitled section",
+          start: roundAnnotationTime(annotation.start),
+          end: roundAnnotationTime(annotation.end),
+        }))
+        .sort((left, right) => left.start - right.start || left.end - right.end);
+
+      if (!isValidAnnotationTimeline(nextAnnotations)) return;
+      onAnnotationsChange(nextAnnotations);
+    },
+    [canEditAnnotations, onAnnotationsChange],
+  );
 
   if (error || engineError) {
     return (
@@ -253,9 +378,16 @@ export function SongMixerWaveform({
         mono={false}
         waveHeight={BASE_WAVE_HEIGHT}
         samplesPerPixel={1024}
-        zoomLevels={[256, 512, 1024, 2048, 4096]}
+        zoomLevels={MIXER_ZOOM_LEVELS}
         automaticScroll
         controls={{ show: true, width: 236 }}
+        annotationList={{
+          annotations: playlistAnnotations,
+          editable: canEditAnnotations,
+          isContinuousPlay: true,
+          linkEndpoints: true,
+        }}
+        onAnnotationsChange={handleAnnotationsChange}
         theme={MIXER_THEME}
         barWidth={2}
         barGap={1}
@@ -263,102 +395,1540 @@ export function SongMixerWaveform({
         deferEngineRebuild={loading}
         onError={handleEngineError}
       >
-        <MixStateSynchronizer
-          effectiveStates={effectiveStates}
-          expandedTrackIds={expandedTrackIds}
-          mixerTracks={loadedMixerTracks}
-          selectedTrackId={selectedTrackId}
-          waveformRootRef={waveformRootRef}
-        />
-        <SuppressWaveformTrackSelection />
-        <WaveformSpacebarShortcut pointerOverWaveformRef={pointerOverWaveformRef} />
-        <MixerTransport
-          loading={loading}
-          loadedCount={loadedCount}
-          totalCount={totalCount}
-          expandedTrackCount={expandedTrackIds.filter((trackId) =>
-            loadedMixerTracks.some((track) => track.id === trackId),
-          ).length}
-          onOpenAllControls={() => setExpandedTrackIds(loadedMixerTracks.map((track) => track.id))}
-          onCloseAllControls={() => setExpandedTrackIds([])}
-        />
-        <div
-          ref={waveformRootRef}
-          aria-keyshortcuts="Space"
-          onPointerEnter={(event) => {
-            pointerOverWaveformRef.current = isWaveformPointerTarget(event.target);
-          }}
-          onPointerMove={(event) => {
-            pointerOverWaveformRef.current = isWaveformPointerTarget(event.target);
-          }}
-          onPointerLeave={() => {
-            pointerOverWaveformRef.current = false;
-          }}
-          className="swell-mixer-waveform min-w-0 overflow-x-auto border-t-2 bg-card"
-        >
-          <WaveformPartColorFilters />
-          <Waveform
-            showClipHeaders={false}
-            interactiveClips={false}
-            renderTrackControls={(trackIndex) => (
-              <MixerTrackControls
-                trackIndex={trackIndex}
-                track={loadedMixerTracks[trackIndex]}
-                expanded={expandedTrackIds.includes(loadedMixerTracks[trackIndex]?.id ?? "")}
-                selected={loadedMixerTracks[trackIndex]?.id === selectedTrackId}
-                selectable={!loadedMixerTracks[trackIndex]?.isBackgroundMix}
-                practiceQuickMute={
-                  mixId === "practice"
-                  && loadedMixerTracks[trackIndex]?.id === selectedTrackId
-                }
-                onSelect={() => {
-                  const trackId = loadedMixerTracks[trackIndex]?.id;
-                  if (trackId) onSelectedTrackChange(trackId);
-                }}
-                onStateValueChange={(key, value) => {
-                  const track = loadedMixerTracks[trackIndex];
-                  const stateName = effectiveStates[trackIndex]?.name;
-                  if (!track || !stateName || !onTrackOverridesChange) return;
-
-                  const nextStateOverride: SongMixerStateOverride = {
-                    ...track.stateOverrides[stateName],
-                  };
-                  const inheritedValue = settings.states[stateName][key];
-
-                  if (value === inheritedValue) {
-                    delete nextStateOverride[key];
-                  } else {
-                    Object.assign(nextStateOverride, { [key]: value });
-                  }
-
-                  const nextStateOverrides = { ...track.stateOverrides };
-                  if (Object.keys(nextStateOverride).length) {
-                    nextStateOverrides[stateName] = nextStateOverride;
-                  } else {
-                    delete nextStateOverrides[stateName];
-                  }
-
-                  if (JSON.stringify(nextStateOverrides) !== JSON.stringify(track.stateOverrides)) {
-                    onTrackOverridesChange(track.id, nextStateOverrides);
-                  }
-                }}
-                onExpandedChange={(expanded) => {
-                  const trackId = loadedMixerTracks[trackIndex]?.id;
-                  if (!trackId) return;
-
-                  setExpandedTrackIds((current) =>
-                    expanded
-                      ? [...new Set([...current, trackId])]
-                      : current.filter((currentTrackId) => currentTrackId !== trackId),
-                  );
-                }}
-              />
-            )}
+        <AnnotationProvider>
+          <AnnotationEditabilitySynchronizer editable={canEditAnnotations} />
+          <AnnotationLanePositionSynchronizer
+            annotationCount={playlistAnnotations.length}
+            waveformRootRef={waveformRootRef}
           />
-        </div>
+          <MixStateSynchronizer
+            effectiveStates={effectiveStates}
+            expandedTrackIds={expandedTrackIds}
+            mixId={mixId}
+            mixerTracks={loadedMixerTracks}
+            selectedTrackId={selectedTrackId}
+            waveformRootRef={waveformRootRef}
+          />
+          <SuppressWaveformTrackSelection />
+          <MixerSpacebarShortcut />
+          {partAndMixControls}
+          <section
+            className="grid gap-3 border-t-2 bg-secondary/70 p-3 sm:p-4"
+            aria-labelledby="song-sections-title"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 id="song-sections-title" className="text-sm font-semibold">
+                Song sections
+              </h2>
+              <AnnotationPlaybackControls
+                annotations={annotations}
+                mode={annotationPlaybackMode}
+                onModeChange={setAnnotationPlaybackMode}
+              />
+            </div>
+            <MixerAnnotations
+              annotations={annotations}
+              editable={canEditAnnotations}
+              playbackMode={annotationPlaybackMode}
+              onCreate={onCreateAnnotation}
+              onUpdate={onUpdateAnnotation}
+              onDelete={onDeleteAnnotation}
+              onImport={onImportAnnotations}
+            />
+          </section>
+          <MixerTransport
+            loading={loading}
+            loadedCount={loadedCount}
+            totalCount={totalCount}
+            annotations={annotations}
+          />
+          <TimelineNavigationSurface
+            waveformRootRef={waveformRootRef}
+          >
+            <WaveformPartColorFilters />
+            <AdminAnnotationDragProvider enabled={canEditAnnotations}>
+              <PlaylistVisualization
+                showClipHeaders={false}
+                interactiveClips={false}
+                getAnnotationBoxLabel={(annotation) => annotation.lines[0] ?? "Untitled section"}
+                renderTrackControls={(trackIndex) => (
+                <MixerTrackControls
+                  trackIndex={trackIndex}
+                  track={loadedMixerTracks[trackIndex]}
+                  expanded={expandedTrackIds.includes(loadedMixerTracks[trackIndex]?.id ?? "")}
+                  mixId={mixId}
+                  selected={loadedMixerTracks[trackIndex]?.id === selectedTrackId}
+                  selectable={!loadedMixerTracks[trackIndex]?.isBackgroundMix}
+                  practiceQuickMute={
+                    mixId === "practice"
+                    && loadedMixerTracks[trackIndex]?.id === selectedTrackId
+                  }
+                  onSelect={() => {
+                    const trackId = loadedMixerTracks[trackIndex]?.id;
+                    if (trackId) onSelectedTrackChange(trackId);
+                  }}
+                  onStateValueChange={(key, value) => {
+                    const track = loadedMixerTracks[trackIndex];
+                    const stateName = effectiveStates[trackIndex]?.name;
+                    if (!track || !stateName || !onTrackOverridesChange) return;
+
+                    const nextStateOverride: SongMixerStateOverride = {
+                      ...track.stateOverrides[stateName],
+                    };
+                    const inheritedValue = settings.states[stateName][key];
+
+                    if (value === inheritedValue) {
+                      delete nextStateOverride[key];
+                    } else {
+                      Object.assign(nextStateOverride, { [key]: value });
+                    }
+
+                    const nextStateOverrides = { ...track.stateOverrides };
+                    if (Object.keys(nextStateOverride).length) {
+                      nextStateOverrides[stateName] = nextStateOverride;
+                    } else {
+                      delete nextStateOverrides[stateName];
+                    }
+
+                    if (JSON.stringify(nextStateOverrides) !== JSON.stringify(track.stateOverrides)) {
+                      onTrackOverridesChange(track.id, nextStateOverrides);
+                    }
+                  }}
+                  onExpandedChange={(expanded) => {
+                    const trackId = loadedMixerTracks[trackIndex]?.id;
+                    if (!trackId) return;
+
+                    setExpandedTrackIds((current) =>
+                      expanded
+                        ? [...new Set([...current, trackId])]
+                        : current.filter((currentTrackId) => currentTrackId !== trackId),
+                    );
+                  }}
+                />
+                )}
+              />
+            </AdminAnnotationDragProvider>
+          </TimelineNavigationSurface>
+        </AnnotationProvider>
       </WaveformPlaylistProvider>
     </>
   );
+}
+
+type AnnotationDragData = {
+  annotationIndex: number;
+  edge: "start" | "end";
+};
+
+type AnnotationDragStartEvent = Parameters<DragStartEvent>[0];
+type AnnotationDragMoveEvent = Parameters<DragMoveEvent>[0];
+type AnnotationDragEndEvent = Parameters<DragEndEvent>[0];
+
+type AnnotationDragSnapshot = {
+  annotations: AnnotationData[];
+  annotationIndex: number;
+  edge: "start" | "end";
+};
+
+function AdminAnnotationDragProvider({
+  enabled,
+  children,
+}: {
+  enabled: boolean;
+  children: ReactNode;
+}) {
+  const { annotations } = usePlaylistState();
+  const { duration, sampleRate, samplesPerPixel } = usePlaylistData();
+  const { setAnnotations } = usePlaylistControls();
+  const sensors = useDragSensors();
+  const dragSnapshotRef = useRef<AnnotationDragSnapshot | null>(null);
+
+  const onDragStart = useCallback(
+    (event: AnnotationDragStartEvent) => {
+      const data = annotationDragData(event);
+      if (!data) {
+        dragSnapshotRef.current = null;
+        return;
+      }
+
+      dragSnapshotRef.current = {
+        annotations: annotations.map((annotation) => ({ ...annotation })),
+        annotationIndex: data.annotationIndex,
+        edge: data.edge,
+      };
+    },
+    [annotations],
+  );
+
+  const onDragMove = useCallback(
+    (event: AnnotationDragMoveEvent) => {
+      const snapshot = dragSnapshotRef.current;
+      const data = annotationDragData(event);
+      if (
+        !snapshot
+        || !data
+        || snapshot.annotationIndex !== data.annotationIndex
+        || snapshot.edge !== data.edge
+      ) {
+        return;
+      }
+
+      const original = snapshot.annotations[data.annotationIndex];
+      if (!original) return;
+
+      const currentX = event.to?.x ?? event.operation.position.current.x;
+      const pixelDelta = currentX - event.operation.position.initial.x;
+      const timeDelta = pixelDelta * samplesPerPixel / sampleRate;
+      const requestedTime =
+        data.edge === "start"
+          ? original.start + timeDelta
+          : original.end + timeDelta;
+
+      setAnnotations(
+        resizeAnnotationBoundary(
+          snapshot.annotations,
+          data.annotationIndex,
+          data.edge,
+          requestedTime,
+          duration,
+          MIN_ANNOTATION_DURATION,
+        ),
+      );
+    },
+    [duration, sampleRate, samplesPerPixel, setAnnotations],
+  );
+
+  const onDragEnd = useCallback(
+    (event: AnnotationDragEndEvent) => {
+      const snapshot = dragSnapshotRef.current;
+      if (event.canceled && snapshot) {
+        setAnnotations(snapshot.annotations);
+      }
+      dragSnapshotRef.current = null;
+    },
+    [setAnnotations],
+  );
+
+  if (!enabled) return children;
+
+  return (
+    <DragDropProvider
+      sensors={sensors}
+      onDragStart={onDragStart}
+      onDragMove={onDragMove}
+      onDragEnd={onDragEnd}
+      plugins={noDropAnimationPlugins}
+    >
+      {children}
+    </DragDropProvider>
+  );
+}
+
+function annotationDragData(
+  event: AnnotationDragStartEvent | AnnotationDragMoveEvent | AnnotationDragEndEvent,
+): AnnotationDragData | null {
+  const data = event.operation.source?.data;
+  if (
+    !data
+    || typeof data.annotationIndex !== "number"
+    || (data.edge !== "start" && data.edge !== "end")
+  ) {
+    return null;
+  }
+
+  return {
+    annotationIndex: data.annotationIndex,
+    edge: data.edge,
+  };
+}
+
+function AnnotationLanePositionSynchronizer({
+  annotationCount,
+  waveformRootRef,
+}: {
+  annotationCount: number;
+  waveformRootRef: RefObject<HTMLDivElement | null>;
+}) {
+  const { isReady, tracks } = usePlaylistData();
+
+  useEffect(() => {
+    const root = waveformRootRef.current;
+    if (!root) return;
+
+    if (!annotationCount) {
+      delete root.dataset.annotationLanePosition;
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      const scrollContainer = root.querySelector<HTMLElement>(
+        '[data-scroll-container="true"]',
+      );
+      const waveformTrack = root.querySelector<HTMLElement>("[data-track-id]");
+      const trackStack = waveformTrack?.parentElement?.parentElement;
+      const controlsColumn = scrollContainer?.previousElementSibling;
+      const annotationLane = trackStack
+        ? Array.from(trackStack.children).find((element) => {
+            const style = window.getComputedStyle(element);
+            return style.position === "relative" && style.zIndex === "110";
+          })
+        : undefined;
+
+      if (
+        !(trackStack instanceof HTMLElement)
+        || !(annotationLane instanceof HTMLElement)
+        || !(controlsColumn instanceof HTMLElement)
+      ) {
+        delete root.dataset.annotationLanePosition;
+        return;
+      }
+
+      trackStack.dataset.mixerTrackStack = "";
+      annotationLane.dataset.mixerAnnotationLane = "";
+      controlsColumn.dataset.mixerControlsColumn = "";
+      root.dataset.annotationLanePosition = "top";
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [annotationCount, isReady, tracks.length, waveformRootRef]);
+
+  return null;
+}
+
+type TimelineDragGesture = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  anchorTime: number;
+  anchorX: number;
+  horizontalDelta: number;
+  startZoomIndex: number;
+  currentZoomIndex: number;
+};
+
+type TimelineScrollSnapshot = Pick<
+  TimelineDragGesture,
+  "anchorTime" | "anchorX" | "horizontalDelta"
+>;
+
+function TimelineNavigationSurface({
+  waveformRootRef,
+  children,
+}: {
+  waveformRootRef: RefObject<HTMLDivElement | null>;
+  children: ReactNode;
+}) {
+  const { sampleRate, samplesPerPixel, timeScaleHeight } = usePlaylistData();
+  const { scrollContainerRef, zoomIn, zoomOut } = usePlaylistControls();
+  const [isDraggingTimeline, setIsDraggingTimeline] = useState(false);
+  const [isPointerOverTimeline, setIsPointerOverTimeline] = useState(false);
+  const gestureRef = useRef<TimelineDragGesture | null>(null);
+  const pendingZoomAnchorRef = useRef<TimelineScrollSnapshot | null>(null);
+  const samplesPerPixelRef = useRef(samplesPerPixel);
+  const scrollFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    samplesPerPixelRef.current = samplesPerPixel;
+  }, [samplesPerPixel]);
+
+  const scrollTimeline = useCallback(
+    (snapshot: TimelineScrollSnapshot, scale: number) => {
+      const scrollContainer = scrollContainerRef.current;
+      if (!scrollContainer) return;
+
+      const anchorPixel = snapshot.anchorTime * sampleRate / scale;
+      scrollContainer.scrollLeft = Math.max(
+        0,
+        anchorPixel - snapshot.anchorX
+          - snapshot.horizontalDelta * TIMELINE_PAN_MULTIPLIER,
+      );
+    },
+    [sampleRate, scrollContainerRef],
+  );
+
+  useEffect(() => {
+    const snapshot = pendingZoomAnchorRef.current;
+    if (!snapshot) return;
+
+    if (scrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(scrollFrameRef.current);
+    }
+    scrollFrameRef.current = window.requestAnimationFrame(() => {
+      scrollTimeline(snapshot, samplesPerPixel);
+      pendingZoomAnchorRef.current = null;
+      scrollFrameRef.current = null;
+    });
+  }, [samplesPerPixel, scrollTimeline]);
+
+  useEffect(() => {
+    return () => {
+      if (scrollFrameRef.current !== null) {
+        window.cancelAnimationFrame(scrollFrameRef.current);
+      }
+    };
+  }, []);
+
+  const isTimelinePoint = useCallback(
+    (clientX: number, clientY: number) => {
+      const scrollContainer = scrollContainerRef.current;
+      if (!scrollContainer || timeScaleHeight <= 0) return false;
+
+      const bounds = scrollContainer.getBoundingClientRect();
+      return (
+        clientX >= bounds.left
+        && clientX <= bounds.right
+        && clientY >= bounds.top
+        && clientY <= bounds.top + timeScaleHeight
+      );
+    },
+    [scrollContainerRef, timeScaleHeight],
+  );
+
+  function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (
+      event.button !== 0
+      || event.pointerType === "touch"
+      || !isTimelinePoint(event.clientX, event.clientY)
+    ) {
+      return;
+    }
+
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+
+    const bounds = scrollContainer.getBoundingClientRect();
+    const anchorX = event.clientX - bounds.left;
+    const startZoomIndex = closestZoomLevelIndex(samplesPerPixelRef.current);
+
+    gestureRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      anchorTime:
+        (scrollContainer.scrollLeft + anchorX) * samplesPerPixelRef.current / sampleRate,
+      anchorX,
+      horizontalDelta: 0,
+      startZoomIndex,
+      currentZoomIndex: startZoomIndex,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    event.preventDefault();
+    setIsDraggingTimeline(true);
+    setIsPointerOverTimeline(true);
+  }
+
+  function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const gesture = gestureRef.current;
+
+    if (!gesture || gesture.pointerId !== event.pointerId) {
+      const isOverTimeline = isTimelinePoint(event.clientX, event.clientY);
+      setIsPointerOverTimeline((current) =>
+        current === isOverTimeline ? current : isOverTimeline,
+      );
+      return;
+    }
+
+    event.preventDefault();
+    gesture.horizontalDelta = event.clientX - gesture.startX;
+    const verticalDelta = event.clientY - gesture.startY;
+    const desiredZoomIndex = clamp(
+      gesture.startZoomIndex - Math.trunc(verticalDelta / TIMELINE_ZOOM_DRAG_STEP),
+      0,
+      MIXER_ZOOM_LEVELS.length - 1,
+    );
+
+    if (desiredZoomIndex !== gesture.currentZoomIndex) {
+      while (gesture.currentZoomIndex > desiredZoomIndex) {
+        zoomIn();
+        gesture.currentZoomIndex -= 1;
+      }
+      while (gesture.currentZoomIndex < desiredZoomIndex) {
+        zoomOut();
+        gesture.currentZoomIndex += 1;
+      }
+      pendingZoomAnchorRef.current = timelineScrollSnapshot(gesture);
+    } else if (pendingZoomAnchorRef.current) {
+      pendingZoomAnchorRef.current = timelineScrollSnapshot(gesture);
+    }
+
+    scrollTimeline(gesture, samplesPerPixelRef.current);
+  }
+
+  function finishTimelineDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    const gesture = gestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+
+    gestureRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    setIsDraggingTimeline(false);
+    setIsPointerOverTimeline(isTimelinePoint(event.clientX, event.clientY));
+  }
+
+  return (
+    <div
+      ref={waveformRootRef}
+      aria-keyshortcuts="Space"
+      data-timeline-dragging={isDraggingTimeline || undefined}
+      title={
+        isPointerOverTimeline
+          ? "Drag up to zoom out or down to zoom in. Drag left or right to scroll."
+          : undefined
+      }
+      onPointerDown={handlePointerDown}
+      onPointerEnter={(event) => {
+        setIsPointerOverTimeline(isTimelinePoint(event.clientX, event.clientY));
+      }}
+      onPointerMove={handlePointerMove}
+      onPointerUp={finishTimelineDrag}
+      onPointerCancel={finishTimelineDrag}
+      onLostPointerCapture={(event) => {
+        if (gestureRef.current?.pointerId !== event.pointerId) return;
+        gestureRef.current = null;
+        setIsDraggingTimeline(false);
+        setIsPointerOverTimeline(false);
+      }}
+      onPointerLeave={() => {
+        if (!gestureRef.current) setIsPointerOverTimeline(false);
+      }}
+      className={cn(
+        "swell-mixer-waveform min-w-0 overflow-x-auto border-t-2 bg-card",
+        isPointerOverTimeline && "cursor-all-scroll",
+        isDraggingTimeline && "cursor-grabbing select-none",
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+function closestZoomLevelIndex(samplesPerPixel: number) {
+  return MIXER_ZOOM_LEVELS.reduce(
+    (closestIndex, zoomLevel, index) =>
+      Math.abs(Math.log(zoomLevel / samplesPerPixel))
+        < Math.abs(Math.log(MIXER_ZOOM_LEVELS[closestIndex] / samplesPerPixel))
+        ? index
+        : closestIndex,
+    0,
+  );
+}
+
+function timelineScrollSnapshot(
+  gesture: TimelineDragGesture,
+): TimelineScrollSnapshot {
+  return {
+    anchorTime: gesture.anchorTime,
+    anchorX: gesture.anchorX,
+    horizontalDelta: gesture.horizontalDelta,
+  };
+}
+
+function clamp(value: number, minimum: number, maximum: number) {
+  return Math.min(Math.max(value, minimum), maximum);
+}
+
+function AnnotationEditabilitySynchronizer({ editable }: { editable: boolean }) {
+  const { setAnnotationsEditable } = usePlaylistControls();
+
+  useEffect(() => {
+    setAnnotationsEditable(editable);
+  }, [editable, setAnnotationsEditable]);
+
+  return null;
+}
+
+function AnnotationPlaybackControls({
+  annotations,
+  mode,
+  onModeChange,
+}: {
+  annotations: SongAnnotation[];
+  mode: AnnotationPlaybackMode;
+  onModeChange: (mode: AnnotationPlaybackMode) => void;
+}) {
+  const {
+    audioStartPositionRef,
+    isPlaying,
+    playbackStartTimeRef,
+    visualTimeRef,
+  } = usePlaybackAnimation();
+  const { activeAnnotationId } = usePlaylistState();
+  const {
+    pause,
+    play,
+    setActiveAnnotationId,
+    setCurrentTime,
+  } = usePlaylistControls();
+  const boundaryStateRef = useRef(createAnnotationPlaybackBoundaryState());
+  const actionInFlightRef = useRef(false);
+  const activeAnnotation = activeAnnotationId
+    ? annotations.find((annotation) => annotation.id === activeAnnotationId) ?? null
+    : null;
+  const targetAnnotationRef = useRef<SongAnnotation | null>(activeAnnotation);
+
+  const handlePlaybackFrame = useCallback(
+    (visualTime: number) => {
+      if (actionInFlightRef.current) return;
+
+      const targetAnnotation = targetAnnotationRef.current;
+      const transition = advanceAnnotationPlayback({
+        mode,
+        annotation: targetAnnotation,
+        currentTime: visualTime,
+        playbackEpoch: playbackStartTimeRef.current,
+        playbackStartPosition: audioStartPositionRef.current,
+        state: boundaryStateRef.current,
+      });
+      boundaryStateRef.current = transition.state;
+
+      if (!targetAnnotation || transition.action === "none") return;
+
+      actionInFlightRef.current = true;
+      if (transition.action === "stop") {
+        pause();
+        queueMicrotask(() => {
+          setCurrentTime(targetAnnotation.end);
+          setActiveAnnotationId(targetAnnotation.id);
+          actionInFlightRef.current = false;
+        });
+        return;
+      }
+
+      void play(targetAnnotation.start).finally(() => {
+        boundaryStateRef.current = {
+          annotationId: targetAnnotation.id,
+          playbackEpoch: playbackStartTimeRef.current,
+          previousTime: targetAnnotation.start,
+          canArm: true,
+          armed: true,
+        };
+        setActiveAnnotationId(targetAnnotation.id);
+        actionInFlightRef.current = false;
+      });
+    },
+    [
+      mode,
+      pause,
+      play,
+      audioStartPositionRef,
+      playbackStartTimeRef,
+      setActiveAnnotationId,
+      setCurrentTime,
+    ],
+  );
+
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    let frame = 0;
+    const checkAnnotationBoundary = () => {
+      handlePlaybackFrame(visualTimeRef.current);
+      frame = window.requestAnimationFrame(checkAnnotationBoundary);
+    };
+    frame = window.requestAnimationFrame(checkAnnotationBoundary);
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [handlePlaybackFrame, isPlaying, visualTimeRef]);
+
+  useEffect(() => {
+    const keepArmedTarget =
+      mode !== "normal"
+      && isPlaying
+      && boundaryStateRef.current.armed
+      && targetAnnotationRef.current !== null;
+
+    if (keepArmedTarget) return;
+
+    targetAnnotationRef.current = mode === "normal" ? null : activeAnnotation;
+    boundaryStateRef.current = createAnnotationPlaybackBoundaryState();
+    actionInFlightRef.current = false;
+  }, [activeAnnotation, isPlaying, mode]);
+
+  if (!annotations.length) return null;
+
+  return (
+    <FieldSet className="w-auto flex-row flex-nowrap items-center gap-3 sm:gap-4">
+      <FieldLegend variant="label" className="mb-0 shrink-0 text-xs">
+        Playback
+      </FieldLegend>
+      <RadioGroup
+        value={mode}
+        onValueChange={(value) => onModeChange(value as AnnotationPlaybackMode)}
+        className="flex w-auto flex-nowrap items-center gap-3 sm:gap-4"
+        aria-label="Section playback behavior"
+      >
+        <Field orientation="horizontal" className="w-auto gap-1.5">
+          <RadioGroupItem value="normal" id="annotation-playback-normal" />
+          <FieldLabel
+            htmlFor="annotation-playback-normal"
+            className="font-normal"
+            title="Continue playing after the selected section"
+          >
+            Normal
+          </FieldLabel>
+        </Field>
+        <Field orientation="horizontal" className="w-auto gap-1.5">
+          <RadioGroupItem value="loop" id="annotation-playback-loop" />
+          <FieldLabel
+            htmlFor="annotation-playback-loop"
+            className="font-normal"
+            title="Return to the selected section start at its end"
+          >
+            Loop
+          </FieldLabel>
+        </Field>
+        <Field orientation="horizontal" className="w-auto gap-1.5">
+          <RadioGroupItem value="stop" id="annotation-playback-stop" />
+          <FieldLabel
+            htmlFor="annotation-playback-stop"
+            className="font-normal"
+            title="Pause when playback crosses the selected section end"
+          >
+            Stop
+          </FieldLabel>
+        </Field>
+      </RadioGroup>
+    </FieldSet>
+  );
+}
+
+type AnnotationDraft = {
+  title: string;
+  start: string;
+  end: string;
+};
+
+function MixerAnnotations({
+  annotations,
+  editable,
+  playbackMode,
+  onCreate,
+  onUpdate,
+  onDelete,
+  onImport,
+}: {
+  annotations: SongAnnotation[];
+  editable: boolean;
+  playbackMode: AnnotationPlaybackMode;
+  onCreate: (annotation: Omit<SongAnnotation, "id">) => Promise<SongAnnotation | null>;
+  onUpdate: (annotation: SongAnnotation) => Promise<boolean>;
+  onDelete: (annotation: SongAnnotation) => Promise<boolean>;
+  onImport: (
+    annotations: Array<Omit<SongAnnotation, "id">>,
+  ) => Promise<SongAnnotation[] | null>;
+}) {
+  const { currentTimeRef, isPlaying, visualTimeRef } = usePlaybackAnimation();
+  const { activeAnnotationId, isAutomaticScroll } = usePlaylistState();
+  const { duration, isReady, sampleRate, samplesPerPixel } = usePlaylistData();
+  const {
+    scrollContainerRef,
+    seekTo,
+    setActiveAnnotationId,
+    setAutomaticScroll,
+    zoomIn,
+    zoomOut,
+  } = usePlaylistControls();
+  const safeDuration = Number.isFinite(duration) ? duration : 0;
+  const [editingId, setEditingId] = useState<string | null>(annotations[0]?.id ?? null);
+  const [newDraft, setNewDraft] = useState<AnnotationDraft>(() => emptyAnnotationDraft());
+  const [editorSession, setEditorSession] = useState(0);
+  const pendingAnnotationFocusRef = useRef<{
+    centerTime: number;
+    samplesPerPixel: number;
+  } | null>(null);
+  const annotationFocusFrameRef = useRef<number | null>(null);
+  const restoreAutomaticScrollRef = useRef(false);
+  const focusedAnnotationRef = useRef<SongAnnotation | null>(null);
+  const midiInputRef = useRef<HTMLInputElement>(null);
+  const [midiPreview, setMidiPreview] = useState<{
+    filename: string;
+    extraction: MidiAnnotationExtraction;
+  } | null>(null);
+  const [midiError, setMidiError] = useState<string | null>(null);
+  const [readingMidi, setReadingMidi] = useState(false);
+  const [savingMidi, setSavingMidi] = useState(false);
+  const [overwriteDialogOpen, setOverwriteDialogOpen] = useState(false);
+  const editingAnnotation = editingId
+    ? annotations.find((annotation) => annotation.id === editingId)
+    : undefined;
+  const midiConflictCount = midiPreview?.extraction.conflictCount ?? 0;
+  const midiAnnotationCount = midiPreview?.extraction.annotations.length ?? 0;
+  const midiPreviewCanSave = midiAnnotationCount > 0 && midiConflictCount === 0;
+
+  const restoreAutomaticScroll = useCallback(() => {
+    focusedAnnotationRef.current = null;
+    if (!restoreAutomaticScrollRef.current) return;
+
+    setAutomaticScroll(true);
+    restoreAutomaticScrollRef.current = false;
+  }, [setAutomaticScroll]);
+
+  const centerPendingAnnotation = useCallback(() => {
+    const focus = pendingAnnotationFocusRef.current;
+    const scrollContainer = scrollContainerRef.current;
+    if (!focus || !scrollContainer) return;
+
+    if (annotationFocusFrameRef.current !== null) {
+      window.cancelAnimationFrame(annotationFocusFrameRef.current);
+    }
+    annotationFocusFrameRef.current = window.requestAnimationFrame(() => {
+      const centerPixel = focus.centerTime * sampleRate / focus.samplesPerPixel;
+      const maximumScrollLeft = Math.max(
+        0,
+        scrollContainer.scrollWidth - scrollContainer.clientWidth,
+      );
+      scrollContainer.scrollLeft = clamp(
+        centerPixel - scrollContainer.clientWidth / 2,
+        0,
+        maximumScrollLeft,
+      );
+      pendingAnnotationFocusRef.current = null;
+      annotationFocusFrameRef.current = null;
+    });
+  }, [sampleRate, scrollContainerRef]);
+
+  useEffect(() => {
+    const focus = pendingAnnotationFocusRef.current;
+    if (!focus || focus.samplesPerPixel !== samplesPerPixel) return;
+
+    centerPendingAnnotation();
+  }, [centerPendingAnnotation, samplesPerPixel]);
+
+  useEffect(() => {
+    return () => {
+      if (annotationFocusFrameRef.current !== null) {
+        window.cancelAnimationFrame(annotationFocusFrameRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const focusedAnnotation = focusedAnnotationRef.current;
+    if (
+      !focusedAnnotation
+      || activeAnnotationId === focusedAnnotation.id
+    ) {
+      return;
+    }
+
+    restoreAutomaticScroll();
+  }, [activeAnnotationId, restoreAutomaticScroll]);
+
+  useEffect(() => {
+    if (!isPlaying || playbackMode === "loop") return;
+
+    let frame = 0;
+    const watchFocusedAnnotation = () => {
+      const focusedAnnotation = focusedAnnotationRef.current;
+      const visualTime = visualTimeRef.current;
+      if (
+        focusedAnnotation
+        && (
+          visualTime < focusedAnnotation.start
+          || visualTime >= focusedAnnotation.end
+        )
+      ) {
+        restoreAutomaticScroll();
+        return;
+      }
+
+      frame = window.requestAnimationFrame(watchFocusedAnnotation);
+    };
+    frame = window.requestAnimationFrame(watchFocusedAnnotation);
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [
+    isPlaying,
+    playbackMode,
+    restoreAutomaticScroll,
+    visualTimeRef,
+  ]);
+
+  const focusAnnotation = (annotation: SongAnnotation) => {
+    const scrollContainer = scrollContainerRef.current;
+    const annotationDuration = annotation.end - annotation.start;
+    if (
+      !scrollContainer
+      || scrollContainer.clientWidth <= 0
+      || sampleRate <= 0
+      || annotationDuration <= 0
+    ) {
+      return;
+    }
+
+    const idealSamplesPerPixel =
+      annotationDuration * sampleRate
+      / (scrollContainer.clientWidth * SELECTED_ANNOTATION_VIEWPORT_FILL);
+    const targetZoomIndex = closestZoomLevelIndex(idealSamplesPerPixel);
+    const currentZoomIndex = closestZoomLevelIndex(samplesPerPixel);
+    const targetSamplesPerPixel = MIXER_ZOOM_LEVELS[targetZoomIndex];
+
+    restoreAutomaticScrollRef.current ||= isAutomaticScroll;
+    if (isAutomaticScroll) setAutomaticScroll(false);
+    focusedAnnotationRef.current = annotation;
+    pendingAnnotationFocusRef.current = {
+      centerTime: (annotation.start + annotation.end) / 2,
+      samplesPerPixel: targetSamplesPerPixel,
+    };
+
+    for (let index = currentZoomIndex; index > targetZoomIndex; index -= 1) {
+      zoomIn();
+    }
+    for (let index = currentZoomIndex; index < targetZoomIndex; index += 1) {
+      zoomOut();
+    }
+
+    if (currentZoomIndex === targetZoomIndex) centerPendingAnnotation();
+  };
+
+  const seekToAnnotation = (annotation: SongAnnotation, selectForEditing: boolean) => {
+    setActiveAnnotationId(annotation.id);
+    seekTo(annotation.start);
+    focusAnnotation(annotation);
+
+    if (selectForEditing) {
+      setEditingId(annotation.id);
+      setEditorSession((current) => current + 1);
+    }
+  };
+
+  const annotationButtons = (
+    <div className="flex flex-wrap gap-2" aria-label="Song annotations">
+      {annotations.map((annotation) => (
+        <Button
+          key={annotation.id}
+          type="button"
+          size="sm"
+          variant={activeAnnotationId === annotation.id ? "default" : "outline"}
+          aria-current={activeAnnotationId === annotation.id ? "true" : undefined}
+          aria-label={`Seek to ${annotation.title} at ${formatAnnotationTimestamp(annotation.start)}`}
+          onClick={() => seekToAnnotation(annotation, editable)}
+        >
+          <span className="max-w-56 truncate">{annotation.title}</span>
+        </Button>
+      ))}
+    </div>
+  );
+
+  if (!editable) {
+    return annotations.length ? annotationButtons : (
+      <p className="text-sm text-muted-foreground">No song sections are available yet.</p>
+    );
+  }
+
+  const startNewAnnotation = () => {
+    const playhead = Math.min(
+      Math.max(Number.isFinite(currentTimeRef.current) ? currentTimeRef.current : 0, 0),
+      safeDuration,
+    );
+    const nextRange = findAnnotationGap(annotations, playhead, safeDuration);
+
+    setEditingId(null);
+    setNewDraft({
+      title: "",
+      start: formatAnnotationInput(nextRange.start),
+      end: formatAnnotationInput(nextRange.end),
+    });
+    setEditorSession((current) => current + 1);
+  };
+
+  const readMidiFile = async (file: File) => {
+    setReadingMidi(true);
+    setMidiError(null);
+    setMidiPreview(null);
+
+    try {
+      const source = await file.arrayBuffer();
+      const extraction = extractAnnotationsFromMidi(source, safeDuration);
+      setMidiPreview({ filename: file.name, extraction });
+    } catch (caught) {
+      setMidiError(
+        caught instanceof Error
+          ? caught.message
+          : "The MIDI markers could not be extracted.",
+      );
+    } finally {
+      setReadingMidi(false);
+    }
+  };
+
+  const saveMidiPreview = async () => {
+    if (!midiPreview || !midiPreviewCanSave || savingMidi) return;
+
+    setSavingMidi(true);
+    try {
+      const imported = await onImport(
+        midiPreview.extraction.annotations.map(({ title, start, end }) => ({
+          title,
+          start,
+          end,
+        })),
+      );
+      if (!imported) return;
+
+      setEditingId(imported[0]?.id ?? null);
+      setEditorSession((current) => current + 1);
+      setMidiPreview(null);
+      setMidiError(null);
+      if (midiInputRef.current) midiInputRef.current.value = "";
+    } finally {
+      setSavingMidi(false);
+    }
+  };
+
+  const requestMidiSave = () => {
+    if (!midiPreview || !midiPreviewCanSave || savingMidi) return;
+
+    if (annotations.length) {
+      setOverwriteDialogOpen(true);
+      return;
+    }
+
+    void saveMidiPreview();
+  };
+
+  const removeMidiPreviewMarker = (markerId: string) => {
+    setMidiPreview((current) => {
+      if (!current) return current;
+
+      const remainingMarkers = current.extraction.markers.filter(
+        (marker) => marker.id !== markerId,
+      );
+      const extraction = buildMidiAnnotationExtraction(
+        remainingMarkers,
+        current.extraction.midiDuration,
+        current.extraction.audioDuration,
+      );
+
+      return { ...current, extraction };
+    });
+  };
+
+  return (
+    <div className="grid gap-3">
+      <Accordion defaultValue={[]} className="gap-0">
+        <AccordionItem value="annotations" className="bg-card shadow-sm hover:shadow-sm data-[open]:shadow-sm">
+          <AccordionTrigger className="min-h-11 px-3 py-2 font-body hover:bg-secondary/55">
+            <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              <span className="font-semibold">Annotations</span>
+              <Badge variant="outline">
+                {annotations.length} section{annotations.length === 1 ? "" : "s"}
+              </Badge>
+              <span className="text-xs font-normal text-muted-foreground">No overlaps</span>
+            </span>
+          </AccordionTrigger>
+          <AccordionContent className="grid gap-4 border-t px-3 py-3 text-foreground">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {annotations.length ? annotationButtons : (
+                <p className="text-sm text-muted-foreground">Create the first section at the current playhead.</p>
+              )}
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={!isReady || safeDuration < MIN_ANNOTATION_DURATION}
+                onClick={startNewAnnotation}
+              >
+                <PlusIcon data-icon="inline-start" />
+                New annotation
+              </Button>
+            </div>
+
+            <AnnotationEditor
+              key={`${editorSession}:${editingAnnotation?.id ?? "new"}:${editingAnnotation?.start ?? newDraft.start}:${editingAnnotation?.end ?? newDraft.end}`}
+              annotation={editingAnnotation}
+              initialDraft={editingAnnotation ? draftFromAnnotation(editingAnnotation) : newDraft}
+              annotations={annotations}
+              duration={safeDuration}
+              isReady={isReady}
+              onCreate={onCreate}
+              onUpdate={onUpdate}
+              onDelete={onDelete}
+              onCreated={(created) => {
+                setEditingId(created.id);
+                setEditorSession((current) => current + 1);
+              }}
+              onDeleted={(deletedId) => {
+                const fallback = annotations.find((annotation) => annotation.id !== deletedId);
+                setEditingId(fallback?.id ?? null);
+                setNewDraft(emptyAnnotationDraft());
+                setEditorSession((current) => current + 1);
+              }}
+            />
+
+            <FieldGroup className="gap-3 rounded-md border bg-background p-3">
+              <Field data-invalid={Boolean(midiError)}>
+                <FieldLabel htmlFor="annotation-midi-file">
+                  Import annotations from MIDI
+                </FieldLabel>
+                <Input
+                  ref={midiInputRef}
+                  id="annotation-midi-file"
+                  type="file"
+                  accept=".mid,.midi,audio/midi,audio/x-midi"
+                  disabled={!isReady || readingMidi || savingMidi}
+                  aria-invalid={Boolean(midiError)}
+                  onChange={(event) => {
+                    const file = event.currentTarget.files?.[0];
+                    if (file) void readMidiFile(file);
+                  }}
+                />
+                <FieldDescription>
+                  Choose a Standard MIDI file with named markers. Each marker ends
+                  at the next marker; a final marker named “end” is used only as
+                  the closing boundary. Conflicting markers stay in the preview
+                  until you remove one with its X.
+                </FieldDescription>
+                {midiError ? <FieldError>{midiError}</FieldError> : null}
+              </Field>
+
+              {readingMidi ? (
+                <p className="text-sm text-muted-foreground">
+                  Reading MIDI markers…
+                </p>
+              ) : null}
+
+              {midiPreview ? (
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <FileMusicIcon aria-hidden className="size-4 shrink-0" />
+                      <span className="max-w-72 truncate text-sm font-medium">
+                        {midiPreview.filename}
+                      </span>
+                      <Badge variant="secondary">
+                        {midiPreview.extraction.annotations.length} annotation
+                        {midiPreview.extraction.annotations.length === 1 ? "" : "s"}
+                      </Badge>
+                      {midiConflictCount ? (
+                        <Badge variant="destructive">
+                          {midiConflictCount} conflicting
+                        </Badge>
+                      ) : null}
+                    </div>
+                    {annotations.length ? (
+                      <Badge variant="destructive">
+                        Replaces {annotations.length} current
+                      </Badge>
+                    ) : null}
+                  </div>
+
+                  <div>
+                    <p className="mb-2 text-sm font-medium">Preview</p>
+                    <ol
+                      className="max-h-64 divide-y overflow-y-auto rounded-md border"
+                      aria-label="Extracted MIDI annotation preview"
+                    >
+                      {midiPreview.extraction.annotations.map((annotation, index) => (
+                        <li
+                          key={annotation.markerId}
+                          data-invalid={annotation.conflict ? true : undefined}
+                          className={cn(
+                            "flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-sm",
+                            annotation.conflict && "bg-destructive/10 text-destructive",
+                          )}
+                        >
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span className="truncate">
+                              {index + 1}. {annotation.title}
+                            </span>
+                            {annotation.conflict ? (
+                              <Badge variant="destructive">Conflict</Badge>
+                            ) : null}
+                          </span>
+                          <span className="flex shrink-0 items-center gap-2">
+                            <span
+                              className={cn(
+                                "font-mono text-xs tabular-nums",
+                                annotation.conflict
+                                  ? "text-destructive"
+                                  : "text-muted-foreground",
+                              )}
+                            >
+                              {formatAnnotationTimestamp(annotation.start)}
+                              {" – "}
+                              {formatAnnotationTimestamp(annotation.end)}
+                            </span>
+                            <Button
+                              type="button"
+                              size="icon-xs"
+                              variant={annotation.conflict ? "destructive" : "ghost"}
+                              disabled={savingMidi}
+                              aria-label={`Remove ${annotation.title} from MIDI import`}
+                              onClick={() => removeMidiPreviewMarker(annotation.markerId)}
+                            >
+                              <XIcon />
+                            </Button>
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+
+                  {midiConflictCount ? (
+                    <Field data-invalid>
+                      <FieldError>
+                        Markers with the same start time cannot become overlapping
+                        annotations. Remove all but one marker from each red conflict.
+                      </FieldError>
+                    </Field>
+                  ) : null}
+
+                  {!midiAnnotationCount ? (
+                    <Field data-invalid>
+                      <FieldError>
+                        Keep at least one section marker before saving.
+                      </FieldError>
+                    </Field>
+                  ) : null}
+
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <FieldDescription>
+                      Found {midiPreview.extraction.markerCount} named marker
+                      {midiPreview.extraction.markerCount === 1 ? "" : "s"}
+                      {midiPreview.extraction.closingMarker
+                        ? `, including the closing “${midiPreview.extraction.closingMarker}” marker.`
+                        : "."}
+                    </FieldDescription>
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={!midiPreviewCanSave || savingMidi}
+                      onClick={requestMidiSave}
+                    >
+                      {savingMidi ? "Saving…" : "Save MIDI annotations"}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </FieldGroup>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+
+      <AlertDialog
+        open={overwriteDialogOpen}
+        onOpenChange={setOverwriteDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Overwrite current annotations?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Do you want to overwrite current annotations with these extracted
+              annotations?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={savingMidi}>No, cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={savingMidi}
+              onClick={() => {
+                setOverwriteDialogOpen(false);
+                void saveMidiPreview();
+              }}
+            >
+              Yes, overwrite
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+function AnnotationEditor({
+  annotation,
+  initialDraft,
+  annotations,
+  duration,
+  isReady,
+  onCreate,
+  onUpdate,
+  onDelete,
+  onCreated,
+  onDeleted,
+}: {
+  annotation: SongAnnotation | undefined;
+  initialDraft: AnnotationDraft;
+  annotations: SongAnnotation[];
+  duration: number;
+  isReady: boolean;
+  onCreate: (annotation: Omit<SongAnnotation, "id">) => Promise<SongAnnotation | null>;
+  onUpdate: (annotation: SongAnnotation) => Promise<boolean>;
+  onDelete: (annotation: SongAnnotation) => Promise<boolean>;
+  onCreated: (annotation: SongAnnotation) => void;
+  onDeleted: (annotationId: string) => void;
+}) {
+  const { currentTimeRef } = usePlaybackAnimation();
+  const [draft, setDraft] = useState(initialDraft);
+  const [showValidation, setShowValidation] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const errors = annotationDraftErrors(
+    draft,
+    annotations,
+    annotation?.id ?? null,
+    duration,
+  );
+  const hasErrors = Boolean(errors.title || errors.time);
+
+  const setBoundaryAtPlayhead = (boundary: "start" | "end") => {
+    const playhead = Math.min(
+      Math.max(Number.isFinite(currentTimeRef.current) ? currentTimeRef.current : 0, 0),
+      duration,
+    );
+    setDraft((current) => ({
+      ...current,
+      [boundary]: formatAnnotationInput(playhead),
+    }));
+  };
+
+  const saveAnnotation = async () => {
+    setShowValidation(true);
+    if (hasErrors) return;
+
+    const values = {
+      title: draft.title.trim(),
+      start: roundAnnotationTime(Number(draft.start)),
+      end: roundAnnotationTime(Number(draft.end)),
+    };
+    setSaving(true);
+
+    try {
+      if (annotation) {
+        const updated = { id: annotation.id, ...values };
+        const saved = await onUpdate(updated);
+        if (saved) setDraft(draftFromAnnotation(updated));
+      } else {
+        const created = await onCreate(values);
+        if (created) onCreated(created);
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeAnnotation = async () => {
+    if (!annotation) return;
+
+    setSaving(true);
+    try {
+      const deleted = await onDelete(annotation);
+      if (deleted) onDeleted(annotation.id);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <FieldGroup className="gap-4 rounded-md border bg-background p-3">
+      <Field data-invalid={showValidation && Boolean(errors.title)}>
+        <FieldLabel htmlFor="annotation-title">Title</FieldLabel>
+        <Input
+          id="annotation-title"
+          value={draft.title}
+          placeholder="Verse, chorus, bridge…"
+          disabled={saving}
+          aria-invalid={showValidation && Boolean(errors.title)}
+          onChange={(event) => {
+            const title = event.currentTarget.value;
+            setDraft((current) => ({ ...current, title }));
+          }}
+        />
+        {showValidation && errors.title ? <FieldError>{errors.title}</FieldError> : null}
+      </Field>
+
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={!isReady || saving}
+          onClick={() => setBoundaryAtPlayhead("start")}
+        >
+          Start at playhead
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={!isReady || saving}
+          onClick={() => setBoundaryAtPlayhead("end")}
+        >
+          End at playhead
+        </Button>
+      </div>
+
+      <FieldGroup className="grid gap-3 sm:grid-cols-2">
+        <Field data-invalid={showValidation && Boolean(errors.time)}>
+          <FieldLabel htmlFor="annotation-start">Start (seconds)</FieldLabel>
+          <Input
+            id="annotation-start"
+            type="number"
+            min={0}
+            max={duration}
+            step={0.01}
+            value={draft.start}
+            disabled={saving}
+            aria-invalid={showValidation && Boolean(errors.time)}
+            onChange={(event) => {
+              const start = event.currentTarget.value;
+              setDraft((current) => ({ ...current, start }));
+            }}
+          />
+        </Field>
+        <Field data-invalid={showValidation && Boolean(errors.time)}>
+          <FieldLabel htmlFor="annotation-end">End (seconds)</FieldLabel>
+          <Input
+            id="annotation-end"
+            type="number"
+            min={0}
+            max={duration}
+            step={0.01}
+            value={draft.end}
+            disabled={saving}
+            aria-invalid={showValidation && Boolean(errors.time)}
+            onChange={(event) => {
+              const end = event.currentTarget.value;
+              setDraft((current) => ({ ...current, end }));
+            }}
+          />
+        </Field>
+      </FieldGroup>
+
+      {showValidation && errors.time ? <FieldError>{errors.time}</FieldError> : null}
+      <FieldDescription>
+        Drag either edge on the timeline for fast adjustments. Touching edges are allowed; overlapping sections are not.
+      </FieldDescription>
+
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" size="sm" disabled={saving} onClick={() => void saveAnnotation()}>
+          {saving ? "Saving…" : "Save"}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="destructive"
+          disabled={!annotation || saving}
+          onClick={() => void removeAnnotation()}
+        >
+          Delete
+        </Button>
+      </div>
+    </FieldGroup>
+  );
+}
+
+function emptyAnnotationDraft(): AnnotationDraft {
+  return { title: "", start: "0.000", end: "0.000" };
+}
+
+function draftFromAnnotation(annotation: SongAnnotation): AnnotationDraft {
+  return {
+    title: annotation.title,
+    start: formatAnnotationInput(annotation.start),
+    end: formatAnnotationInput(annotation.end),
+  };
+}
+
+function formatAnnotationInput(seconds: number) {
+  return roundAnnotationTime(seconds).toFixed(3);
+}
+
+function roundAnnotationTime(seconds: number) {
+  return Math.round(seconds * 1000) / 1000;
+}
+
+function formatAnnotationTimestamp(seconds: number) {
+  const safeSeconds = Math.max(0, seconds);
+  const minutes = Math.floor(safeSeconds / 60);
+  const remaining = safeSeconds - minutes * 60;
+  return `${minutes}:${remaining.toFixed(2).padStart(5, "0")}`;
+}
+
+function findAnnotationGap(
+  annotations: SongAnnotation[],
+  playhead: number,
+  duration: number,
+) {
+  const ordered = [...annotations].sort(
+    (left, right) => left.start - right.start || left.end - right.end,
+  );
+  const starts = [playhead, 0];
+
+  for (const candidate of starts) {
+    let cursor = Math.min(Math.max(candidate, 0), duration);
+
+    for (const annotation of ordered) {
+      if (annotation.end <= cursor) continue;
+
+      if (annotation.start - cursor >= MIN_ANNOTATION_DURATION) {
+        return {
+          start: cursor,
+          end: Math.min(cursor + DEFAULT_ANNOTATION_DURATION, annotation.start),
+        };
+      }
+
+      if (cursor < annotation.end) cursor = annotation.end;
+    }
+
+    if (duration - cursor >= MIN_ANNOTATION_DURATION) {
+      return {
+        start: cursor,
+        end: Math.min(cursor + DEFAULT_ANNOTATION_DURATION, duration),
+      };
+    }
+  }
+
+  const start = Math.max(0, Math.min(playhead, duration - MIN_ANNOTATION_DURATION));
+  return { start, end: Math.min(duration, start + MIN_ANNOTATION_DURATION) };
+}
+
+function annotationDraftErrors(
+  draft: AnnotationDraft,
+  annotations: SongAnnotation[],
+  editingId: string | null,
+  duration: number,
+) {
+  const title = draft.title.trim() ? undefined : "Enter a title for this section.";
+  const start = Number(draft.start);
+  const end = Number(draft.end);
+  let time: string | undefined;
+
+  if (!draft.start.trim() || !draft.end.trim() || !Number.isFinite(start) || !Number.isFinite(end)) {
+    time = "Enter valid start and end times.";
+  } else if (start < 0 || end > duration) {
+    time = `Times must stay between 0 and ${formatAnnotationTimestamp(duration)}.`;
+  } else if (end - start < MIN_ANNOTATION_DURATION) {
+    time = "End must be at least 0.10 seconds after start.";
+  } else {
+    const overlap = annotations.find((annotation) =>
+      annotation.id !== editingId
+      && start < annotation.end
+      && end > annotation.start,
+    );
+
+    if (overlap) time = `This overlaps “${overlap.title}”. Adjust one of the boundaries.`;
+  }
+
+  return { title, time };
+}
+
+function isValidAnnotationTimeline(annotations: SongAnnotation[]) {
+  return annotations.every((annotation, index) => {
+    if (
+      !Number.isFinite(annotation.start)
+      || !Number.isFinite(annotation.end)
+      || annotation.start < 0
+      || annotation.end - annotation.start < MIN_ANNOTATION_DURATION
+    ) {
+      return false;
+    }
+
+    const previous = annotations[index - 1];
+    return !previous || annotation.start >= previous.end;
+  });
 }
 
 function ProgressiveAudioTrackLoader({
@@ -459,12 +2029,14 @@ function MixerLoadingPlaceholder({
 function MixStateSynchronizer({
   effectiveStates,
   expandedTrackIds,
+  mixId,
   mixerTracks,
   selectedTrackId,
   waveformRootRef,
 }: {
   effectiveStates: Array<{ name: SongMixerStateName; values: SongMixerStateValues }>;
   expandedTrackIds: string[];
+  mixId: SongMixerMixId;
   mixerTracks: SongMixerTrack[];
   selectedTrackId: string | null;
   waveformRootRef: RefObject<HTMLDivElement | null>;
@@ -558,6 +2130,7 @@ function MixStateSynchronizer({
         );
         const naturalHeight = BASE_WAVE_HEIGHT * channelCount;
         const configuredScale = effectiveStates[trackIndex]?.values.scale ?? 1;
+        const isMuted = playlistData.trackStates[trackIndex]?.muted ?? false;
         const mixerTrack = mixerTracks[trackIndex];
         const trackId = mixerTrack?.id;
         const isSelectedPart = Boolean(
@@ -580,7 +2153,13 @@ function MixStateSynchronizer({
           delete element.dataset.mixerPartEmphasis;
         } else if (mixerTrack) {
           element.dataset.mixerPartColor = String(partColorSlot(mixerTracks, trackIndex));
-          element.dataset.mixerPartEmphasis = isSelectedPart ? "selected" : "muted";
+          element.dataset.mixerPartEmphasis = isMuted
+            ? "muted"
+            : mixId === "learn"
+              ? isSelectedPart
+                ? "featured"
+                : "unfeatured"
+              : "basic";
         }
         element.style.height = `${naturalHeight}px`;
         element.style.transform = `scaleY(${displayScale})`;
@@ -604,9 +2183,11 @@ function MixStateSynchronizer({
   }, [
     effectiveStates,
     expandedTrackIds,
+    mixId,
     mixerTracks,
     playlistData.audioBuffers,
     playlistData.isReady,
+    playlistData.trackStates,
     selectedTrackId,
     waveformRootRef,
   ]);
@@ -629,6 +2210,10 @@ function WaveformPartColorFilters() {
   return (
     <svg aria-hidden className="absolute size-0 overflow-hidden" focusable="false">
       <defs>
+        <filter id="swell-muted-wave-filter" colorInterpolationFilters="sRGB">
+          <feFlood floodColor="var(--swell-muted-waveform)" result="wave-color" />
+          <feComposite in="wave-color" in2="SourceGraphic" operator="in" />
+        </filter>
         {Array.from({ length: PART_COLOR_COUNT }, (_, index) => {
           const partNumber = index + 1;
 
@@ -675,101 +2260,108 @@ function MixerTransport({
   loading,
   loadedCount,
   totalCount,
-  expandedTrackCount,
-  onOpenAllControls,
-  onCloseAllControls,
+  annotations,
 }: {
   loading: boolean;
   loadedCount: number;
   totalCount: number;
-  expandedTrackCount: number;
-  onOpenAllControls: () => void;
-  onCloseAllControls: () => void;
+  annotations: SongAnnotation[];
 }) {
   const { currentTime, isPlaying } = usePlaybackAnimation();
-  const { duration, isReady, canZoomIn, canZoomOut } = usePlaylistData();
-  const { pause, play, seekTo, stop, zoomIn, zoomOut } = usePlaylistControls();
+  const { activeAnnotationId } = usePlaylistState();
+  const { duration, isReady } = usePlaylistData();
+  const { pause, play, seekTo, setActiveAnnotationId } = usePlaylistControls();
   const safeDuration = Number.isFinite(duration) ? duration : 0;
   const safeCurrentTime = Math.min(Number.isFinite(currentTime) ? currentTime : 0, safeDuration);
+  const orderedAnnotations = useMemo(
+    () => [...annotations].sort((left, right) => left.start - right.start || left.end - right.end),
+    [annotations],
+  );
+  const activeAnnotationIndex = orderedAnnotations.findIndex(
+    (annotation) => annotation.id === activeAnnotationId,
+  );
+  const currentTimeAnnotationIndex = orderedAnnotations.reduce(
+    (currentIndex, annotation, index) =>
+      safeCurrentTime >= annotation.start ? index : currentIndex,
+    -1,
+  );
+  const currentAnnotationIndex =
+    activeAnnotationIndex >= 0 ? activeAnnotationIndex : currentTimeAnnotationIndex;
+  const previousAnnotation =
+    currentAnnotationIndex > 0 ? orderedAnnotations[currentAnnotationIndex - 1] : null;
+  const nextAnnotation = orderedAnnotations[currentAnnotationIndex + 1] ?? null;
+
+  const seekToSection = (annotation: SongAnnotation | null) => {
+    if (!annotation) return;
+    setActiveAnnotationId(annotation.id);
+    seekTo(annotation.start);
+  };
 
   return (
-    <div className="grid gap-3 bg-secondary/70 p-3 sm:p-4">
-      <div className="flex flex-wrap items-center gap-2">
+    <section
+      className="grid gap-2 border-t-2 bg-secondary/70 p-3 sm:p-4"
+      aria-label="Playback controls"
+    >
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:items-stretch">
         <Button
-          size="icon-lg"
-          aria-label="Play"
-          disabled={!isReady || isPlaying}
-          onClick={() => void play()}
+          size="lg"
+          className="col-span-2 min-h-16 w-full gap-3 text-lg sm:col-span-1 sm:w-auto sm:flex-[1.25]"
+          aria-label={isPlaying ? "Pause" : "Play"}
+          disabled={!isReady}
+          onClick={() => {
+            if (isPlaying) {
+              pause();
+            } else {
+              void play();
+            }
+          }}
         >
-          <PlayIcon className="size-4 fill-current" aria-hidden />
+          {isPlaying ? (
+            <PauseIcon className="size-7 fill-current" aria-hidden />
+          ) : (
+            <PlayIcon className="size-7 fill-current" aria-hidden />
+          )}
+          <span>{isPlaying ? "Pause" : "Play"}</span>
         </Button>
-        <Button size="icon-lg" variant="secondary" aria-label="Pause" disabled={!isReady || !isPlaying} onClick={pause}>
-          <PauseIcon className="size-4 fill-current" aria-hidden />
+        <Button
+          size="lg"
+          variant="outline"
+          className="min-h-12 min-w-0 flex-1 px-3 sm:min-w-40"
+          disabled={!isReady || !previousAnnotation}
+          onClick={() => seekToSection(previousAnnotation)}
+        >
+          <ChevronLeftIcon className="size-5" aria-hidden />
+          <span>Prev section</span>
         </Button>
-        <Button size="icon-lg" variant="secondary" aria-label="Stop and return to start" disabled={!isReady} onClick={stop}>
-          <RotateCcwIcon className="size-4" aria-hidden />
+        <Button
+          size="lg"
+          variant="outline"
+          className="min-h-12 min-w-0 flex-1 px-3 sm:min-w-40"
+          disabled={!isReady || !nextAnnotation}
+          onClick={() => seekToSection(nextAnnotation)}
+        >
+          <span>Next section</span>
+          <ChevronRightIcon className="size-5" aria-hidden />
         </Button>
-
-        <div className="ml-1 font-mono text-sm tabular-nums" aria-live="off">
-          {formatTime(safeCurrentTime)} <span className="text-muted-foreground">/ {formatTime(safeDuration)}</span>
-        </div>
-
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
-          <Button
-            size="xs"
-            variant="outline"
-            disabled={!isReady || expandedTrackCount === totalCount}
-            onClick={onOpenAllControls}
-          >
-            Open all controls
-          </Button>
-          <Button
-            size="xs"
-            variant="outline"
-            disabled={!isReady || expandedTrackCount === 0}
-            onClick={onCloseAllControls}
-          >
-            Close all controls
-          </Button>
-          <Button size="icon" variant="ghost" aria-label="Zoom timeline out" disabled={!canZoomOut} onClick={zoomOut}>
-            <ZoomOutIcon aria-hidden />
-          </Button>
-          <Button size="icon" variant="ghost" aria-label="Zoom timeline in" disabled={!canZoomIn} onClick={zoomIn}>
-            <ZoomInIcon aria-hidden />
-          </Button>
-        </div>
       </div>
 
-      <label className="grid gap-1.5">
-        <span className="flex items-center justify-between gap-3 text-xs font-medium">
-          <span>Timeline</span>
-          <span className="text-muted-foreground">
-            {loading
-              ? `Loading and decoding stems ${loadedCount}/${totalCount}`
-              : "Drag to seek. Space over waveforms plays or pauses."}
+      <div className="justify-self-end font-mono text-sm tabular-nums" aria-live="off">
+        {loading ? (
+          <span className="font-sans text-xs text-muted-foreground">
+            Loading stems {loadedCount}/{totalCount}
           </span>
-        </span>
-        <input
-          type="range"
-          min={0}
-          max={Math.max(safeDuration, 0.01)}
-          step={0.01}
-          value={safeCurrentTime}
-          disabled={!isReady}
-          onChange={(event) => seekTo(Number(event.currentTarget.value))}
-          className="swell-mixer-range w-full"
-          aria-label="Song position"
-        />
-      </label>
-    </div>
+        ) : (
+          <>
+            {formatTime(safeCurrentTime)}{" "}
+            <span className="text-muted-foreground">/ {formatTime(safeDuration)}</span>
+          </>
+        )}
+      </div>
+    </section>
   );
 }
 
-function WaveformSpacebarShortcut({
-  pointerOverWaveformRef,
-}: {
-  pointerOverWaveformRef: RefObject<boolean>;
-}) {
+function MixerSpacebarShortcut() {
   const { isPlaying } = usePlaybackAnimation();
   const { isReady } = usePlaylistData();
   const { pause, play } = usePlaylistControls();
@@ -779,19 +2371,19 @@ function WaveformSpacebarShortcut({
     if (
       !isSpace
       || event.defaultPrevented
-      || event.repeat
       || event.altKey
       || event.ctrlKey
       || event.metaKey
       || event.shiftKey
       || !isReady
-      || !pointerOverWaveformRef.current
-      || isInteractiveKeyboardTarget(event.target)
+      || isSpacebarEditingTarget(event.target)
     ) {
       return;
     }
 
     event.preventDefault();
+    if (event.repeat) return;
+
     if (isPlaying) {
       pause();
     } else {
@@ -800,31 +2392,28 @@ function WaveformSpacebarShortcut({
   });
 
   useEffect(() => {
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
   }, []);
 
   return null;
 }
 
-function isInteractiveKeyboardTarget(target: EventTarget | null) {
+function isSpacebarEditingTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
 
   return Boolean(
     target.closest(
-      'a[href], button, input, select, textarea, [contenteditable="true"], [role="button"], [role="checkbox"], [role="combobox"], [role="menuitem"], [role="option"], [role="slider"], [role="switch"], [role="tab"]',
+      'input, select, textarea, [contenteditable="true"], [role="combobox"], [role="slider"], [role="spinbutton"], [role="textbox"]',
     ),
   );
-}
-
-function isWaveformPointerTarget(target: EventTarget | null) {
-  return target instanceof Element && !target.closest("[data-mixer-track-index]");
 }
 
 function MixerTrackControls({
   trackIndex,
   track,
   expanded,
+  mixId,
   selected,
   selectable,
   practiceQuickMute,
@@ -835,6 +2424,7 @@ function MixerTrackControls({
   trackIndex: number;
   track: SongMixerTrack | undefined;
   expanded: boolean;
+  mixId: SongMixerMixId;
   selected: boolean;
   selectable: boolean;
   practiceQuickMute: boolean;
@@ -900,12 +2490,16 @@ function MixerTrackControls({
           <Button
             type="button"
             size="xs"
-            variant={selected ? "secondary" : "outline"}
-            disabled={selected}
+            variant={selected && mixId === "learn" ? "default" : selected ? "secondary" : "outline"}
+            aria-pressed={selected && mixId === "learn"}
             aria-label={
               selected
-                ? `${track.displayName} is selected`
-                : `Select ${track.displayName}`
+                ? mixId === "learn"
+                  ? `Return ${track.displayName} to Basic Mix`
+                  : `Switch ${track.displayName} to Learn Part`
+                : mixId === "listen"
+                  ? `Select ${track.displayName} and switch to Learn Part`
+                  : `Select ${track.displayName}`
             }
             className={cn(
               "absolute right-8",

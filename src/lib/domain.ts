@@ -73,7 +73,7 @@ export const SONG_MIXER_MIXES: ReadonlyArray<{
   },
   {
     id: "listen",
-    label: "Listen",
+    label: "Basic Mix",
     description: "Play every stem at its default balance.",
   },
 ];
@@ -101,10 +101,18 @@ export interface SongMixerTrack {
   stateOverrides: SongMixerStateOverrides;
 }
 
+export interface SongAnnotation {
+  id: string;
+  title: string;
+  start: number;
+  end: number;
+}
+
 export interface SongMixerBundle {
   song: Song;
   tracks: SongMixerTrack[];
   settings: SongMixerSettings;
+  annotations: SongAnnotation[];
 }
 
 export function createDefaultSongMixerSettings(): SongMixerSettings {

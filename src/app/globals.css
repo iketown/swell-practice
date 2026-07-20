@@ -104,6 +104,7 @@
   --swell-part-4: #5bc0eb; /* blue */
   --swell-part-5: #592e83; /* purple */
   --swell-part-muted-neutral: oklch(0.7 0.012 88);
+  --swell-muted-waveform: oklch(0.74 0.008 88);
   --swell-part-1-muted: color-mix(in oklch, var(--swell-part-1) 38%, var(--swell-part-muted-neutral));
   --swell-part-2-muted: color-mix(in oklch, var(--swell-part-2) 38%, var(--swell-part-muted-neutral));
   --swell-part-3-muted: color-mix(in oklch, var(--swell-part-3) 38%, var(--swell-part-muted-neutral));
@@ -232,8 +233,24 @@
     transition: height 180ms ease;
   }
 
+  .swell-mixer-waveform[data-annotation-lane-position="top"] [data-mixer-track-stack] {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .swell-mixer-waveform[data-annotation-lane-position="top"] [data-mixer-annotation-lane] {
+    order: -1;
+    flex: 0 0 30px;
+  }
+
+  .swell-mixer-waveform[data-annotation-lane-position="top"] [data-mixer-controls-column]::before {
+    display: block;
+    height: 30px;
+    content: "";
+  }
+
   .swell-mixer-waveform [data-mixer-wave-content] {
-    transition: filter 180ms ease, transform 180ms ease;
+    transition: filter 180ms ease, opacity 180ms ease, transform 180ms ease;
   }
 
   .swell-mixer-waveform [data-mixer-part-color="1"] {
@@ -261,14 +278,24 @@
     --swell-part-wave-muted-filter: url("#swell-part-5-muted-wave-filter");
   }
 
-  .swell-mixer-waveform [data-mixer-track-kind="part"][data-mixer-part-emphasis="selected"] canvas {
+  .swell-mixer-waveform [data-mixer-track-kind="part"][data-mixer-part-emphasis="basic"] canvas {
+    filter: var(--swell-part-wave-filter);
+    opacity: 0.8;
+  }
+
+  .swell-mixer-waveform [data-mixer-track-kind="part"][data-mixer-part-emphasis="featured"] canvas {
     filter: var(--swell-part-wave-filter);
     opacity: 1;
   }
 
+  .swell-mixer-waveform [data-mixer-track-kind="part"][data-mixer-part-emphasis="unfeatured"] canvas {
+    filter: var(--swell-part-wave-filter);
+    opacity: 0.3;
+  }
+
   .swell-mixer-waveform [data-mixer-track-kind="part"][data-mixer-part-emphasis="muted"] canvas {
-    filter: var(--swell-part-wave-muted-filter);
-    opacity: 0.56;
+    filter: url("#swell-muted-wave-filter");
+    opacity: 0.62;
   }
 
   .swell-mixer-waveform [data-mixer-track-kind="background"] {

@@ -29,6 +29,7 @@ import {
   sortTitle,
   type Song,
   type SongAsset,
+  type SongAnnotation,
   type SongBundle,
   type SongMixerBundle,
   type SongMixerSettings,
@@ -101,6 +102,17 @@ function mixerTrackFromDoc(id: string, data: Record<string, unknown>, fallbackOr
     isBackgroundMix: data.isBackgroundMix === true,
     orderIndex: typeof data.orderIndex === "number" ? data.orderIndex : fallbackOrderIndex,
     stateOverrides: mixerStateOverridesFromData(data.stateOverrides),
+  };
+}
+
+function annotationFromDoc(id: string, data: Record<string, unknown>): SongAnnotation {
+  const start = boundedNumber(data.start, 0, 0, Number.MAX_SAFE_INTEGER);
+
+  return {
+    id,
+    title: String(data.title ?? "Untitled section"),
+    start,
+    end: boundedNumber(data.end, start + 0.1, start + 0.1, Number.MAX_SAFE_INTEGER),
   };
 }
 
@@ -239,7 +251,9 @@ export async function getSongBundle(slug: string): Promise<SongBundle | null> {
 export async function getSongMixerBundle(slug: string): Promise<SongMixerBundle | null> {
   if (!hasFirebaseConfig || !db) {
     const bundle = sampleSongBundle(slug);
-    return bundle ? { song: bundle.song, tracks: [], settings: createDefaultSongMixerSettings() } : null;
+    return bundle
+      ? { song: bundle.song, tracks: [], settings: createDefaultSongMixerSettings(), annotations: [] }
+      : null;
   }
 
   try {
@@ -248,9 +262,13 @@ export async function getSongMixerBundle(slug: string): Promise<SongMixerBundle 
     const songSnap = songSnaps.docs[0];
     if (!songSnap) return null;
 
-    const [tracksSnap, settingsSnap] = await Promise.all([
+    const [tracksSnap, settingsSnap, annotationsSnap] = await Promise.all([
       getDocs(collection(firestore, "songs", songSnap.id, "mixerTracks")),
       getDoc(doc(firestore, "songs", "global-mixer-defaults", "mixerSettings", "main")),
+      getDocs(collection(firestore, "songs", songSnap.id, "annotations")).catch((caught) => {
+        warnReadFailure(`annotations for song "${slug}"`, caught);
+        return null;
+      }),
     ]);
 
     const tracks = tracksSnap.docs
@@ -261,6 +279,9 @@ export async function getSongMixerBundle(slug: string): Promise<SongMixerBundle 
       song: songFromDoc(songSnap.id, songSnap.data()),
       tracks,
       settings: mixerSettingsFromData(settingsSnap.exists() ? settingsSnap.data() : undefined),
+      annotations: (annotationsSnap?.docs ?? [])
+        .map((snap) => annotationFromDoc(snap.id, snap.data()))
+        .sort((left, right) => left.start - right.start || left.end - right.end),
     };
   } catch (caught) {
     warnReadFailure(`mixer tracks for song "${slug}"`, caught);
@@ -536,6 +557,80 @@ export async function saveSongMixerTrackOverridesBatch(
   });
 
   await batch.commit();
+}
+
+export async function createSongAnnotation(
+  bundle: SongMixerBundle,
+  annotation: Omit<SongAnnotation, "id">,
+) {
+  const { db } = requireFirebase();
+  const annotationRef = doc(collection(db, "songs", bundle.song.id, "annotations"));
+  const batch = writeBatch(db);
+
+  batch.set(annotationRef, {
+    title: annotation.title,
+    start: annotation.start,
+    end: annotation.end,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  await batch.commit();
+
+  return { id: annotationRef.id, ...annotation } satisfies SongAnnotation;
+}
+
+export async function updateSongAnnotation(
+  bundle: SongMixerBundle,
+  annotation: SongAnnotation,
+) {
+  const { db } = requireFirebase();
+
+  await updateDoc(doc(db, "songs", bundle.song.id, "annotations", annotation.id), {
+    title: annotation.title,
+    start: annotation.start,
+    end: annotation.end,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function deleteSongAnnotation(bundle: SongMixerBundle, annotationId: string) {
+  const { db } = requireFirebase();
+  const batch = writeBatch(db);
+
+  batch.delete(doc(db, "songs", bundle.song.id, "annotations", annotationId));
+  await batch.commit();
+}
+
+export async function replaceSongAnnotations(
+  bundle: SongMixerBundle,
+  annotations: Array<Omit<SongAnnotation, "id">>,
+) {
+  const { db } = requireFirebase();
+  const annotationsRef = collection(db, "songs", bundle.song.id, "annotations");
+  const existingAnnotations = await getDocs(annotationsRef);
+
+  if (existingAnnotations.size + annotations.length > 500) {
+    throw new Error("Too many annotations to replace in one operation.");
+  }
+
+  const batch = writeBatch(db);
+  existingAnnotations.docs.forEach((annotation) => batch.delete(annotation.ref));
+
+  const replacements = annotations.map((annotation) => {
+    const annotationRef = doc(annotationsRef);
+    batch.set(annotationRef, {
+      title: annotation.title,
+      start: annotation.start,
+      end: annotation.end,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    return { id: annotationRef.id, ...annotation } satisfies SongAnnotation;
+  });
+
+  await batch.commit();
+  return replacements;
 }
 
 export async function deleteSongMixerTrack(bundle: SongMixerBundle, track: SongMixerTrack) {

@@ -7,3 +7,6 @@ ignoredBuiltDependencies:
 overrides:
   "@dnd-kit/abstract": 0.3.2
   "@dnd-kit/dom": 0.3.2
+peerDependencyRules:
+  allowedVersions:
+    "@waveform-playlist/annotations@12.0.6>react": "19"

@@ -26,6 +26,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   SONG_MIXER_MIXES,
+  type SongAnnotation,
   type SongMixerMixId,
   type SongMixerSettings,
   type SongMixerStateOverrides,
@@ -49,7 +50,9 @@ const SongMixerWaveform = dynamic(
 export function SongMixerPlayer({
   tracks,
   settings,
+  annotations,
   canSaveOverrides,
+  canEditAnnotations,
   autoSaveOverrides,
   hasUnsavedOverrideChanges,
   overrideSaveStatus,
@@ -58,10 +61,17 @@ export function SongMixerPlayer({
   onSaveOverrides,
   onRevertOverrides,
   onTrackOverridesChange,
+  onCreateAnnotation,
+  onUpdateAnnotation,
+  onDeleteAnnotation,
+  onImportAnnotations,
+  onAnnotationsChange,
 }: {
   tracks: SongMixerTrack[];
   settings: SongMixerSettings;
+  annotations: SongAnnotation[];
   canSaveOverrides: boolean;
+  canEditAnnotations: boolean;
   autoSaveOverrides: boolean;
   hasUnsavedOverrideChanges: boolean;
   overrideSaveStatus: "idle" | "dirty" | "saving" | "saved" | "error";
@@ -70,6 +80,13 @@ export function SongMixerPlayer({
   onSaveOverrides: () => void;
   onRevertOverrides: () => void;
   onTrackOverridesChange: (trackId: string, stateOverrides: SongMixerStateOverrides) => void;
+  onCreateAnnotation: (annotation: Omit<SongAnnotation, "id">) => Promise<SongAnnotation | null>;
+  onUpdateAnnotation: (annotation: SongAnnotation) => Promise<boolean>;
+  onDeleteAnnotation: (annotation: SongAnnotation) => Promise<boolean>;
+  onImportAnnotations: (
+    annotations: Array<Omit<SongAnnotation, "id">>,
+  ) => Promise<SongAnnotation[] | null>;
+  onAnnotationsChange: (annotations: SongAnnotation[]) => void;
 }) {
   const featureableTracks = useMemo(
     () => tracks.filter((track) => !track.isBackgroundMix),
@@ -79,7 +96,6 @@ export function SongMixerPlayer({
     featureableTracks[0]?.id ?? null,
   );
   const [mixId, setMixId] = useState<SongMixerMixId>("listen");
-  const activeMix = SONG_MIXER_MIXES.find((mix) => mix.id === mixId) ?? SONG_MIXER_MIXES[2];
   const effectiveSelectedTrackId = featureableTracks.some((track) => track.id === selectedTrackId)
     ? selectedTrackId
     : featureableTracks[0]?.id ?? null;
@@ -96,143 +112,163 @@ export function SongMixerPlayer({
           : overrideSaveStatus === "saved"
             ? "Saved"
             : "Stored";
+  const selectTrackFromWaveform = (trackId: string) => {
+    if (mixId === "learn" && trackId === effectiveSelectedTrackId) {
+      setMixId("listen");
+      return;
+    }
 
-  return (
-    <>
-      <div className="grid gap-3 border-b-2 bg-card p-3 sm:grid-cols-[minmax(13rem,0.7fr)_minmax(0,1fr)] sm:items-start sm:p-4">
-        <div className="grid gap-1.5">
-          <Label htmlFor="selected-mixer-stem">Selected part</Label>
-          <Select
-            items={featureableTracks.map((track) => ({
-              label: track.displayName,
-              value: track.id,
-            }))}
-            value={effectiveSelectedTrackId}
-            disabled={!featureableTracks.length}
-            onValueChange={setSelectedTrackId}
-          >
-            <SelectTrigger id="selected-mixer-stem" className="h-10 w-full bg-background">
-              <SelectValue placeholder="No selectable parts" />
-            </SelectTrigger>
-            <SelectContent align="start">
-              <SelectGroup>
-                {featureableTracks.map((track) => (
-                  <SelectItem key={track.id} value={track.id}>
-                    {track.displayName}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-          {manageStemsAction ? <div className="pt-1">{manageStemsAction}</div> : null}
-        </div>
+    setSelectedTrackId(trackId);
+    if (mixId === "listen") setMixId("learn");
+  };
 
-        <div className="grid min-w-0 gap-1.5">
-          <Label>Custom mix</Label>
-          <Tabs
-            value={mixId}
-            onValueChange={(value) => setMixId(value as SongMixerMixId)}
-            className="min-w-0 gap-1.5"
-          >
-            <TabsList className="grid h-auto w-full grid-cols-3">
-              {SONG_MIXER_MIXES.map((mix) => (
-                <TabsTrigger key={mix.id} value={mix.id} className="min-h-9 px-2 text-xs sm:text-sm">
-                  {mix.label}
-                </TabsTrigger>
+  const partAndMixControls = (
+    <section
+      className="grid gap-3 border-t-2 bg-card p-3 sm:grid-cols-[minmax(13rem,0.7fr)_minmax(0,1fr)] sm:items-end sm:p-4"
+      aria-label="Part and mix"
+    >
+      <div className="grid gap-1.5">
+        <Label htmlFor="selected-mixer-stem">Selected part</Label>
+        <Select
+          items={featureableTracks.map((track) => ({
+            label: track.displayName,
+            value: track.id,
+          }))}
+          value={effectiveSelectedTrackId}
+          disabled={!featureableTracks.length}
+          onValueChange={setSelectedTrackId}
+        >
+          <SelectTrigger id="selected-mixer-stem" className="h-11 w-full bg-background">
+            <SelectValue placeholder="No selectable parts" />
+          </SelectTrigger>
+          <SelectContent align="start">
+            <SelectGroup>
+              {featureableTracks.map((track) => (
+                <SelectItem key={track.id} value={track.id}>
+                  {track.displayName}
+                </SelectItem>
               ))}
-            </TabsList>
-          </Tabs>
-        </div>
-
-        <p className="text-xs text-muted-foreground sm:col-span-2">
-          {activeMix?.description}
-        </p>
-
-        {canSaveOverrides ? (
-          <Accordion defaultValue={[]} className="gap-0 sm:col-span-2">
-            <AccordionItem value="song-overrides" className="rounded-md border bg-secondary/35 shadow-none">
-              <AccordionTrigger className="min-h-10 px-3 py-2 font-body hover:bg-secondary/55">
-                <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                  <span className="font-semibold">Song overrides</span>
-                  <Badge variant="outline">
-                    {overrideValueCount} value{overrideValueCount === 1 ? "" : "s"}
-                  </Badge>
-                  <Badge
-                    variant={overrideSaveStatus === "error" ? "destructive" : "secondary"}
-                    aria-live="polite"
-                  >
-                    {overrideStatusLabel}
-                  </Badge>
-                </span>
-              </AccordionTrigger>
-              <AccordionContent className="grid gap-2 border-t px-3 py-3">
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background px-3 py-2">
-                  <Field orientation="horizontal" className="w-auto gap-2">
-                    <Switch
-                      id="auto-save-mixer-overrides"
-                      checked={autoSaveOverrides}
-                      disabled={overrideSaveStatus === "saving"}
-                      onCheckedChange={onAutoSaveOverridesChange}
-                    />
-                    <FieldLabel htmlFor="auto-save-mixer-overrides">
-                      Save moves to overrides
-                    </FieldLabel>
-                  </Field>
-
-                  {!autoSaveOverrides ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button
-                        type="button"
-                        size="xs"
-                        disabled={
-                          !hasUnsavedOverrideChanges || overrideSaveStatus === "saving"
-                        }
-                        onClick={onSaveOverrides}
-                      >
-                        Save overrides
-                      </Button>
-                      <Button
-                        type="button"
-                        size="xs"
-                        variant="outline"
-                        disabled={
-                          !hasUnsavedOverrideChanges || overrideSaveStatus === "saving"
-                        }
-                        onClick={onRevertOverrides}
-                      >
-                        Revert to saved
-                      </Button>
-                    </div>
-                  ) : null}
-                </div>
-                <p className="max-w-3xl text-xs text-muted-foreground">
-                  {autoSaveOverrides
-                    ? "Adjust volume, pan, or mute while a stem is in a mix state. Each move is saved automatically."
-                    : "Changes are held in this page until you save them. Revert restores the last values loaded from the database."}
-                </p>
-                <pre
-                  data-testid="song-mixer-overrides-json"
-                  aria-label="Song mixer overrides JSON"
-                  className="max-h-48 overflow-auto rounded-md border bg-background p-3 font-mono text-[11px] leading-relaxed"
-                >
-                  {JSON.stringify(overridesObject, null, 2)}
-                </pre>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        ) : null}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+        {manageStemsAction ? <div className="pt-1">{manageStemsAction}</div> : null}
       </div>
 
-      <SongMixerWaveform
-        key={tracks.map((track) => track.id).join(":")}
-        tracks={tracks}
-        settings={settings}
-        mixId={mixId}
-        selectedTrackId={effectiveSelectedTrackId}
-        onSelectedTrackChange={setSelectedTrackId}
-        onTrackOverridesChange={canSaveOverrides ? onTrackOverridesChange : undefined}
-      />
-    </>
+      <div className="grid min-w-0 gap-1.5">
+        <Label>Mix</Label>
+        <Tabs
+          value={mixId}
+          onValueChange={(value) => setMixId(value as SongMixerMixId)}
+          className="min-w-0 gap-1.5"
+        >
+          <TabsList className="grid h-auto w-full grid-cols-3">
+            {SONG_MIXER_MIXES.map((mix) => (
+              <TabsTrigger
+                key={mix.id}
+                value={mix.id}
+                className="min-h-10 px-2 text-xs sm:text-sm"
+              >
+                {mix.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      </div>
+
+      {canSaveOverrides ? (
+        <Accordion defaultValue={[]} className="gap-0 sm:col-span-2">
+          <AccordionItem value="song-overrides" className="rounded-md border bg-secondary/35 shadow-none">
+            <AccordionTrigger className="min-h-10 px-3 py-2 font-body hover:bg-secondary/55">
+              <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                <span className="font-semibold">Song overrides</span>
+                <Badge variant="outline">
+                  {overrideValueCount} value{overrideValueCount === 1 ? "" : "s"}
+                </Badge>
+                <Badge
+                  variant={overrideSaveStatus === "error" ? "destructive" : "secondary"}
+                  aria-live="polite"
+                >
+                  {overrideStatusLabel}
+                </Badge>
+              </span>
+            </AccordionTrigger>
+            <AccordionContent className="grid gap-2 border-t px-3 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background px-3 py-2">
+                <Field orientation="horizontal" className="w-auto gap-2">
+                  <Switch
+                    id="auto-save-mixer-overrides"
+                    checked={autoSaveOverrides}
+                    disabled={overrideSaveStatus === "saving"}
+                    onCheckedChange={onAutoSaveOverridesChange}
+                  />
+                  <FieldLabel htmlFor="auto-save-mixer-overrides">
+                    Save moves to overrides
+                  </FieldLabel>
+                </Field>
+
+                {!autoSaveOverrides ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      size="xs"
+                      disabled={
+                        !hasUnsavedOverrideChanges || overrideSaveStatus === "saving"
+                      }
+                      onClick={onSaveOverrides}
+                    >
+                      Save overrides
+                    </Button>
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="outline"
+                      disabled={
+                        !hasUnsavedOverrideChanges || overrideSaveStatus === "saving"
+                      }
+                      onClick={onRevertOverrides}
+                    >
+                      Revert to saved
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+              <p className="max-w-3xl text-xs text-muted-foreground">
+                {autoSaveOverrides
+                  ? "Adjust volume, pan, or mute while a stem is in a mix state. Each move is saved automatically."
+                  : "Changes are held in this page until you save them. Revert restores the last values loaded from the database."}
+              </p>
+              <pre
+                data-testid="song-mixer-overrides-json"
+                aria-label="Song mixer overrides JSON"
+                className="max-h-48 overflow-auto rounded-md border bg-background p-3 font-mono text-[11px] leading-relaxed"
+              >
+                {JSON.stringify(overridesObject, null, 2)}
+              </pre>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      ) : null}
+    </section>
+  );
+
+  return (
+    <SongMixerWaveform
+      key={tracks.map((track) => track.id).join(":")}
+      tracks={tracks}
+      settings={settings}
+      annotations={annotations}
+      partAndMixControls={partAndMixControls}
+      mixId={mixId}
+      selectedTrackId={effectiveSelectedTrackId}
+      onSelectedTrackChange={selectTrackFromWaveform}
+      onTrackOverridesChange={canSaveOverrides ? onTrackOverridesChange : undefined}
+      canEditAnnotations={canEditAnnotations}
+      onCreateAnnotation={onCreateAnnotation}
+      onUpdateAnnotation={onUpdateAnnotation}
+      onDeleteAnnotation={onDeleteAnnotation}
+      onImportAnnotations={onImportAnnotations}
+      onAnnotationsChange={onAnnotationsChange}
+    />
   );
 }
 

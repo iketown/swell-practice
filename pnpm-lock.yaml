@@ -18,9 +18,12 @@ importers:
       '@dnd-kit/react':
         specifier: ^0.3.2
         version: 0.3.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@waveform-playlist/annotations':
+        specifier: ^12.0.6
+        version: 12.0.6(@dnd-kit/react@0.3.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(@waveform-playlist/browser@15.3.4)(@waveform-playlist/engine@13.5.1(@waveform-playlist/core@12.6.1))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(styled-components@6.4.4(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(tone@15.1.22)
       '@waveform-playlist/browser':
         specifier: ^15.3.4
-        version: 15.3.4(@dnd-kit/abstract@0.3.2)(@dnd-kit/dom@0.3.2)(@dnd-kit/react@0.3.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(@waveform-playlist/playout@12.5.4(@waveform-playlist/engine@13.5.1(@waveform-playlist/core@12.6.1))(tone@15.1.22))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(styled-components@6.4.4(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(tone@15.1.22)
+        version: 15.3.4(@dnd-kit/abstract@0.3.2)(@dnd-kit/dom@0.3.2)(@dnd-kit/react@0.3.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(@waveform-playlist/annotations@12.0.6)(@waveform-playlist/playout@12.5.4(@waveform-playlist/engine@13.5.1(@waveform-playlist/core@12.6.1))(tone@15.1.22))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(styled-components@6.4.4(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(tone@15.1.22)
       '@waveform-playlist/playout':
         specifier: ^12.5.4
         version: 12.5.4(@waveform-playlist/engine@13.5.1(@waveform-playlist/core@12.6.1))(tone@15.1.22)
@@ -1213,6 +1216,14 @@ packages:
     resolution: {integrity: sha512-nAB74NfSNKknqQ1RrYj6uz8FcXEomu/MATJZxh/x+BArzN2U3JbOYC0APYzUIGhVY3m5hRxA8VPNdPBoG8txlA==}
     cpu: [x64]
     os: [win32]
+
+  '@waveform-playlist/annotations@12.0.6':
+    resolution: {integrity: sha512-EPo/qUyPZLljwKRnaDEQ5E92V7GnbCF9wZp7u9BGhOHDv8RY63CvaHF/rSrD+RGUZ0eDa3Bke6RmZHQMIBfkkA==}
+    peerDependencies:
+      '@dnd-kit/react': ^0.3.0
+      '@waveform-playlist/browser': ^15.3.4
+      react: ^18.0.0
+      styled-components: ^6.0.0
 
   '@waveform-playlist/browser@15.3.4':
     resolution: {integrity: sha512-/ARUGfeEnNeafAlHi2KLl9Z6jU7KBHc5PnUy2ugCtCbHkD1bbh/7q5wkIr3on2v7m7AP8VkLFTwTvEOy2i1i6g==}
@@ -4649,7 +4660,20 @@ snapshots:
   '@unrs/resolver-binding-win32-x64-msvc@1.12.2':
     optional: true
 
-  '@waveform-playlist/browser@15.3.4(@dnd-kit/abstract@0.3.2)(@dnd-kit/dom@0.3.2)(@dnd-kit/react@0.3.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(@waveform-playlist/playout@12.5.4(@waveform-playlist/engine@13.5.1(@waveform-playlist/core@12.6.1))(tone@15.1.22))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(styled-components@6.4.4(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(tone@15.1.22)':
+  '@waveform-playlist/annotations@12.0.6(@dnd-kit/react@0.3.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(@waveform-playlist/browser@15.3.4)(@waveform-playlist/engine@13.5.1(@waveform-playlist/core@12.6.1))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(styled-components@6.4.4(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(tone@15.1.22)':
+    dependencies:
+      '@dnd-kit/react': 0.3.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@waveform-playlist/browser': 15.3.4(@dnd-kit/abstract@0.3.2)(@dnd-kit/dom@0.3.2)(@dnd-kit/react@0.3.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(@waveform-playlist/annotations@12.0.6)(@waveform-playlist/playout@12.5.4(@waveform-playlist/engine@13.5.1(@waveform-playlist/core@12.6.1))(tone@15.1.22))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(styled-components@6.4.4(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(tone@15.1.22)
+      '@waveform-playlist/core': 12.6.1
+      '@waveform-playlist/ui-components': 13.1.5(@dnd-kit/react@0.3.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(@waveform-playlist/engine@13.5.1(@waveform-playlist/core@12.6.1))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(styled-components@6.4.4(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(tone@15.1.22)
+      react: 19.2.4
+      styled-components: 6.4.4(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+    transitivePeerDependencies:
+      - '@waveform-playlist/engine'
+      - react-dom
+      - tone
+
+  '@waveform-playlist/browser@15.3.4(@dnd-kit/abstract@0.3.2)(@dnd-kit/dom@0.3.2)(@dnd-kit/react@0.3.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(@waveform-playlist/annotations@12.0.6)(@waveform-playlist/playout@12.5.4(@waveform-playlist/engine@13.5.1(@waveform-playlist/core@12.6.1))(tone@15.1.22))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(styled-components@6.4.4(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(tone@15.1.22)':
     dependencies:
       '@dnd-kit/abstract': 0.3.2
       '@dnd-kit/dom': 0.3.2
@@ -4664,6 +4688,7 @@ snapshots:
       uuid: 13.0.2
       waveform-data: 4.5.2
     optionalDependencies:
+      '@waveform-playlist/annotations': 12.0.6(@dnd-kit/react@0.3.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(@waveform-playlist/browser@15.3.4)(@waveform-playlist/engine@13.5.1(@waveform-playlist/core@12.6.1))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(styled-components@6.4.4(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(tone@15.1.22)
       '@waveform-playlist/playout': 12.5.4(@waveform-playlist/engine@13.5.1(@waveform-playlist/core@12.6.1))(tone@15.1.22)
       tone: 15.1.22
 

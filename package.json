@@ -11,6 +11,7 @@
   "dependencies": {
     "@base-ui/react": "^1.6.0",
     "@dnd-kit/react": "^0.3.2",
+    "@waveform-playlist/annotations": "^12.0.6",
     "@waveform-playlist/browser": "^15.3.4",
     "@waveform-playlist/playout": "^12.5.4",
     "class-variance-authority": "^0.7.1",
