@@ -321,7 +321,12 @@ export function SongMixerWaveform({
   const effectiveStates = useMemo(
     () =>
       loadedMixerTracks.map((track) => {
-        const name = mixerStateForTrack(mixId, track.id, selectedTrackId);
+        const name = mixerStateForTrack(
+          mixId,
+          track.id,
+          selectedTrackId,
+          track.isBackgroundMix,
+        );
 
         return {
           name,
@@ -2472,6 +2477,7 @@ function DialogMixerTrackControls({
   if (!track || !state) return null;
 
   const showsSelectAction = selectable && !practiceQuickMute;
+  const showsPracticeMuteAction = selectable && practiceQuickMute;
   const dialogTitle = `${track.displayName} track controls`;
   const visibleTrackName = track.displayName.slice(0, 5);
   const changeVolume = (volume: number) => {
@@ -2513,6 +2519,19 @@ function DialogMixerTrackControls({
           onClick={onSelect}
         >
           <span className="truncate">{visibleTrackName}</span>
+        </Button>
+      ) : showsPracticeMuteAction ? (
+        <Button
+          type="button"
+          size="xs"
+          variant={state.muted ? "default" : "secondary"}
+          aria-pressed={state.muted}
+          aria-label={`${state.muted ? "Unmute" : "Mute"} ${track.displayName} for this practice session`}
+          title={`${state.muted ? "Unmute" : "Mute"} ${track.displayName}`}
+          className="absolute inset-y-0 left-1 right-12 z-10 my-auto min-w-0 justify-start"
+          onClick={toggleMute}
+        >
+          <span className="truncate">{state.muted ? "Unmute" : "Mute"}</span>
         </Button>
       ) : (
         <span

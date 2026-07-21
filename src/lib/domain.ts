@@ -37,7 +37,14 @@ export interface SongBundle {
   assets: SongAsset[];
 }
 
-export const SONG_MIXER_STATE_NAMES = ["featured", "unfeatured", "default", "muted"] as const;
+export const SONG_MIXER_STATE_NAMES = [
+  "featured",
+  "unfeatured",
+  "default",
+  "muted",
+  "practice",
+  "practiceBackground",
+] as const;
 export type SongMixerStateName = (typeof SONG_MIXER_STATE_NAMES)[number];
 
 export type SongMixerStateValues = {
@@ -69,7 +76,7 @@ export const SONG_MIXER_MIXES: ReadonlyArray<{
   {
     id: "practice",
     label: "Practice Part",
-    description: "Mute the selected part and play the other stems at their default balance.",
+    description: "Mute the selected part, boost the other selectable parts, and soften the backing mix.",
   },
   {
     id: "listen",
@@ -84,6 +91,8 @@ export const DEFAULT_SONG_MIXER_SETTINGS: SongMixerSettings = {
     unfeatured: { volume: 10, pan: 50, muted: false, scale: 1 },
     default: { volume: 40, pan: 0, muted: false, scale: 1 },
     muted: { volume: 70, pan: 0, muted: true, scale: 1 },
+    practice: { volume: 60, pan: 0, muted: false, scale: 1 },
+    practiceBackground: { volume: 30, pan: 0, muted: false, scale: 1 },
   },
 };
 
@@ -149,13 +158,15 @@ export function mixerStateForTrack(
   mixId: SongMixerMixId,
   trackId: string,
   selectedTrackId: string | null,
+  isBackgroundMix = false,
 ): SongMixerStateName {
   if (mixId === "learn") {
     return trackId === selectedTrackId ? "featured" : "unfeatured";
   }
 
   if (mixId === "practice") {
-    return trackId === selectedTrackId ? "muted" : "default";
+    if (trackId === selectedTrackId) return "muted";
+    return isBackgroundMix ? "practiceBackground" : "practice";
   }
 
   return "default";

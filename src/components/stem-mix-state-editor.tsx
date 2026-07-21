@@ -29,6 +29,8 @@ const STATE_LABELS: Record<SongMixerStateName, string> = {
   unfeatured: "Unfeatured",
   default: "Default",
   muted: "Muted",
+  practice: "Practice part",
+  practiceBackground: "Practice backing",
 };
 
 type NumericSetting = "volume" | "pan" | "scale";
