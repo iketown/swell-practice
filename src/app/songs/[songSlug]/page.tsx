@@ -1,10 +1,23 @@
-import { SongPageClient } from "@/components/song-page-client";
+import { SongPlayerPageClient } from "@/components/song-player-page-client";
 
-export default async function SongPage({
+export default async function SongMixerPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ songSlug: string }>;
+  searchParams: Promise<{ mix?: string | string[]; part?: string | string[]; member?: string | string[] }>;
 }) {
-  const { songSlug } = await params;
-  return <SongPageClient slug={songSlug} />;
+  const [{ songSlug }, query] = await Promise.all([params, searchParams]);
+  return (
+    <SongPlayerPageClient
+      slug={songSlug}
+      requestedMix={queryValue(query.mix)}
+      requestedPart={queryValue(query.part)}
+      requestedMember={queryValue(query.member)}
+    />
+  );
+}
+
+function queryValue(value: string | string[] | undefined) {
+  return typeof value === "string" ? value : undefined;
 }

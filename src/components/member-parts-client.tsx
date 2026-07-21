@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { BookOpenCheckIcon, Layers3Icon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -8,6 +9,7 @@ import { AssetLinks } from "@/components/asset-links";
 import { MemberAvatar } from "@/components/member-avatar";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -103,25 +105,41 @@ export function MemberPartsClient({ memberSlug }: { memberSlug: string }) {
       <section className="flex flex-col gap-4" aria-labelledby="member-set-list-title">
         <header className="flex flex-col gap-1 px-1">
           <h2 id="member-set-list-title" className="text-xl font-semibold">Set list</h2>
-          <p className="text-sm text-muted-foreground">Open a song to get the files for your assigned parts.</p>
+          <p className="text-sm text-muted-foreground">Choose a part to open its mixer, or expand a song for files.</p>
         </header>
         <Accordion multiple>
           {data.rows.map((row) => (
             <AccordionItem key={row.song.id} value={row.song.id} disabled={!row.effectivePartSlugs.length}>
-              <AccordionTrigger>
-                <span className="flex min-w-0 flex-1 flex-col gap-2">
+              <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <AccordionTrigger className="min-w-0 p-0 hover:bg-transparent data-[open]:bg-transparent">
+                  <span className="flex min-w-0 flex-1 flex-col gap-2">
                   <span className="flex flex-wrap items-center gap-2">
                     <span className="font-semibold">{row.song.title}</span>
                     {row.hasOverride ? <Badge variant="outline">Band change</Badge> : null}
                   </span>
-                  <span className="flex flex-wrap gap-2">
-                    {row.effectivePartSlugs.length ? row.effectivePartSlugs.map((partSlug) => {
-                      const changed = !row.defaultPartSlugs.includes(partSlug);
-                      return <Badge key={partSlug} variant={changed ? "default" : "secondary"}>{partLabel(partSlug)}{changed ? " · Changed" : ""}</Badge>;
-                    }) : <span className="text-sm font-normal text-muted-foreground">No assignment for this song</span>}
+                  {!row.effectivePartSlugs.length ? <span className="text-sm font-normal text-muted-foreground">No assignment for this song</span> : null}
                   </span>
-                </span>
-              </AccordionTrigger>
+                </AccordionTrigger>
+                {row.effectivePartSlugs.length ? (
+                  <div className="flex flex-wrap gap-2 sm:justify-end">
+                    {row.effectivePartSlugs.map((partSlug) => {
+                      const changed = !row.defaultPartSlugs.includes(partSlug);
+                      const mix = partSlug.startsWith("voc_") ? "voc" : "inst";
+                      return (
+                        <Button
+                          key={partSlug}
+                          render={<Link href={`/songs/${row.song.slug}?mix=${mix}&part=${partSlug}&member=${data.member.slug}`} />}
+                          variant={changed ? "default" : "secondary"}
+                          size="sm"
+                          nativeButton={false}
+                        >
+                          {partLabel(partSlug)}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
               <AccordionContent className="border-t">
                 <div className="flex flex-col gap-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">

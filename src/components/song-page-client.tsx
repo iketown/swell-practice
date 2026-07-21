@@ -186,7 +186,7 @@ export function SongPageClient({ slug }: { slug: string }) {
       <header className="flex flex-col gap-3 py-1 sm:flex-row sm:items-end sm:justify-between sm:py-2">
         <h1 className="swell-song-title">{bundle.song.title}</h1>
         <div className="flex flex-wrap gap-2">
-          <Button render={<Link href={`/songs/${bundle.song.slug}/player`} />} variant="secondary" nativeButton={false}>
+          <Button render={<Link href={`/songs/${bundle.song.slug}`} />} variant="secondary" nativeButton={false}>
             <AudioLinesIcon data-icon="inline-start" />
             Test mixer
           </Button>

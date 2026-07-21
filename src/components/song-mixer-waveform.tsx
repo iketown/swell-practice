@@ -1,20 +1,22 @@
 "use client";
 
 import {
-  ArrowRightIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   FileMusicIcon,
   PauseIcon,
   PlayIcon,
   PlusIcon,
+  Settings2Icon,
   XIcon,
 } from "lucide-react";
 import {
+  createContext,
   Fragment,
   useCallback,
   useEffect,
   useEffectEvent,
+  useContext,
   useMemo,
   useRef,
   useState,
@@ -61,6 +63,16 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
   Field,
   FieldDescription,
   FieldError,
@@ -105,11 +117,11 @@ import {
 import { cn } from "@/lib/utils";
 
 const BASE_WAVE_HEIGHT = 52;
-const MIN_EXPANDED_TRACK_HEIGHT = 104;
 const SELECTED_PART_SCALE = 2;
 const PART_COLOR_COUNT = 5;
 const DEFAULT_ANNOTATION_DURATION = 3;
 const MIN_ANNOTATION_DURATION = 0.1;
+const MIXER_TRACK_CONTROLS_WIDTH = 120;
 const MIXER_ZOOM_LEVELS = [
   256,
   320,
@@ -218,7 +230,6 @@ export function SongMixerWaveform({
     () => new Map<string, { sourceUrl: string | undefined; message: string }>(),
   );
   const [engineError, setEngineError] = useState<string | null>(null);
-  const [expandedTrackIds, setExpandedTrackIds] = useState<string[]>([]);
   const [annotationPlaybackMode, setAnnotationPlaybackMode] =
     useState<AnnotationPlaybackMode>("normal");
   const waveformRootRef = useRef<HTMLDivElement>(null);
@@ -380,7 +391,10 @@ export function SongMixerWaveform({
         samplesPerPixel={1024}
         zoomLevels={MIXER_ZOOM_LEVELS}
         automaticScroll
-        controls={{ show: true, width: 236 }}
+        controls={{
+          show: true,
+          width: MIXER_TRACK_CONTROLS_WIDTH,
+        }}
         annotationList={{
           annotations: playlistAnnotations,
           editable: canEditAnnotations,
@@ -403,7 +417,6 @@ export function SongMixerWaveform({
           />
           <MixStateSynchronizer
             effectiveStates={effectiveStates}
-            expandedTrackIds={expandedTrackIds}
             mixId={mixId}
             mixerTracks={loadedMixerTracks}
             selectedTrackId={selectedTrackId}
@@ -411,37 +424,37 @@ export function SongMixerWaveform({
           />
           <SuppressWaveformTrackSelection />
           <MixerSpacebarShortcut />
-          {partAndMixControls}
-          <section
-            className="grid gap-3 border-t-2 bg-secondary/70 p-3 sm:p-4"
-            aria-labelledby="song-sections-title"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 id="song-sections-title" className="text-sm font-semibold">
-                Song sections
-              </h2>
-              <AnnotationPlaybackControls
+          <AnnotationNavigationProvider playbackMode={annotationPlaybackMode}>
+            <section
+              className="grid gap-3 border-t-2 bg-secondary/70 p-3 sm:p-4"
+              aria-labelledby="song-sections-title"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 id="song-sections-title" className="text-sm font-semibold">
+                  Song sections
+                </h2>
+                <AnnotationPlaybackControls
+                  annotations={annotations}
+                  mode={annotationPlaybackMode}
+                  onModeChange={setAnnotationPlaybackMode}
+                />
+              </div>
+              <MixerAnnotations
                 annotations={annotations}
-                mode={annotationPlaybackMode}
-                onModeChange={setAnnotationPlaybackMode}
+                editable={canEditAnnotations}
+                onCreate={onCreateAnnotation}
+                onUpdate={onUpdateAnnotation}
+                onDelete={onDeleteAnnotation}
+                onImport={onImportAnnotations}
               />
-            </div>
-            <MixerAnnotations
+            </section>
+            <MixerTransport
+              loading={loading}
+              loadedCount={loadedCount}
+              totalCount={totalCount}
               annotations={annotations}
-              editable={canEditAnnotations}
-              playbackMode={annotationPlaybackMode}
-              onCreate={onCreateAnnotation}
-              onUpdate={onUpdateAnnotation}
-              onDelete={onDeleteAnnotation}
-              onImport={onImportAnnotations}
             />
-          </section>
-          <MixerTransport
-            loading={loading}
-            loadedCount={loadedCount}
-            totalCount={totalCount}
-            annotations={annotations}
-          />
+          </AnnotationNavigationProvider>
           <TimelineNavigationSurface
             waveformRootRef={waveformRootRef}
           >
@@ -455,7 +468,6 @@ export function SongMixerWaveform({
                 <MixerTrackControls
                   trackIndex={trackIndex}
                   track={loadedMixerTracks[trackIndex]}
-                  expanded={expandedTrackIds.includes(loadedMixerTracks[trackIndex]?.id ?? "")}
                   mixId={mixId}
                   selected={loadedMixerTracks[trackIndex]?.id === selectedTrackId}
                   selectable={!loadedMixerTracks[trackIndex]?.isBackgroundMix}
@@ -494,21 +506,12 @@ export function SongMixerWaveform({
                       onTrackOverridesChange(track.id, nextStateOverrides);
                     }
                   }}
-                  onExpandedChange={(expanded) => {
-                    const trackId = loadedMixerTracks[trackIndex]?.id;
-                    if (!trackId) return;
-
-                    setExpandedTrackIds((current) =>
-                      expanded
-                        ? [...new Set([...current, trackId])]
-                        : current.filter((currentTrackId) => currentTrackId !== trackId),
-                    );
-                  }}
                 />
                 )}
               />
             </AdminAnnotationDragProvider>
           </TimelineNavigationSurface>
+          {partAndMixControls}
         </AnnotationProvider>
       </WaveformPlaylistProvider>
     </>
@@ -928,6 +931,190 @@ function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(Math.max(value, minimum), maximum);
 }
 
+type NavigateToAnnotation = (annotation: SongAnnotation | null) => void;
+
+const AnnotationNavigationContext = createContext<NavigateToAnnotation | null>(null);
+
+function AnnotationNavigationProvider({
+  playbackMode,
+  children,
+}: {
+  playbackMode: AnnotationPlaybackMode;
+  children: ReactNode;
+}) {
+  const { isPlaying, visualTimeRef } = usePlaybackAnimation();
+  const { activeAnnotationId, isAutomaticScroll } = usePlaylistState();
+  const { sampleRate, samplesPerPixel } = usePlaylistData();
+  const {
+    scrollContainerRef,
+    seekTo,
+    setActiveAnnotationId,
+    setAutomaticScroll,
+    zoomIn,
+    zoomOut,
+  } = usePlaylistControls();
+  const pendingAnnotationFocusRef = useRef<{
+    centerTime: number;
+    samplesPerPixel: number;
+  } | null>(null);
+  const annotationFocusFrameRef = useRef<number | null>(null);
+  const restoreAutomaticScrollRef = useRef(false);
+  const focusedAnnotationRef = useRef<SongAnnotation | null>(null);
+
+  const restoreAutomaticScroll = useCallback(() => {
+    focusedAnnotationRef.current = null;
+    if (!restoreAutomaticScrollRef.current) return;
+
+    setAutomaticScroll(true);
+    restoreAutomaticScrollRef.current = false;
+  }, [setAutomaticScroll]);
+
+  const centerPendingAnnotation = useCallback(() => {
+    const focus = pendingAnnotationFocusRef.current;
+    const scrollContainer = scrollContainerRef.current;
+    if (!focus || !scrollContainer) return;
+
+    if (annotationFocusFrameRef.current !== null) {
+      window.cancelAnimationFrame(annotationFocusFrameRef.current);
+    }
+    annotationFocusFrameRef.current = window.requestAnimationFrame(() => {
+      const centerPixel = focus.centerTime * sampleRate / focus.samplesPerPixel;
+      const maximumScrollLeft = Math.max(
+        0,
+        scrollContainer.scrollWidth - scrollContainer.clientWidth,
+      );
+      scrollContainer.scrollLeft = clamp(
+        centerPixel - scrollContainer.clientWidth / 2,
+        0,
+        maximumScrollLeft,
+      );
+      pendingAnnotationFocusRef.current = null;
+      annotationFocusFrameRef.current = null;
+    });
+  }, [sampleRate, scrollContainerRef]);
+
+  useEffect(() => {
+    const focus = pendingAnnotationFocusRef.current;
+    if (!focus || focus.samplesPerPixel !== samplesPerPixel) return;
+
+    centerPendingAnnotation();
+  }, [centerPendingAnnotation, samplesPerPixel]);
+
+  useEffect(() => {
+    return () => {
+      if (annotationFocusFrameRef.current !== null) {
+        window.cancelAnimationFrame(annotationFocusFrameRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const focusedAnnotation = focusedAnnotationRef.current;
+    if (!focusedAnnotation || activeAnnotationId === focusedAnnotation.id) return;
+
+    restoreAutomaticScroll();
+  }, [activeAnnotationId, restoreAutomaticScroll]);
+
+  useEffect(() => {
+    if (!isPlaying || playbackMode === "loop") return;
+
+    let frame = 0;
+    const watchFocusedAnnotation = () => {
+      const focusedAnnotation = focusedAnnotationRef.current;
+      const visualTime = visualTimeRef.current;
+      if (
+        focusedAnnotation
+        && (
+          visualTime < focusedAnnotation.start
+          || visualTime >= focusedAnnotation.end
+        )
+      ) {
+        restoreAutomaticScroll();
+        return;
+      }
+
+      frame = window.requestAnimationFrame(watchFocusedAnnotation);
+    };
+    frame = window.requestAnimationFrame(watchFocusedAnnotation);
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [
+    isPlaying,
+    playbackMode,
+    restoreAutomaticScroll,
+    visualTimeRef,
+  ]);
+
+  const focusAnnotation = useCallback((annotation: SongAnnotation) => {
+    const scrollContainer = scrollContainerRef.current;
+    const annotationDuration = annotation.end - annotation.start;
+    if (
+      !scrollContainer
+      || scrollContainer.clientWidth <= 0
+      || sampleRate <= 0
+      || annotationDuration <= 0
+    ) {
+      return;
+    }
+
+    const idealSamplesPerPixel =
+      annotationDuration * sampleRate
+      / (scrollContainer.clientWidth * SELECTED_ANNOTATION_VIEWPORT_FILL);
+    const targetZoomIndex = closestZoomLevelIndex(idealSamplesPerPixel);
+    const currentZoomIndex = closestZoomLevelIndex(samplesPerPixel);
+    const targetSamplesPerPixel = MIXER_ZOOM_LEVELS[targetZoomIndex];
+
+    restoreAutomaticScrollRef.current ||= isAutomaticScroll;
+    if (isAutomaticScroll) setAutomaticScroll(false);
+    focusedAnnotationRef.current = annotation;
+    pendingAnnotationFocusRef.current = {
+      centerTime: (annotation.start + annotation.end) / 2,
+      samplesPerPixel: targetSamplesPerPixel,
+    };
+
+    for (let index = currentZoomIndex; index > targetZoomIndex; index -= 1) {
+      zoomIn();
+    }
+    for (let index = currentZoomIndex; index < targetZoomIndex; index += 1) {
+      zoomOut();
+    }
+
+    if (currentZoomIndex === targetZoomIndex) centerPendingAnnotation();
+  }, [
+    centerPendingAnnotation,
+    isAutomaticScroll,
+    sampleRate,
+    samplesPerPixel,
+    scrollContainerRef,
+    setAutomaticScroll,
+    zoomIn,
+    zoomOut,
+  ]);
+
+  const navigateToAnnotation = useCallback<NavigateToAnnotation>((annotation) => {
+    if (!annotation) return;
+
+    setActiveAnnotationId(annotation.id);
+    seekTo(annotation.start);
+    focusAnnotation(annotation);
+  }, [focusAnnotation, seekTo, setActiveAnnotationId]);
+
+  return (
+    <AnnotationNavigationContext.Provider value={navigateToAnnotation}>
+      {children}
+    </AnnotationNavigationContext.Provider>
+  );
+}
+
+function useAnnotationNavigation() {
+  const navigateToAnnotation = useContext(AnnotationNavigationContext);
+  if (!navigateToAnnotation) {
+    throw new Error("useAnnotationNavigation must be used within AnnotationNavigationProvider");
+  }
+
+  return navigateToAnnotation;
+}
+
 function AnnotationEditabilitySynchronizer({ editable }: { editable: boolean }) {
   const { setAnnotationsEditable } = usePlaylistControls();
 
@@ -1102,7 +1289,6 @@ type AnnotationDraft = {
 function MixerAnnotations({
   annotations,
   editable,
-  playbackMode,
   onCreate,
   onUpdate,
   onDelete,
@@ -1110,7 +1296,6 @@ function MixerAnnotations({
 }: {
   annotations: SongAnnotation[];
   editable: boolean;
-  playbackMode: AnnotationPlaybackMode;
   onCreate: (annotation: Omit<SongAnnotation, "id">) => Promise<SongAnnotation | null>;
   onUpdate: (annotation: SongAnnotation) => Promise<boolean>;
   onDelete: (annotation: SongAnnotation) => Promise<boolean>;
@@ -1118,28 +1303,14 @@ function MixerAnnotations({
     annotations: Array<Omit<SongAnnotation, "id">>,
   ) => Promise<SongAnnotation[] | null>;
 }) {
-  const { currentTimeRef, isPlaying, visualTimeRef } = usePlaybackAnimation();
-  const { activeAnnotationId, isAutomaticScroll } = usePlaylistState();
-  const { duration, isReady, sampleRate, samplesPerPixel } = usePlaylistData();
-  const {
-    scrollContainerRef,
-    seekTo,
-    setActiveAnnotationId,
-    setAutomaticScroll,
-    zoomIn,
-    zoomOut,
-  } = usePlaylistControls();
+  const { currentTimeRef } = usePlaybackAnimation();
+  const { activeAnnotationId } = usePlaylistState();
+  const { duration, isReady } = usePlaylistData();
+  const navigateToAnnotation = useAnnotationNavigation();
   const safeDuration = Number.isFinite(duration) ? duration : 0;
   const [editingId, setEditingId] = useState<string | null>(annotations[0]?.id ?? null);
   const [newDraft, setNewDraft] = useState<AnnotationDraft>(() => emptyAnnotationDraft());
   const [editorSession, setEditorSession] = useState(0);
-  const pendingAnnotationFocusRef = useRef<{
-    centerTime: number;
-    samplesPerPixel: number;
-  } | null>(null);
-  const annotationFocusFrameRef = useRef<number | null>(null);
-  const restoreAutomaticScrollRef = useRef(false);
-  const focusedAnnotationRef = useRef<SongAnnotation | null>(null);
   const midiInputRef = useRef<HTMLInputElement>(null);
   const [midiPreview, setMidiPreview] = useState<{
     filename: string;
@@ -1156,136 +1327,8 @@ function MixerAnnotations({
   const midiAnnotationCount = midiPreview?.extraction.annotations.length ?? 0;
   const midiPreviewCanSave = midiAnnotationCount > 0 && midiConflictCount === 0;
 
-  const restoreAutomaticScroll = useCallback(() => {
-    focusedAnnotationRef.current = null;
-    if (!restoreAutomaticScrollRef.current) return;
-
-    setAutomaticScroll(true);
-    restoreAutomaticScrollRef.current = false;
-  }, [setAutomaticScroll]);
-
-  const centerPendingAnnotation = useCallback(() => {
-    const focus = pendingAnnotationFocusRef.current;
-    const scrollContainer = scrollContainerRef.current;
-    if (!focus || !scrollContainer) return;
-
-    if (annotationFocusFrameRef.current !== null) {
-      window.cancelAnimationFrame(annotationFocusFrameRef.current);
-    }
-    annotationFocusFrameRef.current = window.requestAnimationFrame(() => {
-      const centerPixel = focus.centerTime * sampleRate / focus.samplesPerPixel;
-      const maximumScrollLeft = Math.max(
-        0,
-        scrollContainer.scrollWidth - scrollContainer.clientWidth,
-      );
-      scrollContainer.scrollLeft = clamp(
-        centerPixel - scrollContainer.clientWidth / 2,
-        0,
-        maximumScrollLeft,
-      );
-      pendingAnnotationFocusRef.current = null;
-      annotationFocusFrameRef.current = null;
-    });
-  }, [sampleRate, scrollContainerRef]);
-
-  useEffect(() => {
-    const focus = pendingAnnotationFocusRef.current;
-    if (!focus || focus.samplesPerPixel !== samplesPerPixel) return;
-
-    centerPendingAnnotation();
-  }, [centerPendingAnnotation, samplesPerPixel]);
-
-  useEffect(() => {
-    return () => {
-      if (annotationFocusFrameRef.current !== null) {
-        window.cancelAnimationFrame(annotationFocusFrameRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    const focusedAnnotation = focusedAnnotationRef.current;
-    if (
-      !focusedAnnotation
-      || activeAnnotationId === focusedAnnotation.id
-    ) {
-      return;
-    }
-
-    restoreAutomaticScroll();
-  }, [activeAnnotationId, restoreAutomaticScroll]);
-
-  useEffect(() => {
-    if (!isPlaying || playbackMode === "loop") return;
-
-    let frame = 0;
-    const watchFocusedAnnotation = () => {
-      const focusedAnnotation = focusedAnnotationRef.current;
-      const visualTime = visualTimeRef.current;
-      if (
-        focusedAnnotation
-        && (
-          visualTime < focusedAnnotation.start
-          || visualTime >= focusedAnnotation.end
-        )
-      ) {
-        restoreAutomaticScroll();
-        return;
-      }
-
-      frame = window.requestAnimationFrame(watchFocusedAnnotation);
-    };
-    frame = window.requestAnimationFrame(watchFocusedAnnotation);
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [
-    isPlaying,
-    playbackMode,
-    restoreAutomaticScroll,
-    visualTimeRef,
-  ]);
-
-  const focusAnnotation = (annotation: SongAnnotation) => {
-    const scrollContainer = scrollContainerRef.current;
-    const annotationDuration = annotation.end - annotation.start;
-    if (
-      !scrollContainer
-      || scrollContainer.clientWidth <= 0
-      || sampleRate <= 0
-      || annotationDuration <= 0
-    ) {
-      return;
-    }
-
-    const idealSamplesPerPixel =
-      annotationDuration * sampleRate
-      / (scrollContainer.clientWidth * SELECTED_ANNOTATION_VIEWPORT_FILL);
-    const targetZoomIndex = closestZoomLevelIndex(idealSamplesPerPixel);
-    const currentZoomIndex = closestZoomLevelIndex(samplesPerPixel);
-    const targetSamplesPerPixel = MIXER_ZOOM_LEVELS[targetZoomIndex];
-
-    restoreAutomaticScrollRef.current ||= isAutomaticScroll;
-    if (isAutomaticScroll) setAutomaticScroll(false);
-    focusedAnnotationRef.current = annotation;
-    pendingAnnotationFocusRef.current = {
-      centerTime: (annotation.start + annotation.end) / 2,
-      samplesPerPixel: targetSamplesPerPixel,
-    };
-
-    for (let index = currentZoomIndex; index > targetZoomIndex; index -= 1) {
-      zoomIn();
-    }
-    for (let index = currentZoomIndex; index < targetZoomIndex; index += 1) {
-      zoomOut();
-    }
-
-    if (currentZoomIndex === targetZoomIndex) centerPendingAnnotation();
-  };
-
   const seekToAnnotation = (annotation: SongAnnotation, selectForEditing: boolean) => {
-    setActiveAnnotationId(annotation.id);
-    seekTo(annotation.start);
-    focusAnnotation(annotation);
+    navigateToAnnotation(annotation);
 
     if (selectForEditing) {
       setEditingId(annotation.id);
@@ -2028,14 +2071,12 @@ function MixerLoadingPlaceholder({
 
 function MixStateSynchronizer({
   effectiveStates,
-  expandedTrackIds,
   mixId,
   mixerTracks,
   selectedTrackId,
   waveformRootRef,
 }: {
   effectiveStates: Array<{ name: SongMixerStateName; values: SongMixerStateValues }>;
-  expandedTrackIds: string[];
   mixId: SongMixerMixId;
   mixerTracks: SongMixerTrack[];
   selectedTrackId: string | null;
@@ -2132,17 +2173,12 @@ function MixStateSynchronizer({
         const configuredScale = effectiveStates[trackIndex]?.values.scale ?? 1;
         const isMuted = playlistData.trackStates[trackIndex]?.muted ?? false;
         const mixerTrack = mixerTracks[trackIndex];
-        const trackId = mixerTrack?.id;
         const isSelectedPart = Boolean(
           mixerTrack && !mixerTrack.isBackgroundMix && mixerTrack.id === selectedTrackId,
         );
         const selectedScale = isSelectedPart ? SELECTED_PART_SCALE : 1;
         const visualScale = Math.max(configuredScale, selectedScale);
-        const isExpanded = trackId ? expandedTrackIds.includes(trackId) : false;
-        const displayScale = isExpanded
-          ? Math.max(visualScale, MIN_EXPANDED_TRACK_HEIGHT / naturalHeight)
-          : visualScale;
-        const displayHeight = Math.round(naturalHeight * displayScale);
+        const displayHeight = Math.round(naturalHeight * visualScale);
         const waveformRow = element.parentElement;
         const controlRow = controlElements[trackIndex]?.parentElement;
 
@@ -2162,7 +2198,7 @@ function MixStateSynchronizer({
               : "basic";
         }
         element.style.height = `${naturalHeight}px`;
-        element.style.transform = `scaleY(${displayScale})`;
+        element.style.transform = `scaleY(${visualScale})`;
         element.style.transformOrigin = "top left";
 
         if (waveformRow) {
@@ -2182,7 +2218,6 @@ function MixStateSynchronizer({
     };
   }, [
     effectiveStates,
-    expandedTrackIds,
     mixId,
     mixerTracks,
     playlistData.audioBuffers,
@@ -2270,7 +2305,8 @@ function MixerTransport({
   const { currentTime, isPlaying } = usePlaybackAnimation();
   const { activeAnnotationId } = usePlaylistState();
   const { duration, isReady } = usePlaylistData();
-  const { pause, play, seekTo, setActiveAnnotationId } = usePlaylistControls();
+  const { pause, play } = usePlaylistControls();
+  const navigateToAnnotation = useAnnotationNavigation();
   const safeDuration = Number.isFinite(duration) ? duration : 0;
   const safeCurrentTime = Math.min(Number.isFinite(currentTime) ? currentTime : 0, safeDuration);
   const orderedAnnotations = useMemo(
@@ -2290,12 +2326,6 @@ function MixerTransport({
   const previousAnnotation =
     currentAnnotationIndex > 0 ? orderedAnnotations[currentAnnotationIndex - 1] : null;
   const nextAnnotation = orderedAnnotations[currentAnnotationIndex + 1] ?? null;
-
-  const seekToSection = (annotation: SongAnnotation | null) => {
-    if (!annotation) return;
-    setActiveAnnotationId(annotation.id);
-    seekTo(annotation.start);
-  };
 
   return (
     <section
@@ -2328,7 +2358,7 @@ function MixerTransport({
           variant="outline"
           className="min-h-12 min-w-0 flex-1 px-3 sm:min-w-40"
           disabled={!isReady || !previousAnnotation}
-          onClick={() => seekToSection(previousAnnotation)}
+          onClick={() => navigateToAnnotation(previousAnnotation)}
         >
           <ChevronLeftIcon className="size-5" aria-hidden />
           <span>Prev section</span>
@@ -2338,7 +2368,7 @@ function MixerTransport({
           variant="outline"
           className="min-h-12 min-w-0 flex-1 px-3 sm:min-w-40"
           disabled={!isReady || !nextAnnotation}
-          onClick={() => seekToSection(nextAnnotation)}
+          onClick={() => navigateToAnnotation(nextAnnotation)}
         >
           <span>Next section</span>
           <ChevronRightIcon className="size-5" aria-hidden />
@@ -2409,29 +2439,32 @@ function isSpacebarEditingTarget(target: EventTarget | null) {
   );
 }
 
-function MixerTrackControls({
-  trackIndex,
-  track,
-  expanded,
-  mixId,
-  selected,
-  selectable,
-  practiceQuickMute,
-  onSelect,
-  onStateValueChange,
-  onExpandedChange,
-}: {
+type MixerTrackControlProps = {
   trackIndex: number;
   track: SongMixerTrack | undefined;
-  expanded: boolean;
   mixId: SongMixerMixId;
   selected: boolean;
   selectable: boolean;
   practiceQuickMute: boolean;
   onSelect: () => void;
   onStateValueChange: (key: "volume" | "pan" | "muted", value: number | boolean) => void;
-  onExpandedChange: (expanded: boolean) => void;
-}) {
+};
+
+function MixerTrackControls(props: MixerTrackControlProps) {
+  return <DialogMixerTrackControls {...props} />;
+}
+
+function DialogMixerTrackControls({
+  trackIndex,
+  track,
+  mixId,
+  selected,
+  selectable,
+  practiceQuickMute,
+  onSelect,
+  onStateValueChange,
+}: MixerTrackControlProps) {
+  const [controlsOpen, setControlsOpen] = useState(false);
   const { trackStates } = usePlaylistData();
   const { setTrackMute, setTrackPan, setTrackSolo, setTrackVolume } = usePlaylistControls();
   const state = trackStates[trackIndex];
@@ -2439,147 +2472,149 @@ function MixerTrackControls({
   if (!track || !state) return null;
 
   const showsSelectAction = selectable && !practiceQuickMute;
-  const hasHeaderAction = practiceQuickMute || showsSelectAction;
+  const dialogTitle = `${track.displayName} track controls`;
+  const visibleTrackName = track.displayName.slice(0, 5);
+  const changeVolume = (volume: number) => {
+    setTrackVolume(trackIndex, volume);
+    onStateValueChange("volume", Math.round(volume * 100));
+  };
+  const changePan = (pan: number) => {
+    setTrackPan(trackIndex, pan);
+    onStateValueChange("pan", Math.round(pan * 100));
+  };
+  const toggleMute = () => {
+    const muted = !state.muted;
+    setTrackMute(trackIndex, muted);
+    if (!practiceQuickMute) onStateValueChange("muted", muted);
+  };
 
   return (
-    <Accordion
-      value={expanded ? [track.id] : []}
-      onValueChange={(values) => onExpandedChange(values.includes(track.id))}
+    <div
       data-mixer-track-index={trackIndex}
-      className="h-full gap-0 border-r-2 bg-secondary/60"
+      className="relative h-full min-h-10 border-r-2 bg-secondary/60"
     >
-      <AccordionItem
-        value={track.id}
-        className="relative min-h-full rounded-none border-0 bg-transparent shadow-none hover:shadow-none data-[open]:shadow-none"
-      >
-        <AccordionTrigger
-          className={cn(
-            "gap-2 px-2 font-body hover:bg-secondary/85 data-[open]:bg-secondary/85",
-            expanded ? "h-8 min-h-8 py-0.5" : "h-full min-h-10 py-1",
-          )}
+      {showsSelectAction ? (
+        <Button
+          type="button"
+          size="xs"
+          variant={selected && mixId === "learn" ? "default" : selected ? "secondary" : "outline"}
+          aria-pressed={selected && mixId === "learn"}
+          aria-label={
+            selected
+              ? mixId === "learn"
+                ? `Return ${track.displayName} to Basic Mix`
+                : `Switch ${track.displayName} to Learn Part`
+              : mixId === "listen"
+                ? `Select ${track.displayName} and switch to Learn Part`
+                : `Select ${track.displayName}`
+          }
+          title={track.displayName}
+          className="absolute inset-y-0 left-1 right-12 z-10 my-auto min-w-0 justify-start"
+          onClick={onSelect}
         >
-          <span className="min-w-0 flex-1">
-            <span className="min-w-0 flex-1 truncate text-sm font-semibold" title={track.displayName}>
-              {track.displayName}
-            </span>
-          </span>
-          {hasHeaderAction ? <span aria-hidden className="w-[4.75rem] shrink-0" /> : null}
-        </AccordionTrigger>
+          <span className="truncate">{visibleTrackName}</span>
+        </Button>
+      ) : (
+        <span
+          className="absolute inset-y-0 left-2 right-12 flex min-w-0 items-center truncate text-sm font-semibold"
+          title={track.displayName}
+        >
+          {visibleTrackName}
+        </span>
+      )}
 
-        {practiceQuickMute ? (
-          <Button
-            type="button"
-            size="xs"
-            variant={state.muted ? "default" : "outline"}
-            aria-label={
-              state.muted
-                ? `Unmute ${track.displayName} for a quick check`
-                : `Mute ${track.displayName} again`
-            }
-            className={cn(
-              "absolute right-8",
-              expanded ? "top-1" : "inset-y-0 my-auto",
-            )}
-            onClick={() => setTrackMute(trackIndex, !state.muted)}
-          >
-            {state.muted ? "Unmute" : "Mute"}
-          </Button>
-        ) : null}
-
-        {showsSelectAction ? (
-          <Button
-            type="button"
-            size="xs"
-            variant={selected && mixId === "learn" ? "default" : selected ? "secondary" : "outline"}
-            aria-pressed={selected && mixId === "learn"}
-            aria-label={
-              selected
-                ? mixId === "learn"
-                  ? `Return ${track.displayName} to Basic Mix`
-                  : `Switch ${track.displayName} to Learn Part`
-                : mixId === "listen"
-                  ? `Select ${track.displayName} and switch to Learn Part`
-                  : `Select ${track.displayName}`
-            }
-            className={cn(
-              "absolute right-8",
-              expanded ? "top-1" : "inset-y-0 my-auto",
-            )}
-            onClick={onSelect}
-          >
-            {selected ? "Selected" : "Select"}
-            {!selected ? <ArrowRightIcon data-icon="inline-end" /> : null}
-          </Button>
-        ) : null}
-
-        <AccordionContent className="grid gap-0.5 border-t px-2 py-0.5 text-foreground">
-          <div className="grid grid-cols-[2rem_minmax(0,1fr)_2rem] items-center gap-x-1 gap-y-0.5">
-            <label htmlFor={`volume-${track.id}`} className="text-[11px] font-semibold text-muted-foreground">
-              VOL
-            </label>
-            <input
-              id={`volume-${track.id}`}
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={state.volume}
-              onChange={(event) => {
-                const volume = Number(event.currentTarget.value);
-                setTrackVolume(trackIndex, volume);
-                onStateValueChange("volume", Math.round(volume * 100));
-              }}
-              className="swell-mixer-range"
-            />
-            <output className="text-right font-mono text-[11px] tabular-nums">
-              {Math.round(state.volume * 100)}
-            </output>
-
-            <label htmlFor={`pan-${track.id}`} className="text-[11px] font-semibold text-muted-foreground">
-              PAN
-            </label>
-            <input
-              id={`pan-${track.id}`}
-              type="range"
-              min={-1}
-              max={1}
-              step={0.01}
-              value={state.pan}
-              onChange={(event) => {
-                const pan = Number(event.currentTarget.value);
-                setTrackPan(trackIndex, pan);
-                onStateValueChange("pan", Math.round(pan * 100));
-              }}
-              className="swell-mixer-range"
-            />
-            <output className="text-right font-mono text-[11px] tabular-nums">{formatPan(state.pan)}</output>
-          </div>
-
-          <div className="flex items-center gap-1">
+      <Dialog open={controlsOpen} onOpenChange={setControlsOpen}>
+        <DialogTrigger
+          render={
             <Button
-              size="xs"
-              variant={state.muted ? "default" : "secondary"}
-              aria-pressed={state.muted}
-              onClick={() => {
-                const muted = !state.muted;
-                setTrackMute(trackIndex, muted);
-                onStateValueChange("muted", muted);
-              }}
-            >
-              Mute
-            </Button>
-            <Button
-              size="xs"
-              variant={state.soloed ? "default" : "secondary"}
-              aria-pressed={state.soloed}
-              onClick={() => setTrackSolo(trackIndex, !state.soloed)}
-            >
-              Solo
-            </Button>
-          </div>
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
+              type="button"
+              variant="ghost"
+              size="icon-lg"
+              className="absolute inset-y-0 right-0 z-20 my-auto size-11"
+              aria-label={`Open ${dialogTitle}`}
+              title={dialogTitle}
+            />
+          }
+        >
+          <Settings2Icon aria-hidden />
+        </DialogTrigger>
+        <DialogContent className="gap-5 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{dialogTitle}</DialogTitle>
+            <DialogDescription>
+              {practiceQuickMute
+                ? "Mute changes apply only during this practice session. Other controls take effect immediately."
+                : "Changes take effect immediately for this mix."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <FieldSet>
+            <FieldLegend className="sr-only">{dialogTitle}</FieldLegend>
+            <FieldGroup className="gap-5">
+              <Field>
+                <FieldLabel htmlFor={`compact-volume-${track.id}`} className="w-full justify-between">
+                  Volume
+                  <output className="font-mono tabular-nums">{Math.round(state.volume * 100)}%</output>
+                </FieldLabel>
+                <input
+                  id={`compact-volume-${track.id}`}
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={state.volume}
+                  onChange={(event) => changeVolume(Number(event.currentTarget.value))}
+                  className="swell-mixer-range h-4 w-full"
+                />
+              </Field>
+
+              <Field>
+                <FieldLabel htmlFor={`compact-pan-${track.id}`} className="w-full justify-between">
+                  Pan
+                  <output className="font-mono tabular-nums">{formatPan(state.pan)}</output>
+                </FieldLabel>
+                <input
+                  id={`compact-pan-${track.id}`}
+                  type="range"
+                  min={-1}
+                  max={1}
+                  step={0.01}
+                  value={state.pan}
+                  onChange={(event) => changePan(Number(event.currentTarget.value))}
+                  className="swell-mixer-range h-4 w-full"
+                />
+              </Field>
+
+              <Field>
+                <FieldLabel>Playback</FieldLabel>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant={state.muted ? "default" : "secondary"}
+                    aria-pressed={state.muted}
+                    onClick={toggleMute}
+                  >
+                    {state.muted ? "Unmute" : "Mute"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={state.soloed ? "default" : "secondary"}
+                    aria-pressed={state.soloed}
+                    onClick={() => setTrackSolo(trackIndex, !state.soloed)}
+                  >
+                    Solo
+                  </Button>
+                </div>
+              </Field>
+            </FieldGroup>
+          </FieldSet>
+
+          <DialogFooter className="mx-0 mb-0 border-0 bg-transparent p-0 sm:justify-end">
+            <DialogClose render={<Button className="w-full sm:w-auto" />}>OK</DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
 

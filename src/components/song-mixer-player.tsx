@@ -26,6 +26,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   SONG_MIXER_MIXES,
+  DEFAULT_SONG_MIXER_CONFIGURATION_IDS,
   type SongAnnotation,
   type SongMixerConfiguration,
   type SongMixerMixId,
@@ -51,6 +52,8 @@ const SongMixerWaveform = dynamic(
 export function SongMixerPlayer({
   tracks,
   configurations,
+  requestedMix,
+  requestedPart,
   settings,
   annotations,
   canSaveOverrides,
@@ -71,6 +74,8 @@ export function SongMixerPlayer({
 }: {
   tracks: SongMixerTrack[];
   configurations: SongMixerConfiguration[];
+  requestedMix?: string;
+  requestedPart?: string;
   settings: SongMixerSettings;
   annotations: SongAnnotation[];
   canSaveOverrides: boolean;
@@ -91,8 +96,14 @@ export function SongMixerPlayer({
   ) => Promise<SongAnnotation[] | null>;
   onAnnotationsChange: (annotations: SongAnnotation[]) => void;
 }) {
+  const requestedConfiguration = configurationForAddressMix(configurations, requestedMix);
+  const initialConfiguration = requestedConfiguration ?? configurations[0] ?? null;
+  const initialFeatureableTracks = tracks.filter(
+    (track) => initialConfiguration?.trackIds.includes(track.id) && !track.isBackgroundMix,
+  );
+  const initialRequestedTrack = trackForAddressPart(initialFeatureableTracks, requestedPart);
   const [configurationId, setConfigurationId] = useState<string | null>(
-    configurations[0]?.id ?? null,
+    initialConfiguration?.id ?? null,
   );
   const effectiveConfigurationId = configurations.some(
     (configuration) => configuration.id === configurationId,
@@ -117,11 +128,13 @@ export function SongMixerPlayer({
   const [selectedTrackIdsByConfiguration, setSelectedTrackIdsByConfiguration] = useState<
     Record<string, string | null>
   >(
-    effectiveConfigurationId
-      ? { [effectiveConfigurationId]: featureableTracks[0]?.id ?? null }
+    initialConfiguration
+      ? { [initialConfiguration.id]: initialRequestedTrack?.id ?? initialFeatureableTracks[0]?.id ?? null }
       : {},
   );
-  const [mixId, setMixId] = useState<SongMixerMixId>("listen");
+  const [mixId, setMixId] = useState<SongMixerMixId>(
+    requestedConfiguration || initialRequestedTrack ? "learn" : "listen",
+  );
   const requestedSelectedTrackId = effectiveConfigurationId
     ? selectedTrackIdsByConfiguration[effectiveConfigurationId]
     : null;
@@ -385,4 +398,53 @@ function countOverrideValues(tracks: SongMixerTrack[]) {
       ),
     0,
   );
+}
+
+function configurationForAddressMix(
+  configurations: SongMixerConfiguration[],
+  requestedMix: string | undefined,
+) {
+  const mix = normalizeAddressValue(requestedMix);
+  if (!mix) return null;
+
+  const directMatch = configurations.find(
+    (configuration) => normalizeAddressValue(configuration.id) === mix,
+  );
+  if (directMatch) return directMatch;
+
+  if (mix === "voc" || mix === "vocal" || mix === "vocals") {
+    return (
+      configurations.find(
+        (configuration) => configuration.id === DEFAULT_SONG_MIXER_CONFIGURATION_IDS.vocals,
+      )
+      ?? configurations.find((configuration) => /\bvocals?\b/i.test(configuration.name))
+      ?? null
+    );
+  }
+
+  if (mix === "inst" || mix === "instrument" || mix === "instruments") {
+    return (
+      configurations.find(
+        (configuration) => configuration.id === DEFAULT_SONG_MIXER_CONFIGURATION_IDS.instruments,
+      )
+      ?? configurations.find((configuration) => /\binstruments?\b/i.test(configuration.name))
+      ?? null
+    );
+  }
+
+  return null;
+}
+
+function trackForAddressPart(tracks: SongMixerTrack[], requestedPart: string | undefined) {
+  const part = normalizeAddressValue(requestedPart);
+  if (!part) return null;
+
+  return (
+    tracks.find((track) => track.partSlug === part)
+    ?? null
+  );
+}
+
+function normalizeAddressValue(value: string | undefined) {
+  return value?.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") ?? "";
 }

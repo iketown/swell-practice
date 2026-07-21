@@ -10,6 +10,7 @@ import {
   limit,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   updateDoc,
   where,
@@ -20,6 +21,7 @@ import { deleteObject, getDownloadURL, ref, uploadBytes, uploadBytesResumable } 
 import {
   createDefaultSongMixerConfigurations,
   createDefaultSongMixerSettings,
+  DEFAULT_SONG_MIXER_CONFIGURATION_IDS,
   DEFAULT_PARTS,
   fileTypeFromFile,
   inferPartSlugs,
@@ -28,6 +30,7 @@ import {
   slugify,
   sortPartSlugs,
   sortTitle,
+  stemDisplayNameFromFilename,
   type Song,
   type SongAsset,
   type SongAnnotation,
@@ -92,10 +95,24 @@ function assetFromDoc(id: string, data: Record<string, unknown>): SongAsset {
 }
 
 function mixerTrackFromDoc(id: string, data: Record<string, unknown>, fallbackOrderIndex: number): SongMixerTrack {
+  const filename = String(data.filename ?? "");
+  const storedDisplayName = typeof data.displayName === "string" ? data.displayName.trim() : "";
+  const displayNameIsCustom = data.displayNameIsCustom === true;
+
   return {
     id,
-    filename: String(data.filename ?? ""),
-    displayName: String(data.displayName ?? data.filename ?? ""),
+    filename,
+    // Existing tracks used the complete filename as their display name before
+    // stem names became editable. The marker keeps a custom title intact even
+    // when it intentionally includes a filename extension.
+    displayName:
+      !storedDisplayName || (!displayNameIsCustom && hasFilenameExtension(storedDisplayName))
+        ? stemDisplayNameFromFilename(filename)
+        : storedDisplayName,
+    // Older mixer tracks did not store their part association. Their original
+    // filename remains immutable, so it is a stable source for the same
+    // normalization used for newly uploaded stems.
+    partSlug: mixerPartSlugFromData(data, filename),
     contentType: String(data.contentType ?? "audio/mpeg"),
     size: Number(data.size ?? 0),
     storagePath: String(data.storagePath ?? ""),
@@ -105,6 +122,24 @@ function mixerTrackFromDoc(id: string, data: Record<string, unknown>, fallbackOr
     orderIndex: typeof data.orderIndex === "number" ? data.orderIndex : fallbackOrderIndex,
     stateOverrides: mixerStateOverridesFromData(data.stateOverrides),
   };
+}
+
+function hasFilenameExtension(value: string) {
+  return /\.[^./\\]+$/.test(value);
+}
+
+function mixerPartSlugFromData(data: Record<string, unknown>, filename: string) {
+  const validSlugs = new Set(DEFAULT_PARTS.map((part) => part.slug));
+  const storedPartSlug = typeof data.partSlug === "string" ? data.partSlug : undefined;
+  const legacyPartSlug = Array.isArray(data.partSlugs)
+    ? data.partSlugs.map(String).find((partSlug) => validSlugs.has(partSlug))
+    : undefined;
+  const partSlug = storedPartSlug ?? legacyPartSlug;
+
+  if (partSlug && validSlugs.has(partSlug)) return partSlug;
+
+  const inferredPartSlugs = inferPartSlugs(filename);
+  return inferredPartSlugs.length === 1 ? inferredPartSlugs[0] ?? null : null;
 }
 
 function mixerConfigurationFromData(
@@ -507,11 +542,26 @@ export async function uploadSongMixerTrack(
   await ensureNotCanceled();
   const downloadUrl = await getDownloadURL(uploadRef);
   await ensureNotCanceled();
+  const inferredPartSlugs = inferPartSlugs(file.name);
+  const partSlug = inferredPartSlugs.length === 1 ? inferredPartSlugs[0] ?? null : null;
+  const songRef = doc(db, "songs", bundle.song.id);
 
-  await writeBatch(db)
-    .set(trackRef, {
+  await runTransaction(db, async (transaction) => {
+    const songSnap = await transaction.get(songRef);
+    const songData = songSnap.data();
+    const savedMixerMixes: unknown[] = Array.isArray(songData?.mixerMixes)
+      ? songData.mixerMixes
+      : [];
+    const savedConfigurations = savedMixerMixes.map((value, index) =>
+      mixerConfigurationFromData(value, index),
+    );
+    const targetConfiguration = configurationForUploadedStem(savedConfigurations, partSlug);
+
+    transaction.set(trackRef, {
       filename,
-      displayName: file.name,
+      displayName: stemDisplayNameFromFilename(file.name),
+      displayNameIsCustom: false,
+      partSlug,
       contentType: file.type || "audio/mpeg",
       size: file.size,
       storagePath,
@@ -522,10 +572,37 @@ export async function uploadSongMixerTrack(
       stateOverrides: {},
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    })
-    .commit();
+    });
+
+    if (targetConfiguration) {
+      transaction.update(songRef, {
+        mixerMixes: savedConfigurations.map((configuration) => ({
+          ...configuration,
+          trackIds: configuration.id === targetConfiguration.id
+            ? [...new Set([...configuration.trackIds, trackRef.id])]
+            : configuration.trackIds,
+        })),
+        updatedAt: serverTimestamp(),
+      });
+    }
+  });
 
   return trackRef.id;
+}
+
+function configurationForUploadedStem(
+  configurations: SongMixerConfiguration[],
+  partSlug: string | null,
+) {
+  const targetId = partSlug?.startsWith("voc_")
+    ? DEFAULT_SONG_MIXER_CONFIGURATION_IDS.vocals
+    : partSlug
+      ? DEFAULT_SONG_MIXER_CONFIGURATION_IDS.instruments
+      : null;
+
+  if (!targetId) return null;
+
+  return configurations.find((configuration) => configuration.id === targetId) ?? null;
 }
 
 export async function saveSongMixerConfiguration(
@@ -539,7 +616,12 @@ export async function saveSongMixerConfiguration(
   const batch = writeBatch(db);
 
   tracks.forEach((track, orderIndex) => {
+    const displayName = track.displayName.trim() || stemDisplayNameFromFilename(track.filename);
+
     batch.update(doc(db, "songs", bundle.song.id, "mixerTracks", track.id), {
+      displayName,
+      displayNameIsCustom: displayName !== stemDisplayNameFromFilename(track.filename),
+      partSlug: track.partSlug,
       shown: track.shown,
       isBackgroundMix: track.isBackgroundMix,
       orderIndex,

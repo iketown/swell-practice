@@ -91,6 +91,7 @@ export interface SongMixerTrack {
   id: string;
   filename: string;
   displayName: string;
+  partSlug: string | null;
   contentType: string;
   size: number;
   storagePath: string;
@@ -99,6 +100,11 @@ export interface SongMixerTrack {
   isBackgroundMix: boolean;
   orderIndex: number;
   stateOverrides: SongMixerStateOverrides;
+}
+
+export function stemDisplayNameFromFilename(filename: string) {
+  const name = filename.replace(/\.[^./\\]+$/, "");
+  return name || filename;
 }
 
 export interface SongMixerConfiguration {
@@ -458,6 +464,8 @@ export function inferPartSlugs(filename: string, availablePartSlugs = DEFAULT_PA
       available.has(`voc_${i}`) &&
       (joined.includes(`_voc_${i}_`) ||
         joined.includes(`_voc${i}_`) ||
+        joined.includes(`_vox_${i}_`) ||
+        joined.includes(`_vox${i}_`) ||
         joined.includes(`_vocal_${i}_`) ||
         joined.includes(`_vocal${i}_`))
     ) {
@@ -465,8 +473,8 @@ export function inferPartSlugs(filename: string, availablePartSlugs = DEFAULT_PA
     }
   }
 
-  if (available.has("guit_a") && /(guit|gtr)_?a/.test(normalized)) inferred.add("guit_a");
-  if (available.has("guit_b") && /(guit|gtr)_?b/.test(normalized)) inferred.add("guit_b");
+  if (available.has("guit_a") && /(?:guit(?:ar)?|gtr)_?a/.test(normalized)) inferred.add("guit_a");
+  if (available.has("guit_b") && /(?:guit(?:ar)?|gtr)_?b/.test(normalized)) inferred.add("guit_b");
   if (available.has("bass") && tokens.has("bass")) inferred.add("bass");
   if (available.has("keys") && (tokens.has("keys") || tokens.has("keyboards") || tokens.has("piano"))) {
     inferred.add("keys");

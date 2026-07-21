@@ -232,8 +232,8 @@ export function MemberAdminClient() {
                 <Input id="member-last-name" value={form.lastName} onChange={(event) => updateField("lastName", event.target.value)} required />
               </Field>
               <Field>
-                <FieldLabel htmlFor="member-display-name">Display name</FieldLabel>
-                <Input id="member-display-name" value={form.displayName} onChange={(event) => updateField("displayName", event.target.value)} placeholder={form.firstName || "Ike"} required />
+                <FieldLabel htmlFor="member-display-name">Display name (optional)</FieldLabel>
+                <Input id="member-display-name" value={form.displayName} onChange={(event) => updateField("displayName", event.target.value)} placeholder={form.firstName || "Ike"} />
               </Field>
               <Field>
                 <FieldLabel htmlFor="member-email">Contact email</FieldLabel>
@@ -251,7 +251,7 @@ export function MemberAdminClient() {
             </FieldGroup>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeForm} disabled={saving}>Cancel</Button>
-              <Button type="submit" disabled={saving || !form.firstName.trim() || !form.lastName.trim() || !form.displayName.trim()}>
+              <Button type="submit" disabled={saving || !form.firstName.trim() || !form.lastName.trim()}>
                 {saving ? "Saving..." : "Save member"}
               </Button>
             </DialogFooter>

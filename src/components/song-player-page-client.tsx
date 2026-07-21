@@ -51,13 +51,23 @@ type OverrideSaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
 type SavedTrackOverrides = Record<string, SongMixerStateOverrides>;
 type PlayerView = "admin" | "user";
 
-export function SongPlayerPageClient({ slug }: { slug: string }) {
+export function SongPlayerPageClient({
+  slug,
+  requestedMix,
+  requestedPart,
+  requestedMember,
+}: {
+  slug: string;
+  requestedMix?: string;
+  requestedPart?: string;
+  requestedMember?: string;
+}) {
   const admin = useAdmin();
   const [bundle, setBundle] = useState<SongMixerBundle | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
   const [deletingTrackId, setDeletingTrackId] = useState<string | null>(null);
-  const [playerView, setPlayerView] = useState<PlayerView>("admin");
+  const [playerView, setPlayerView] = useState<PlayerView>("user");
   const [autoSaveOverrides, setAutoSaveOverrides] = useState(false);
   const [overrideSaveStatus, setOverrideSaveStatus] = useState<OverrideSaveStatus>("idle");
   const [savedTrackOverrides, setSavedTrackOverrides] = useState<SavedTrackOverrides>({});
@@ -527,14 +537,14 @@ export function SongPlayerPageClient({ slug }: { slug: string }) {
       <header className="grid gap-3 py-1 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end sm:py-2">
         <div className="grid gap-2">
           <Button
-            render={<Link href={`/songs/${bundle.song.slug}`} />}
+            render={<Link href={requestedMember ? `/members/${requestedMember}` : `/songs/${bundle.song.slug}/downloads`} />}
             variant="ghost"
             size="sm"
             nativeButton={false}
             className="w-fit"
           >
             <ArrowLeftIcon data-icon="inline-start" />
-            Song files
+            {requestedMember ? "My parts" : "Song files"}
           </Button>
           <div>
             <p className="swell-page-kicker">Test mixer</p>
@@ -576,8 +586,11 @@ export function SongPlayerPageClient({ slug }: { slug: string }) {
         <Card className="gap-0 py-0">
           <CardContent className="p-0">
             <SongMixerPlayer
+              key={`${requestedMix ?? ""}:${requestedPart ?? ""}`}
               tracks={visibleTracks}
               configurations={bundle.configurations}
+              requestedMix={requestedMix}
+              requestedPart={requestedPart}
               settings={bundle.settings}
               annotations={bundle.annotations}
               canSaveOverrides={showAdminControls}

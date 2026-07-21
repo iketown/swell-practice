@@ -36,9 +36,19 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { StemMixConfigEditor } from "@/components/stem-mix-config-editor";
 import { StemMixStateEditor } from "@/components/stem-mix-state-editor";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DEFAULT_PARTS, DEFAULT_SONG_MIXER_CONFIGURATION_IDS, partLabel } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 import type {
   SongMixerConfiguration,
@@ -83,6 +93,7 @@ export function StemManagerDialog({
         configuration.name.trim().toLocaleLowerCase(),
       ),
     ).size === draftConfigurations.length;
+  const stemNamesAreValid = draftTracks.every((track) => track.displayName.trim());
   const isDirty = useMemo(
     () =>
       mixerConfigurationKey(draftTracks, draftConfigurations, draftSettings)
@@ -115,6 +126,18 @@ export function StemManagerDialog({
       current.map((track) =>
         track.id === trackId ? { ...track, isBackgroundMix } : track,
       ),
+    );
+  };
+
+  const updateDisplayName = (trackId: string, displayName: string) => {
+    setDraftTracks((current) =>
+      current.map((track) => (track.id === trackId ? { ...track, displayName } : track)),
+    );
+  };
+
+  const updatePartAssignment = (trackId: string, partSlug: string | null) => {
+    setDraftTracks((current) =>
+      current.map((track) => (track.id === trackId ? { ...track, partSlug } : track)),
     );
   };
 
@@ -167,18 +190,13 @@ export function StemManagerDialog({
   const save = async () => {
     setSaving(true);
     try {
+      const tracksForSave = draftTracks.map((track, orderIndex) => ({
+        ...track,
+        orderIndex,
+      }));
       const saved = await onSave(
-        draftTracks.map((track, orderIndex) => ({
-          ...track,
-          orderIndex,
-        })),
-        draftConfigurations.map((configuration, orderIndex) => ({
-          ...configuration,
-          orderIndex,
-          trackIds: draftTracks.flatMap((track) =>
-            configuration.trackIds.includes(track.id) ? [track.id] : [],
-          ),
-        })),
+        tracksForSave,
+        configurationsForPartAssignments(tracksForSave, draftConfigurations),
         draftSettings,
       );
 
@@ -235,6 +253,7 @@ export function StemManagerDialog({
             <ol className="grid gap-2" aria-label="Uploaded mixer stems">
               {draftTracks.map((track, index) => {
                 const deleting = deletingTrackId === track.id;
+                const nameIsInvalid = !track.displayName.trim();
 
                 return (
                   <li
@@ -271,9 +290,20 @@ export function StemManagerDialog({
                     <div className="grid min-w-0 gap-1.5">
                       <div className="flex min-w-0 items-center gap-2">
                         <FileAudioIcon className="size-4 shrink-0 text-primary" aria-hidden />
-                        <p className="truncate font-medium" title={track.displayName}>
-                          {track.displayName}
-                        </p>
+                        <Field data-invalid={nameIsInvalid} className="min-w-0 flex-1 gap-1">
+                          <FieldLabel htmlFor={`stem-name-${track.id}`} className="sr-only">
+                            Stem name
+                          </FieldLabel>
+                          <Input
+                            id={`stem-name-${track.id}`}
+                            value={track.displayName}
+                            maxLength={80}
+                            required
+                            aria-invalid={nameIsInvalid}
+                            onChange={(event) => updateDisplayName(track.id, event.currentTarget.value)}
+                            className="h-8 font-medium"
+                          />
+                        </Field>
                         {track.isBackgroundMix ? (
                           <Badge variant="outline" className="shrink-0">
                             BG
@@ -281,9 +311,44 @@ export function StemManagerDialog({
                         ) : null}
                       </div>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                        <span className="min-w-0 truncate" title={track.filename}>
+                          File: {track.filename}
+                        </span>
                         <span>Position {index + 1}</span>
                         <span>{formatBytes(track.size)}</span>
                       </div>
+                      <Field className="grid gap-1.5 border-t pt-2 sm:grid-cols-[auto_minmax(10rem,1fr)] sm:items-center">
+                        <FieldLabel htmlFor={`stem-part-${track.id}`} className="text-xs">
+                          Linked part
+                        </FieldLabel>
+                        <Select
+                          items={[
+                            { label: "No linked part", value: "unassigned" },
+                            ...DEFAULT_PARTS.map((part) => ({
+                              label: partLabel(part.slug),
+                              value: part.slug,
+                            })),
+                          ]}
+                          value={track.partSlug ?? "unassigned"}
+                          onValueChange={(value) =>
+                            updatePartAssignment(track.id, value === "unassigned" ? null : value ?? null)
+                          }
+                        >
+                          <SelectTrigger id={`stem-part-${track.id}`} size="sm" className="w-full bg-background">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent align="start">
+                            <SelectGroup>
+                              <SelectItem value="unassigned">No linked part</SelectItem>
+                              {DEFAULT_PARTS.map((part) => (
+                                <SelectItem key={part.slug} value={part.slug}>
+                                  {partLabel(part.slug)}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      </Field>
                     </div>
 
                     <div className="col-span-2 flex flex-wrap items-center justify-end gap-1 sm:col-span-1">
@@ -392,7 +457,7 @@ export function StemManagerDialog({
         <DialogFooter className="mx-0 mb-0 rounded-none">
           <DialogClose render={<Button variant="outline" disabled={saving} />}>Cancel</DialogClose>
           <Button
-            disabled={!isDirty || !configurationsAreValid || saving}
+            disabled={!isDirty || !configurationsAreValid || !stemNamesAreValid || saving}
             onClick={() => void save()}
           >
             {saving ? <LoaderCircleIcon data-icon="inline-start" className="animate-spin" aria-hidden /> : null}
@@ -412,6 +477,8 @@ function mixerConfigurationKey(
   return JSON.stringify({
     tracks: tracks.map((track) => ({
       id: track.id,
+      displayName: track.displayName,
+      partSlug: track.partSlug,
       shown: track.shown,
       isBackgroundMix: track.isBackgroundMix,
       stateOverrides: track.stateOverrides,
@@ -422,6 +489,31 @@ function mixerConfigurationKey(
       trackIds: configuration.trackIds,
     })),
     settings,
+  });
+}
+
+function configurationsForPartAssignments(
+  tracks: SongMixerTrack[],
+  configurations: SongMixerConfiguration[],
+) {
+  return configurations.map((configuration, orderIndex) => {
+    const isVocalMix = configuration.id === DEFAULT_SONG_MIXER_CONFIGURATION_IDS.vocals;
+    const isInstrumentMix = configuration.id === DEFAULT_SONG_MIXER_CONFIGURATION_IDS.instruments;
+    const isDefaultPartMix = isVocalMix || isInstrumentMix;
+
+    return {
+      ...configuration,
+      orderIndex,
+      trackIds: tracks.flatMap((track) => {
+        const hasLinkedPart = Boolean(track.partSlug);
+        const belongsInMix = (isVocalMix && track.partSlug?.startsWith("voc_"))
+          || (isInstrumentMix && typeof track.partSlug === "string" && !track.partSlug.startsWith("voc_"));
+        const remainsInMix = configuration.trackIds.includes(track.id)
+          && (!isDefaultPartMix || !hasLinkedPart);
+
+        return belongsInMix || remainsInMix ? [track.id] : [];
+      }),
+    };
   });
 }
 
