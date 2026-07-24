@@ -43,6 +43,7 @@ import {
 } from "@waveform-playlist/browser";
 import { useAudioTracks, type AudioTrackConfig } from "@waveform-playlist/browser/tone";
 import { AnnotationProvider } from "@waveform-playlist/annotations";
+import { start as startTone } from "tone";
 
 import {
   Accordion,
@@ -366,7 +367,9 @@ export function SongMixerWaveform({
   if (error || engineError) {
     return (
       <div className="m-4 rounded-md border border-destructive/55 bg-destructive/10 p-4 text-sm">
-        <p className="font-medium">The mixer could not decode one of these MP3s.</p>
+        <p className="font-medium">
+          {error ? "The mixer could not decode one of these MP3s." : "The mixer could not start audio."}
+        </p>
         <p className="mt-1 text-muted-foreground">{error ?? engineError}</p>
       </div>
     );
@@ -428,7 +431,7 @@ export function SongMixerWaveform({
             waveformRootRef={waveformRootRef}
           />
           <SuppressWaveformTrackSelection />
-          <MixerSpacebarShortcut />
+          <MixerSpacebarShortcut onPlaybackStartError={handleEngineError} />
           <AnnotationNavigationProvider playbackMode={annotationPlaybackMode}>
             <section
               className="grid gap-3 border-t-2 bg-secondary/70 p-3 sm:p-4"
@@ -458,6 +461,7 @@ export function SongMixerWaveform({
               loadedCount={loadedCount}
               totalCount={totalCount}
               annotations={annotations}
+              onPlaybackStartError={handleEngineError}
             />
           </AnnotationNavigationProvider>
           <TimelineNavigationSurface
@@ -2296,16 +2300,38 @@ type MixerControlAction =
   | { control: "pan"; trackIndex: number; value: number }
   | { control: "mute"; trackIndex: number; value: boolean };
 
+function startPlaybackFromUserGesture(
+  play: () => Promise<void>,
+  onError: (error: Error) => void,
+) {
+  // Safari only permits a suspended Web Audio context to resume from the
+  // synchronous portion of a trusted user gesture. The playlist engine also
+  // starts Tone, but it does so after its async initialization path begins.
+  // Starting here makes the transport reliable in Safari and remains a no-op
+  // once the shared Tone context is already running.
+  void startTone()
+    .then(play)
+    .catch((caught) => {
+      onError(
+        caught instanceof Error
+          ? caught
+          : new Error("Your browser prevented the audio engine from starting."),
+      );
+    });
+}
+
 function MixerTransport({
   loading,
   loadedCount,
   totalCount,
   annotations,
+  onPlaybackStartError,
 }: {
   loading: boolean;
   loadedCount: number;
   totalCount: number;
   annotations: SongAnnotation[];
+  onPlaybackStartError: (error: Error) => void;
 }) {
   const { currentTime, isPlaying } = usePlaybackAnimation();
   const { activeAnnotationId } = usePlaylistState();
@@ -2347,7 +2373,7 @@ function MixerTransport({
             if (isPlaying) {
               pause();
             } else {
-              void play();
+              startPlaybackFromUserGesture(play, onPlaybackStartError);
             }
           }}
         >
@@ -2396,7 +2422,11 @@ function MixerTransport({
   );
 }
 
-function MixerSpacebarShortcut() {
+function MixerSpacebarShortcut({
+  onPlaybackStartError,
+}: {
+  onPlaybackStartError: (error: Error) => void;
+}) {
   const { isPlaying } = usePlaybackAnimation();
   const { isReady } = usePlaylistData();
   const { pause, play } = usePlaylistControls();
@@ -2422,7 +2452,7 @@ function MixerSpacebarShortcut() {
     if (isPlaying) {
       pause();
     } else {
-      void play();
+      startPlaybackFromUserGesture(play, onPlaybackStartError);
     }
   });
 
