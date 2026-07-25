@@ -178,6 +178,7 @@ export function SongMixerWaveform({
   settings,
   annotations,
   partAndMixControls,
+  partVideoAction,
   mixId,
   selectedTrackId,
   onSelectedTrackChange,
@@ -193,6 +194,7 @@ export function SongMixerWaveform({
   settings: SongMixerSettings;
   annotations: SongAnnotation[];
   partAndMixControls: ReactNode;
+  partVideoAction?: ReactNode;
   mixId: SongMixerMixId;
   selectedTrackId: string | null;
   onSelectedTrackChange: (trackId: string) => void;
@@ -461,6 +463,7 @@ export function SongMixerWaveform({
               loadedCount={loadedCount}
               totalCount={totalCount}
               annotations={annotations}
+              partVideoAction={partVideoAction}
               onPlaybackStartError={handleEngineError}
             />
           </AnnotationNavigationProvider>
@@ -2325,12 +2328,14 @@ function MixerTransport({
   loadedCount,
   totalCount,
   annotations,
+  partVideoAction,
   onPlaybackStartError,
 }: {
   loading: boolean;
   loadedCount: number;
   totalCount: number;
   annotations: SongAnnotation[];
+  partVideoAction?: ReactNode;
   onPlaybackStartError: (error: Error) => void;
 }) {
   const { currentTime, isPlaying } = usePlaybackAnimation();
@@ -2364,26 +2369,29 @@ function MixerTransport({
       aria-label="Playback controls"
     >
       <div className="grid grid-cols-2 gap-2 sm:flex sm:items-stretch">
-        <Button
-          size="lg"
-          className="col-span-2 min-h-16 w-full gap-3 text-lg sm:col-span-1 sm:w-auto sm:flex-[1.25]"
-          aria-label={isPlaying ? "Pause" : "Play"}
-          disabled={!isReady}
-          onClick={() => {
-            if (isPlaying) {
-              pause();
-            } else {
-              startPlaybackFromUserGesture(play, onPlaybackStartError);
-            }
-          }}
-        >
-          {isPlaying ? (
-            <PauseIcon className="size-7 fill-current" aria-hidden />
-          ) : (
-            <PlayIcon className="size-7 fill-current" aria-hidden />
-          )}
-          <span>{isPlaying ? "Pause" : "Play"}</span>
-        </Button>
+        <div className="col-span-2 grid gap-1.5 sm:col-span-1 sm:flex-[1.25]">
+          <Button
+            size="lg"
+            className="min-h-16 w-full gap-3 text-lg"
+            aria-label={isPlaying ? "Pause" : "Play"}
+            disabled={!isReady}
+            onClick={() => {
+              if (isPlaying) {
+                pause();
+              } else {
+                startPlaybackFromUserGesture(play, onPlaybackStartError);
+              }
+            }}
+          >
+            {isPlaying ? (
+              <PauseIcon className="size-7 fill-current" aria-hidden />
+            ) : (
+              <PlayIcon className="size-7 fill-current" aria-hidden />
+            )}
+            <span>{isPlaying ? "Pause" : "Play"}</span>
+          </Button>
+          {partVideoAction ? <div className="px-1">{partVideoAction}</div> : null}
+        </div>
         <Button
           size="lg"
           variant="outline"

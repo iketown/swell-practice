@@ -4,6 +4,7 @@ import {
   ArrowDownIcon,
   ArrowUpIcon,
   FileAudioIcon,
+  FileVideoIcon,
   GripVerticalIcon,
   LoaderCircleIcon,
   SlidersHorizontalIcon,
@@ -55,29 +56,38 @@ import type {
   SongMixerSettings,
   SongMixerStateOverrides,
   SongMixerTrack,
+  SongMixerVideo,
 } from "@/lib/domain";
 
 export function StemManagerDialog({
   tracks,
+  videos,
   configurations,
   settings,
   deletingTrackId,
+  deletingVideoId,
   onDeleteTrack,
+  onDeleteVideo,
   onSave,
 }: {
   tracks: SongMixerTrack[];
+  videos: SongMixerVideo[];
   configurations: SongMixerConfiguration[];
   settings: SongMixerSettings;
   deletingTrackId: string | null;
+  deletingVideoId: string | null;
   onDeleteTrack: (track: SongMixerTrack) => Promise<boolean>;
+  onDeleteVideo: (video: SongMixerVideo) => Promise<boolean>;
   onSave: (
     tracks: SongMixerTrack[],
+    videos: SongMixerVideo[],
     configurations: SongMixerConfiguration[],
     settings: SongMixerSettings,
   ) => Promise<boolean>;
 }) {
   const [open, setOpen] = useState(false);
   const [draftTracks, setDraftTracks] = useState(tracks);
+  const [draftVideos, setDraftVideos] = useState(videos);
   const [draftConfigurations, setDraftConfigurations] = useState(configurations);
   const [draftSettings, setDraftSettings] = useState(settings);
   const [activeTab, setActiveTab] = useState("stems");
@@ -96,9 +106,9 @@ export function StemManagerDialog({
   const stemNamesAreValid = draftTracks.every((track) => track.displayName.trim());
   const isDirty = useMemo(
     () =>
-      mixerConfigurationKey(draftTracks, draftConfigurations, draftSettings)
-      !== mixerConfigurationKey(tracks, configurations, settings),
-    [configurations, draftConfigurations, draftSettings, draftTracks, settings, tracks],
+      mixerConfigurationKey(draftTracks, draftVideos, draftConfigurations, draftSettings)
+      !== mixerConfigurationKey(tracks, videos, configurations, settings),
+    [configurations, draftConfigurations, draftSettings, draftTracks, draftVideos, settings, tracks, videos],
   );
 
   const setDialogOpen = (nextOpen: boolean) => {
@@ -107,6 +117,7 @@ export function StemManagerDialog({
 
     if (nextOpen) {
       setDraftTracks(tracks);
+      setDraftVideos(videos);
       setDraftConfigurations(configurations);
       setDraftSettings(settings);
       setActiveTab("stems");
@@ -187,6 +198,26 @@ export function StemManagerDialog({
     );
   };
 
+  const updateVideoDisplayName = (videoId: string, displayName: string) => {
+    setDraftVideos((current) =>
+      current.map((video) => (video.id === videoId ? { ...video, displayName } : video)),
+    );
+  };
+
+  const updateVideoPartAssignment = (videoId: string, partSlug: string | null) => {
+    setDraftVideos((current) =>
+      current.map((video) => (video.id === videoId ? { ...video, partSlug } : video)),
+    );
+  };
+
+  const deleteVideo = async (video: SongMixerVideo) => {
+    const deleted = await onDeleteVideo(video);
+    if (!deleted) return;
+
+    setDraftVideos((current) => current.filter((currentVideo) => currentVideo.id !== video.id));
+    setAnnouncement(`${video.displayName} was permanently deleted.`);
+  };
+
   const save = async () => {
     setSaving(true);
     try {
@@ -196,6 +227,7 @@ export function StemManagerDialog({
       }));
       const saved = await onSave(
         tracksForSave,
+        draftVideos,
         configurationsForPartAssignments(tracksForSave, draftConfigurations),
         draftSettings,
       );
@@ -222,7 +254,7 @@ export function StemManagerDialog({
             <DialogTitle>Stem manager</DialogTitle>
             <Badge variant="secondary">
               {draftConfigurations.length} mix{draftConfigurations.length === 1 ? "" : "es"} ·{" "}
-              {draftTracks.length} stem{draftTracks.length === 1 ? "" : "s"}
+              {draftTracks.length} stem{draftTracks.length === 1 ? "" : "s"} · {draftVideos.length} video{draftVideos.length === 1 ? "" : "s"}
             </Badge>
           </div>
           <DialogDescription>
@@ -245,6 +277,9 @@ export function StemManagerDialog({
               </TabsTrigger>
               <TabsTrigger value="mix-states" className="px-4 py-1.5">
                 Mix states
+              </TabsTrigger>
+              <TabsTrigger value="videos" className="px-4 py-1.5">
+                Videos
               </TabsTrigger>
             </TabsList>
           </div>
@@ -452,12 +487,124 @@ export function StemManagerDialog({
               onTrackOverridesChange={updateTrackOverrides}
             />
           </TabsContent>
+
+          <TabsContent value="videos" className="min-h-0 overflow-y-auto p-4">
+            {draftVideos.length ? (
+              <ol className="grid gap-2" aria-label="Uploaded mixer videos">
+                {draftVideos.map((video) => {
+                  const deleting = deletingVideoId === video.id;
+                  const nameIsInvalid = !video.displayName.trim();
+
+                  return (
+                    <li
+                      key={video.id}
+                      className="grid gap-3 rounded-md border bg-card p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                    >
+                      <div className="grid min-w-0 gap-1.5">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <FileVideoIcon className="size-4 shrink-0 text-primary" aria-hidden />
+                          <Field data-invalid={nameIsInvalid} className="min-w-0 flex-1 gap-1">
+                            <FieldLabel htmlFor={`video-name-${video.id}`} className="sr-only">
+                              Video name
+                            </FieldLabel>
+                            <Input
+                              id={`video-name-${video.id}`}
+                              value={video.displayName}
+                              maxLength={80}
+                              required
+                              aria-invalid={nameIsInvalid}
+                              onChange={(event) => updateVideoDisplayName(video.id, event.currentTarget.value)}
+                              className="h-8 font-medium"
+                            />
+                          </Field>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                          <span className="min-w-0 truncate" title={video.filename}>
+                            File: {video.filename}
+                          </span>
+                          <span>{formatBytes(video.size)}</span>
+                        </div>
+                        <Field className="grid gap-1.5 border-t pt-2 sm:grid-cols-[auto_minmax(10rem,1fr)] sm:items-center">
+                          <FieldLabel htmlFor={`video-part-${video.id}`} className="text-xs">
+                            Linked part
+                          </FieldLabel>
+                          <Select
+                            items={[
+                              { label: "No linked part", value: "unassigned" },
+                              ...DEFAULT_PARTS.map((part) => ({ label: partLabel(part.slug), value: part.slug })),
+                            ]}
+                            value={video.partSlug ?? "unassigned"}
+                            onValueChange={(value) =>
+                              updateVideoPartAssignment(video.id, value === "unassigned" ? null : value ?? null)
+                            }
+                          >
+                            <SelectTrigger id={`video-part-${video.id}`} size="sm" className="w-full bg-background">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent align="start">
+                              <SelectGroup>
+                                <SelectItem value="unassigned">No linked part</SelectItem>
+                                {DEFAULT_PARTS.map((part) => (
+                                  <SelectItem key={part.slug} value={part.slug}>
+                                    {partLabel(part.slug)}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        </Field>
+                      </div>
+
+                      <AlertDialog>
+                        <AlertDialogTrigger
+                          render={
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`Permanently delete ${video.displayName}`}
+                              disabled={deleting}
+                              className="justify-self-end text-muted-foreground hover:text-destructive"
+                            />
+                          }
+                        >
+                          {deleting ? (
+                            <LoaderCircleIcon className="animate-spin" aria-hidden />
+                          ) : (
+                            <Trash2Icon aria-hidden />
+                          )}
+                        </AlertDialogTrigger>
+                        <AlertDialogContent size="sm">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete this video permanently?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              “{video.displayName}” will be removed from this song and deleted from Firebase Storage.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Keep video</AlertDialogCancel>
+                            <AlertDialogAction variant="destructive" onClick={() => void deleteVideo(video)}>
+                              Delete video
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </li>
+                  );
+                })}
+              </ol>
+            ) : (
+              <p className="rounded-md border border-dashed bg-secondary/30 px-4 py-8 text-center text-sm text-muted-foreground">
+                Upload an MP4 above, then link it to the part that should see it in the player.
+              </p>
+            )}
+          </TabsContent>
         </Tabs>
 
         <DialogFooter className="mx-0 mb-0 rounded-none">
           <DialogClose render={<Button variant="outline" disabled={saving} />}>Cancel</DialogClose>
           <Button
-            disabled={!isDirty || !configurationsAreValid || !stemNamesAreValid || saving}
+            disabled={!isDirty || !configurationsAreValid || !stemNamesAreValid || draftVideos.some((video) => !video.displayName.trim()) || saving}
             onClick={() => void save()}
           >
             {saving ? <LoaderCircleIcon data-icon="inline-start" className="animate-spin" aria-hidden /> : null}
@@ -471,6 +618,7 @@ export function StemManagerDialog({
 
 function mixerConfigurationKey(
   tracks: SongMixerTrack[],
+  videos: SongMixerVideo[],
   configurations: SongMixerConfiguration[],
   settings: SongMixerSettings,
 ) {
@@ -482,6 +630,11 @@ function mixerConfigurationKey(
       shown: track.shown,
       isBackgroundMix: track.isBackgroundMix,
       stateOverrides: track.stateOverrides,
+    })),
+    videos: videos.map((video) => ({
+      id: video.id,
+      displayName: video.displayName,
+      partSlug: video.partSlug,
     })),
     configurations: configurations.map((configuration) => ({
       id: configuration.id,

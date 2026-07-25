@@ -111,6 +111,17 @@ export interface SongMixerTrack {
   stateOverrides: SongMixerStateOverrides;
 }
 
+export interface SongMixerVideo {
+  id: string;
+  filename: string;
+  displayName: string;
+  partSlug: string | null;
+  contentType: string;
+  size: number;
+  storagePath: string;
+  downloadUrl?: string;
+}
+
 export function stemDisplayNameFromFilename(filename: string) {
   const name = filename.replace(/\.[^./\\]+$/, "");
   return name || filename;
@@ -138,6 +149,7 @@ export interface SongAnnotation {
 export interface SongMixerBundle {
   song: Song;
   tracks: SongMixerTrack[];
+  videos: SongMixerVideo[];
   configurations: SongMixerConfiguration[];
   settings: SongMixerSettings;
   annotations: SongAnnotation[];

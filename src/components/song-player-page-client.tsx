@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeftIcon, FileAudioIcon, UploadIcon, XIcon } from "lucide-react";
+import { ArrowLeftIcon, FileAudioIcon, FileVideoIcon, UploadIcon, XIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
@@ -24,11 +24,13 @@ import type {
   SongMixerSettings,
   SongMixerStateOverrides,
   SongMixerTrack,
+  SongMixerVideo,
 } from "@/lib/domain";
 import {
   createSongAnnotation,
   deleteSongAnnotation,
   deleteSongMixerTrack,
+  deleteSongMixerVideo,
   getSongMixerBundle,
   replaceSongAnnotations,
   saveSongMixerConfiguration,
@@ -36,6 +38,7 @@ import {
   saveSongMixerTrackOverridesBatch,
   updateSongAnnotation,
   uploadSongMixerTrack,
+  uploadSongMixerVideo,
   type SongAssetUploadProgress,
 } from "@/lib/firestore";
 
@@ -67,6 +70,7 @@ export function SongPlayerPageClient({
   const [loading, setLoading] = useState(true);
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
   const [deletingTrackId, setDeletingTrackId] = useState<string | null>(null);
+  const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
   const [playerView, setPlayerView] = useState<PlayerView>("user");
   const [autoSaveOverrides, setAutoSaveOverrides] = useState(false);
   const [overrideSaveStatus, setOverrideSaveStatus] = useState<OverrideSaveStatus>("idle");
@@ -155,15 +159,16 @@ export function SongPlayerPageClient({
       await Promise.all(
         queuedUploads.map(async ({ controller, file, item }, uploadIndex) => {
           try {
-            await uploadSongMixerTrack(bundle, file, {
+            const isVideo = isMp4(file);
+            await (isVideo ? uploadSongMixerVideo : uploadSongMixerTrack)(bundle, file, {
               signal: controller.signal,
-              orderIndex: bundle.tracks.length + uploadIndex,
+              ...(isVideo ? {} : { orderIndex: bundle.tracks.length + uploadIndex }),
               onProgress: (progress: SongAssetUploadProgress) => updateUpload(item.id, progress),
             });
 
             if (controller.signal.aborted) return;
             setUploadItems((current) => current.filter((currentItem) => currentItem.id !== item.id));
-            toast.success(`${file.name} added to the mixer`);
+            toast.success(`${file.name} added to ${isVideo ? "videos" : "the mixer"}`);
           } catch (caught) {
             if (controller.signal.aborted) {
               setUploadItems((current) => current.filter((currentItem) => currentItem.id !== item.id));
@@ -201,6 +206,28 @@ export function SongPlayerPageClient({
         return false;
       } finally {
         setDeletingTrackId(null);
+      }
+    },
+    [bundle, refresh],
+  );
+
+  const deleteVideo = useCallback(
+    async (video: SongMixerVideo) => {
+      if (!bundle) return false;
+
+      setDeletingVideoId(video.id);
+      try {
+        await deleteSongMixerVideo(bundle, video);
+        toast.success(`${video.displayName} deleted from the project`);
+        await refresh();
+        return true;
+      } catch (caught) {
+        toast.error("Video could not be deleted", {
+          description: caught instanceof Error ? caught.message : "Please try again.",
+        });
+        return false;
+      } finally {
+        setDeletingVideoId(null);
       }
     },
     [bundle, refresh],
@@ -354,6 +381,7 @@ export function SongPlayerPageClient({
   const saveMixerConfiguration = useCallback(
     async (
       tracks: SongMixerTrack[],
+      videos: SongMixerVideo[],
       configurations: SongMixerConfiguration[],
       settings: SongMixerSettings,
     ) => {
@@ -364,6 +392,7 @@ export function SongPlayerPageClient({
         await saveSongMixerConfiguration(
           bundle,
           tracks,
+          videos,
           configurations,
           settings,
           settingsChanged,
@@ -521,13 +550,16 @@ export function SongPlayerPageClient({
   const trackCount = bundle.tracks.length + activeUploadCount;
   const visibleTracks = bundle.tracks.filter((track) => track.shown);
   const showAdminControls = admin.isAdmin && playerView === "admin";
-  const manageStemsAction = showAdminControls && bundle.tracks.length ? (
+  const manageStemsAction = showAdminControls && (bundle.tracks.length || bundle.videos.length) ? (
     <StemManagerDialog
       tracks={bundle.tracks}
+      videos={bundle.videos}
       configurations={bundle.configurations}
       settings={bundle.settings}
       deletingTrackId={deletingTrackId}
+      deletingVideoId={deletingVideoId}
       onDeleteTrack={deleteTrack}
+      onDeleteVideo={deleteVideo}
       onSave={saveMixerConfiguration}
     />
   ) : null;
@@ -571,6 +603,11 @@ export function SongPlayerPageClient({
           <Badge variant="secondary" className="w-fit">
             {trackCount} stem{trackCount === 1 ? "" : "s"} uploaded
           </Badge>
+          {bundle.videos.length ? (
+            <Badge variant="secondary" className="w-fit">
+              {bundle.videos.length} video{bundle.videos.length === 1 ? "" : "s"} uploaded
+            </Badge>
+          ) : null}
         </div>
       </header>
 
@@ -588,6 +625,7 @@ export function SongPlayerPageClient({
             <SongMixerPlayer
               key={`${requestedMix ?? ""}:${requestedPart ?? ""}`}
               tracks={visibleTracks}
+              videos={bundle.videos}
               configurations={bundle.configurations}
               requestedMix={requestedMix}
               requestedPart={requestedPart}
@@ -668,6 +706,7 @@ function MixerUploadPanel({
     accept: {
       "audio/mpeg": [".mp3"],
       "audio/mp3": [".mp3"],
+      "video/mp4": [".mp4"],
     },
     multiple: true,
     onDropAccepted: (files) => void onDrop(files),
@@ -675,15 +714,15 @@ function MixerUploadPanel({
       const hasInvalidType = rejections.some((rejection) =>
         rejection.errors.some((error) => error.code === "file-invalid-type"),
       );
-      toast.error(hasInvalidType ? "Choose MP3 files only" : "Those files could not be added.");
+      toast.error(hasInvalidType ? "Choose MP3 or MP4 files only" : "Those files could not be added.");
     },
   });
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Add mixer stems</CardTitle>
-        <CardDescription>Mono and stereo MP3s are both supported. All stems should begin at the same song start.</CardDescription>
+        <CardTitle>Add mixer stems or videos</CardTitle>
+        <CardDescription>MP3 stems must begin at the same song start. MP4s can be linked to a player part in Manage stems.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         <div
@@ -700,10 +739,10 @@ function MixerUploadPanel({
           </span>
           <div className="grid gap-0.5">
             <p className="font-medium">
-              {isDragActive ? "Drop MP3 stems here" : "Drop MP3 stems or click to choose"}
+              {isDragActive ? "Drop MP3 stems or MP4 videos here" : "Drop MP3 stems or MP4 videos, or click to choose"}
             </p>
             <p className="text-sm text-muted-foreground">
-              Each file becomes an available stem that you can add to one or more mixes.
+              MP3s become mixer stems. MP4s appear in the Videos tab, ready to link to a part.
             </p>
           </div>
         </div>
@@ -719,7 +758,11 @@ function MixerUploadPanel({
                   key={item.id}
                   className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border bg-card p-3"
                 >
-                  <FileAudioIcon className="size-4 text-primary" aria-hidden />
+                  {isMp4Name(item.filename) ? (
+                    <FileVideoIcon className="size-4 text-primary" aria-hidden />
+                  ) : (
+                    <FileAudioIcon className="size-4 text-primary" aria-hidden />
+                  )}
                   <Progress value={percentage} className="min-w-0 gap-2">
                     <ProgressLabel className="min-w-0 flex-1 truncate">{item.filename}</ProgressLabel>
                     <ProgressValue />
@@ -739,4 +782,12 @@ function MixerUploadPanel({
       </CardContent>
     </Card>
   );
+}
+
+function isMp4(file: Pick<File, "name" | "type">) {
+  return file.type === "video/mp4" || isMp4Name(file.name);
+}
+
+function isMp4Name(filename: string) {
+  return filename.toLowerCase().endsWith(".mp4");
 }

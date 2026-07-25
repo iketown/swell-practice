@@ -192,6 +192,22 @@ Part pages group by song and show only assets assigned to that part for that son
 }
 ```
 
+### `songs/{songId}/mixerVideos/{videoId}`
+
+```ts
+{
+  filename: string;
+  displayName: string;
+  contentType: "video/mp4";
+  size: number;
+  storagePath: string;
+  downloadUrl: string;
+  partSlug: string | null; // linked to one player part, or left unassigned
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+```
+
 ### `songs/{songId}.mixerMixes`
 
 ```ts
@@ -232,6 +248,8 @@ added to an already-saved mix.
 Annotations label shared sections of the synchronized mixer timeline. Sections may touch but may not overlap. Administrators can create, edit, resize, and delete them. Viewers can see the same sections and seek to a section start, but cannot change boundaries or stored annotation data. Annotation playback behavior is session-only for both administrators and viewers: `NORMAL` continues through the selected annotation's end, `LOOP` returns to its start after playback crosses its end, and `STOP` pauses at its end. LOOP and STOP arm only while playback is inside the selected annotation, so starting or seeking after that annotation remains unrestricted.
 
 Mixer tracks are intentionally not referenced by song parts and never appear on `/songs/[songSlug]` or `/parts/[partSlug]`. They are isolated stems for synchronized test playback only. Each track has an editable player-facing name that starts as its uploaded filename without the extension; the source filename remains immutable for storage and audit context. Admins can choose which uploaded tracks are available, mark backing tracks as background mixes, drag tracks into playback order, assign them to player mixes, or permanently delete them from the project. A background-mix track remains audible and configurable but is excluded from the player’s selected-part menu, so it can never receive the selected stem’s `featured` or `muted` state.
+
+Mixer videos are uploaded as MP4 files through the same mixer upload drop zone, but do not load into the audio engine. In the stem manager's Videos tab, an admin can link each uploaded video to a song part. When a member selects that linked part in the mixer, its video link appears beneath Play and opens the video in a dialog.
 
 ### `songs/global-mixer-defaults/mixerSettings/main`
 

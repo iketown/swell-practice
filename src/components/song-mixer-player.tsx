@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { VideoIcon } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 
 import {
@@ -11,6 +12,14 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Label } from "@/components/ui/label";
 import {
@@ -33,6 +42,7 @@ import {
   type SongMixerSettings,
   type SongMixerStateOverrides,
   type SongMixerTrack,
+  type SongMixerVideo,
 } from "@/lib/domain";
 
 const SongMixerWaveform = dynamic(
@@ -51,6 +61,7 @@ const SongMixerWaveform = dynamic(
 
 export function SongMixerPlayer({
   tracks,
+  videos,
   configurations,
   requestedMix,
   requestedPart,
@@ -73,6 +84,7 @@ export function SongMixerPlayer({
   onAnnotationsChange,
 }: {
   tracks: SongMixerTrack[];
+  videos: SongMixerVideo[];
   configurations: SongMixerConfiguration[];
   requestedMix?: string;
   requestedPart?: string;
@@ -143,6 +155,13 @@ export function SongMixerPlayer({
   )
     ? requestedSelectedTrackId ?? null
     : featureableTracks[0]?.id ?? null;
+  const selectedPartSlug = featureableTracks.find(
+    (track) => track.id === effectiveSelectedTrackId,
+  )?.partSlug ?? null;
+  const selectedPartVideos = useMemo(
+    () => selectedPartSlug ? videos.filter((video) => video.partSlug === selectedPartSlug) : [],
+    [selectedPartSlug, videos],
+  );
   const overridesObject = useMemo(() => songOverridesObject(tracks), [tracks]);
   const overrideValueCount = useMemo(() => countOverrideValues(tracks), [tracks]);
   const overrideStatusLabel = !canSaveOverrides
@@ -355,6 +374,7 @@ export function SongMixerPlayer({
       settings={settings}
       annotations={annotations}
       partAndMixControls={partAndMixControls}
+      partVideoAction={<SelectedPartVideoLinks videos={selectedPartVideos} />}
       mixId={mixId}
       selectedTrackId={effectiveSelectedTrackId}
       onSelectedTrackChange={selectTrackFromWaveform}
@@ -366,6 +386,48 @@ export function SongMixerPlayer({
       onImportAnnotations={onImportAnnotations}
       onAnnotationsChange={onAnnotationsChange}
     />
+  );
+}
+
+function SelectedPartVideoLinks({ videos }: { videos: SongMixerVideo[] }) {
+  const [activeVideo, setActiveVideo] = useState<SongMixerVideo | null>(null);
+
+  if (!videos.length) return null;
+
+  return (
+    <>
+      <div className="flex flex-wrap gap-x-3 gap-y-1" aria-label="Selected part videos">
+        {videos.map((video) => (
+          <Dialog key={video.id} open={activeVideo?.id === video.id} onOpenChange={(open) => setActiveVideo(open ? video : null)}>
+            <DialogTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-10 max-w-full justify-start gap-2 px-3 text-base"
+                >
+                  <VideoIcon className="size-5" aria-hidden />
+                  <span className="truncate">Watch video: {video.displayName}</span>
+                </Button>
+              }
+            />
+            <DialogContent className="w-[min(58rem,calc(100%-2rem))] gap-3 p-3 sm:max-w-none">
+              <DialogHeader className="pr-9">
+                <DialogTitle>{video.displayName}</DialogTitle>
+                <DialogDescription>Video for the selected part</DialogDescription>
+              </DialogHeader>
+              {video.downloadUrl ? (
+                <video controls autoPlay className="max-h-[72dvh] w-full rounded-md bg-black" src={video.downloadUrl}>
+                  Your browser cannot play this video.
+                </video>
+              ) : (
+                <p className="text-sm text-muted-foreground">This video is not available right now.</p>
+              )}
+            </DialogContent>
+          </Dialog>
+        ))}
+      </div>
+    </>
   );
 }
 

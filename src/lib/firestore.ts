@@ -43,6 +43,7 @@ import {
   type SongMixerStateOverrides,
   type SongMixerStateValues,
   type SongMixerTrack,
+  type SongMixerVideo,
   type SongPart,
   type PartSongRow,
 } from "@/lib/domain";
@@ -121,6 +122,22 @@ function mixerTrackFromDoc(id: string, data: Record<string, unknown>, fallbackOr
     isBackgroundMix: data.isBackgroundMix === true,
     orderIndex: typeof data.orderIndex === "number" ? data.orderIndex : fallbackOrderIndex,
     stateOverrides: mixerStateOverridesFromData(data.stateOverrides),
+  };
+}
+
+function mixerVideoFromDoc(id: string, data: Record<string, unknown>): SongMixerVideo {
+  const filename = String(data.filename ?? "");
+  const storedDisplayName = typeof data.displayName === "string" ? data.displayName.trim() : "";
+
+  return {
+    id,
+    filename,
+    displayName: storedDisplayName || stemDisplayNameFromFilename(filename),
+    partSlug: mixerPartSlugFromData(data, filename),
+    contentType: String(data.contentType ?? "video/mp4"),
+    size: Number(data.size ?? 0),
+    storagePath: String(data.storagePath ?? ""),
+    downloadUrl: typeof data.downloadUrl === "string" ? data.downloadUrl : undefined,
   };
 }
 
@@ -308,6 +325,7 @@ export async function getSongMixerBundle(slug: string): Promise<SongMixerBundle 
       ? {
           song: bundle.song,
           tracks: [],
+          videos: [],
           configurations: createDefaultSongMixerConfigurations([]),
           settings: createDefaultSongMixerSettings(),
           annotations: [],
@@ -321,8 +339,12 @@ export async function getSongMixerBundle(slug: string): Promise<SongMixerBundle 
     const songSnap = songSnaps.docs[0];
     if (!songSnap) return null;
 
-    const [tracksSnap, settingsSnap, annotationsSnap] = await Promise.all([
+    const [tracksSnap, videosSnap, settingsSnap, annotationsSnap] = await Promise.all([
       getDocs(collection(firestore, "songs", songSnap.id, "mixerTracks")),
+      getDocs(collection(firestore, "songs", songSnap.id, "mixerVideos")).catch((caught) => {
+        warnReadFailure(`mixer videos for song "${slug}"`, caught);
+        return null;
+      }),
       getDoc(doc(firestore, "songs", "global-mixer-defaults", "mixerSettings", "main")),
       getDocs(collection(firestore, "songs", songSnap.id, "annotations")).catch((caught) => {
         warnReadFailure(`annotations for song "${slug}"`, caught);
@@ -346,6 +368,9 @@ export async function getSongMixerBundle(slug: string): Promise<SongMixerBundle 
     return {
       song: songFromDoc(songSnap.id, songSnap.data()),
       tracks,
+      videos: (videosSnap?.docs ?? [])
+        .map((snap) => mixerVideoFromDoc(snap.id, snap.data()))
+        .sort((left, right) => left.displayName.localeCompare(right.displayName)),
       configurations: savedConfigurations.length
         ? savedConfigurations
         : createDefaultSongMixerConfigurations(tracks),
@@ -482,6 +507,81 @@ export type SongMixerTrackUploadOptions = SongAssetUploadOptions & {
   orderIndex?: number;
 };
 
+export async function uploadSongMixerVideo(
+  bundle: SongMixerBundle,
+  file: File,
+  options: SongAssetUploadOptions = {},
+) {
+  const { db, storage } = requireFirebase();
+  const { onProgress, signal } = options;
+
+  if (!file.name.toLowerCase().endsWith(".mp4") && file.type !== "video/mp4") {
+    throw new Error("Mixer videos must be MP4 files.");
+  }
+
+  const videoRef = doc(collection(db, "songs", bundle.song.id, "mixerVideos"));
+  const filename = sanitizeFilename(file.name);
+  const storagePath = `songs/${bundle.song.slug}/mixer-videos/${videoRef.id}-${filename}`;
+  const uploadRef = ref(storage, storagePath);
+  const uploadTask = uploadBytesResumable(uploadRef, file, {
+    contentType: file.type || "video/mp4",
+    cacheControl: "public,max-age=31536000,immutable",
+  });
+  const cancelUpload = () => uploadTask.cancel();
+
+  if (signal?.aborted) cancelUpload();
+  signal?.addEventListener("abort", cancelUpload, { once: true });
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => onProgress?.({
+          bytesTransferred: snapshot.bytesTransferred,
+          totalBytes: snapshot.totalBytes,
+        }),
+        reject,
+        resolve,
+      );
+    });
+  } finally {
+    signal?.removeEventListener("abort", cancelUpload);
+  }
+
+  const ensureNotCanceled = async () => {
+    if (!signal?.aborted) return;
+
+    try {
+      await deleteObject(uploadRef);
+    } catch (caught) {
+      if (!isMissingStorageObject(caught)) throw caught;
+    }
+
+    throw new DOMException("The upload was canceled.", "AbortError");
+  };
+
+  await ensureNotCanceled();
+  const downloadUrl = await getDownloadURL(uploadRef);
+  await ensureNotCanceled();
+  const inferredPartSlugs = inferPartSlugs(file.name);
+
+  await writeBatch(db)
+    .set(videoRef, {
+      filename,
+      displayName: stemDisplayNameFromFilename(file.name),
+      partSlug: inferredPartSlugs.length === 1 ? inferredPartSlugs[0] ?? null : null,
+      contentType: file.type || "video/mp4",
+      size: file.size,
+      storagePath,
+      downloadUrl,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    })
+    .commit();
+
+  return videoRef.id;
+}
+
 export async function uploadSongMixerTrack(
   bundle: SongMixerBundle,
   file: File,
@@ -608,6 +708,7 @@ function configurationForUploadedStem(
 export async function saveSongMixerConfiguration(
   bundle: SongMixerBundle,
   tracks: SongMixerTrack[],
+  videos: SongMixerVideo[],
   configurations: SongMixerConfiguration[],
   settings: SongMixerSettings,
   saveGlobalSettings: boolean,
@@ -626,6 +727,16 @@ export async function saveSongMixerConfiguration(
       isBackgroundMix: track.isBackgroundMix,
       orderIndex,
       stateOverrides: serializeMixerStateOverrides(track.stateOverrides),
+      updatedAt: serverTimestamp(),
+    });
+  });
+
+  videos.forEach((video) => {
+    const displayName = video.displayName.trim() || stemDisplayNameFromFilename(video.filename);
+
+    batch.update(doc(db, "songs", bundle.song.id, "mixerVideos", video.id), {
+      displayName,
+      partSlug: video.partSlug,
       updatedAt: serverTimestamp(),
     });
   });
@@ -779,6 +890,20 @@ export async function deleteSongMixerTrack(bundle: SongMixerBundle, track: SongM
     })),
     updatedAt: serverTimestamp(),
   });
+  await batch.commit();
+}
+
+export async function deleteSongMixerVideo(bundle: SongMixerBundle, video: SongMixerVideo) {
+  const { db, storage } = requireFirebase();
+
+  try {
+    await deleteObject(ref(storage, video.storagePath));
+  } catch (caught) {
+    if (!isMissingStorageObject(caught)) throw caught;
+  }
+
+  const batch = writeBatch(db);
+  batch.delete(doc(db, "songs", bundle.song.id, "mixerVideos", video.id));
   await batch.commit();
 }
 
