@@ -21,10 +21,12 @@ import { deleteObject, getDownloadURL, ref, uploadBytes, uploadBytesResumable } 
 import {
   createDefaultSongMixerConfigurations,
   createDefaultSongMixerSettings,
+  createEmptyInstrumentAssignments,
   DEFAULT_SONG_MIXER_CONFIGURATION_IDS,
   DEFAULT_PARTS,
   fileTypeFromFile,
   inferPartSlugs,
+  INSTRUMENT_IDS,
   SONG_MIXER_STATE_NAMES,
   sanitizeFilename,
   slugify,
@@ -35,6 +37,7 @@ import {
   type SongAsset,
   type SongAnnotation,
   type SongBundle,
+  type SongInstrumentAssignment,
   type SongMixerBundle,
   type SongMixerConfiguration,
   type SongMixerSettings,
@@ -46,6 +49,8 @@ import {
   type SongMixerVideo,
   type SongPart,
   type PartSongRow,
+  type SongInstrumentAssignments,
+  type SongOriginalRecording,
 } from "@/lib/domain";
 import { db, hasFirebaseConfig, storage } from "@/lib/firebase";
 import { samplePartRows, sampleSongBundle, sampleSongList } from "@/lib/sample-data";
@@ -65,6 +70,96 @@ function songFromDoc(id: string, data: Record<string, unknown>): Song {
     slug: String(data.slug ?? ""),
     sortTitle: String(data.sortTitle ?? data.title ?? ""),
     notes: typeof data.notes === "string" ? data.notes : undefined,
+    instrumentOrder:
+      typeof data.instrumentOrder === "number" && Number.isFinite(data.instrumentOrder)
+        ? data.instrumentOrder
+        : undefined,
+    instrumentAssignments: instrumentAssignmentsFromData(
+      data.instrumentAssignments,
+      {
+        title:
+          typeof data.notesTitle === "string" ? data.notesTitle : "Notes",
+        notes: typeof data.notes === "string" ? data.notes : "",
+      },
+    ),
+    originalRecording: originalRecordingFromData(data.originalRecording),
+  };
+}
+
+function instrumentAssignmentsFromData(
+  value: unknown,
+  legacyNote: { title: string; notes: string },
+): SongInstrumentAssignments {
+  const data = objectValue(value);
+  const validInstrumentIds = new Set<string>(
+    INSTRUMENT_IDS.filter((instrumentId) => instrumentId !== "notes"),
+  );
+  const assignmentFromData = (
+    storedValue: unknown,
+    fallbackId: string,
+  ): SongInstrumentAssignment | null => {
+    if (typeof storedValue === "string") {
+      if (storedValue === "notes") {
+        return {
+          kind: "notes",
+          id: `legacy-${fallbackId}`,
+          title: legacyNote.title.trim() || "Notes",
+          notes: legacyNote.notes,
+        };
+      }
+
+      return validInstrumentIds.has(storedValue)
+        ? storedValue as SongInstrumentAssignment
+        : null;
+    }
+
+    const storedNote = objectValue(storedValue);
+    if (storedNote.kind !== "notes") return null;
+
+    return {
+      kind: "notes",
+      id:
+        typeof storedNote.id === "string" && storedNote.id
+          ? storedNote.id
+          : `legacy-${fallbackId}`,
+      title:
+        typeof storedNote.title === "string" && storedNote.title.trim()
+          ? storedNote.title
+          : "Notes",
+      notes: typeof storedNote.notes === "string" ? storedNote.notes : "",
+    };
+  };
+  const storedPlayers = Array.isArray(data.players) ? data.players : [];
+  const players = Array.from({ length: 5 }, (_, index) => {
+    return assignmentFromData(storedPlayers[index], `player-${index}`);
+  }) as SongInstrumentAssignments["players"];
+  const tracks = Array.isArray(data.tracks)
+    ? data.tracks
+        .map((storedValue, index) =>
+          assignmentFromData(storedValue, `track-${index}`),
+        )
+        .filter(
+          (assignment): assignment is SongInstrumentAssignment =>
+            assignment !== null,
+        )
+    : [];
+
+  return { players, tracks };
+}
+
+function originalRecordingFromData(value: unknown): SongOriginalRecording | undefined {
+  const data = objectValue(value);
+  const downloadUrl = typeof data.downloadUrl === "string" ? data.downloadUrl : "";
+  const storagePath = typeof data.storagePath === "string" ? data.storagePath : "";
+
+  if (!downloadUrl || !storagePath) return undefined;
+
+  return {
+    filename: String(data.filename ?? "Original recording.mp3"),
+    contentType: String(data.contentType ?? "audio/mpeg"),
+    size: Number(data.size ?? 0),
+    storagePath,
+    downloadUrl,
   };
 }
 
@@ -439,6 +534,7 @@ export async function createSong(title: string) {
     title: trimmedTitle,
     slug,
     sortTitle: sortTitle(trimmedTitle),
+    instrumentAssignments: createEmptyInstrumentAssignments(),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -506,6 +602,133 @@ export type SongAssetUploadOptions = {
 export type SongMixerTrackUploadOptions = SongAssetUploadOptions & {
   orderIndex?: number;
 };
+
+export async function saveSongInstrumentAssignments(
+  changes: Array<{ songId: string; assignments: SongInstrumentAssignments }>,
+) {
+  const { db } = requireFirebase();
+  const latestBySongId = new Map(changes.map((change) => [change.songId, change.assignments]));
+  const batch = writeBatch(db);
+
+  latestBySongId.forEach((assignments, songId) => {
+    batch.update(doc(db, "songs", songId), {
+      instrumentAssignments: assignments,
+      updatedAt: serverTimestamp(),
+    });
+  });
+
+  await batch.commit();
+}
+
+export async function saveSongInstrumentOrder(
+  changes: Array<{ songId: string; instrumentOrder: number }>,
+) {
+  const { db } = requireFirebase();
+  const latestBySongId = new Map(
+    changes.map((change) => [change.songId, change.instrumentOrder]),
+  );
+  const batch = writeBatch(db);
+
+  latestBySongId.forEach((instrumentOrder, songId) => {
+    batch.update(doc(db, "songs", songId), {
+      instrumentOrder,
+      updatedAt: serverTimestamp(),
+    });
+  });
+
+  await batch.commit();
+}
+
+export async function saveSongNotes(songId: string, notes: string) {
+  const { db } = requireFirebase();
+
+  await updateDoc(doc(db, "songs", songId), {
+    notes: notes.trim(),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function uploadSongOriginalRecording(
+  song: Song,
+  file: File,
+  options: SongAssetUploadOptions = {},
+) {
+  const { db, storage } = requireFirebase();
+  const { onProgress, signal } = options;
+
+  if (!file.name.toLowerCase().endsWith(".mp3") && file.type !== "audio/mpeg") {
+    throw new Error("Original recordings must be MP3 files.");
+  }
+
+  const filename = sanitizeFilename(file.name);
+  const storagePath = `songs/${song.slug}/original/${crypto.randomUUID()}-${filename}`;
+  const uploadRef = ref(storage, storagePath);
+  const uploadTask = uploadBytesResumable(uploadRef, file, {
+    contentType: file.type || "audio/mpeg",
+    cacheControl: "public,max-age=31536000,immutable",
+  });
+  const cancelUpload = () => uploadTask.cancel();
+
+  if (signal?.aborted) cancelUpload();
+  signal?.addEventListener("abort", cancelUpload, { once: true });
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => onProgress?.({
+          bytesTransferred: snapshot.bytesTransferred,
+          totalBytes: snapshot.totalBytes,
+        }),
+        reject,
+        resolve,
+      );
+    });
+  } finally {
+    signal?.removeEventListener("abort", cancelUpload);
+  }
+
+  const ensureNotCanceled = async () => {
+    if (!signal?.aborted) return;
+
+    try {
+      await deleteObject(uploadRef);
+    } catch (caught) {
+      if (!isMissingStorageObject(caught)) throw caught;
+    }
+
+    throw new DOMException("The upload was canceled.", "AbortError");
+  };
+
+  await ensureNotCanceled();
+  const downloadUrl = await getDownloadURL(uploadRef);
+  await ensureNotCanceled();
+
+  const originalRecording: SongOriginalRecording = {
+    filename,
+    contentType: file.type || "audio/mpeg",
+    size: file.size,
+    storagePath,
+    downloadUrl,
+  };
+
+  await updateDoc(doc(db, "songs", song.id), {
+    originalRecording,
+    updatedAt: serverTimestamp(),
+  });
+
+  if (song.originalRecording?.storagePath && song.originalRecording.storagePath !== storagePath) {
+    try {
+      await deleteObject(ref(storage, song.originalRecording.storagePath));
+    } catch (caught) {
+      if (!isMissingStorageObject(caught)) {
+        console.warn("[swell-parts] Could not remove the replaced original recording.", caught);
+      }
+    }
+  }
+
+  return originalRecording;
+}
 
 export async function uploadSongMixerVideo(
   bundle: SongMixerBundle,

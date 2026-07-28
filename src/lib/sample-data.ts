@@ -1,5 +1,5 @@
 import type { SongAsset, SongBundle } from "@/lib/domain";
-import { DEFAULT_PARTS } from "@/lib/domain";
+import { createEmptyInstrumentAssignments, DEFAULT_PARTS } from "@/lib/domain";
 
 function asset(
   id: string,
@@ -31,6 +31,7 @@ export const sampleBundles: SongBundle[] = [
       title: "California Girls",
       slug: "california-girls",
       sortTitle: "california girls",
+      instrumentAssignments: createEmptyInstrumentAssignments(),
     },
     parts: DEFAULT_PARTS.map((part) => ({ ...part, assetIds: [] })),
     assets: [],
@@ -41,6 +42,7 @@ export const sampleBundles: SongBundle[] = [
       title: "I Get Around",
       slug: "i-get-around",
       sortTitle: "i get around",
+      instrumentAssignments: createEmptyInstrumentAssignments(),
     },
     parts: DEFAULT_PARTS.map((part) => ({
       ...part,
@@ -72,6 +74,7 @@ export const sampleBundles: SongBundle[] = [
       title: "Help Me, Rhonda",
       slug: "rhonda",
       sortTitle: "help me rhonda",
+      instrumentAssignments: createEmptyInstrumentAssignments(),
     },
     parts: DEFAULT_PARTS.map((part) => ({
       ...part,

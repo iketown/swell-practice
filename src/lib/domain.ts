@@ -1,11 +1,69 @@
 export type FileType = "audio" | "pdf" | "video" | "zip" | "other";
 
+export const INSTRUMENT_IDS = [
+  "guit_a",
+  "guit_b",
+  "bass",
+  "drums",
+  "keys",
+  "perc",
+  "horns",
+  "strings",
+  "voc",
+  "xtra_vox",
+  "lion",
+  "accordion",
+  "notes",
+] as const;
+
+export type InstrumentId = (typeof INSTRUMENT_IDS)[number];
+
+export interface SongInstrumentNote {
+  kind: "notes";
+  id: string;
+  title: string;
+  notes: string;
+}
+
+export type SongInstrumentAssignment =
+  | Exclude<InstrumentId, "notes">
+  | SongInstrumentNote;
+
+export interface SongInstrumentAssignments {
+  players: [
+    SongInstrumentAssignment | null,
+    SongInstrumentAssignment | null,
+    SongInstrumentAssignment | null,
+    SongInstrumentAssignment | null,
+    SongInstrumentAssignment | null,
+  ];
+  tracks: SongInstrumentAssignment[];
+}
+
+export interface SongOriginalRecording {
+  filename: string;
+  contentType: string;
+  size: number;
+  storagePath: string;
+  downloadUrl: string;
+}
+
 export interface Song {
   id: string;
   title: string;
   slug: string;
   sortTitle: string;
   notes?: string;
+  instrumentOrder?: number;
+  instrumentAssignments: SongInstrumentAssignments;
+  originalRecording?: SongOriginalRecording;
+}
+
+export function createEmptyInstrumentAssignments(): SongInstrumentAssignments {
+  return {
+    players: [null, null, null, null, null],
+    tracks: [],
+  };
 }
 
 export interface SongPart {

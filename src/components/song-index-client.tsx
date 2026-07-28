@@ -6,13 +6,13 @@ import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { SongFilterInput } from "@/components/song-filter-input";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Song } from "@/lib/domain";
-import { DEFAULT_PART_SLUGS, partLabel, rankSongsForQuery } from "@/lib/domain";
+import { rankSongsForQuery } from "@/lib/domain";
 import { listSongs } from "@/lib/firestore";
 import { cn } from "@/lib/utils";
 
@@ -46,20 +46,11 @@ export function SongIndexClient() {
           <div className="grid gap-1.5">
             <p className="swell-page-kicker">Practice library</p>
             <h1 className="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">Songs</h1>
-            <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">
-              Pick a song to see every assigned part, or jump straight to the role you sing or play.
-            </p>
+            <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">Pick a song to see every assigned part.</p>
           </div>
           <Badge variant="secondary" className="mt-1">
             {loading ? "Loading" : `${songs.length} songs`}
           </Badge>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {DEFAULT_PART_SLUGS.map((slug) => (
-            <Button key={slug} render={<Link href={`/parts/${slug}`} />} variant="outline" nativeButton={false} className="bg-card">
-              {partLabel(slug)}
-            </Button>
-          ))}
         </div>
         <SongFilterInput id="public-song-search" songs={songs} value={songQuery} onChange={setSongQuery} matchCount={matchingSongCount} />
       </section>

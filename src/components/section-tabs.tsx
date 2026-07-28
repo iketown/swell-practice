@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils";
 
 const baseTabs = [
   { href: "/songs", label: "Songs" },
-  { href: "/parts", label: "Parts" },
   { href: "/members", label: "Members" },
 ] as const;
 

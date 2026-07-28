@@ -20,6 +20,7 @@ This is not the public marketing site and not the full band OS. It is a practica
 - List every song on the front page.
 - Give every song a detail page at `/songs/[songSlug]`.
 - Give every song a separate test mixer at `/songs/[songSlug]/player`.
+- Give administrators a live instrument assignment table at `/songs/inst`.
 - Give every part a detail page at `/parts/[partSlug]`.
 - Upload audio, PDFs, videos, zip files, and related rehearsal files once.
 - Assign each uploaded asset to one or more parts for the song.
@@ -49,6 +50,7 @@ This is not the public marketing site and not the full band OS. It is a practica
 | `/` | Song index with quick links to songs and common parts. |
 | `/songs/[songSlug]` | Song page showing all parts and their assigned assets. Admins can upload files and edit assignments here. |
 | `/songs/[songSlug]/player` | Song-scoped multitrack player that loads one administrator-defined stem mix at a time, kept separate from rehearsal assets. |
+| `/songs/inst` | All-song live arrangement table with five single-instrument performer slots, multi-instrument Trax assignments, and original-recording playback. |
 | `/parts/[partSlug]` | Part page showing every song that has assets assigned to that part. |
 | `/admin/songs/new` | Create a new song. |
 | `/admin` | Lightweight admin index with create-song action and song list. |
@@ -128,10 +130,30 @@ Part pages group by song and show only assets assigned to that part for that son
   slug: string;
   sortTitle: string;
   notes?: string;
+  instrumentOrder?: number;
+  instrumentAssignments: {
+    players: [
+      InstrumentAssignment | null,
+      InstrumentAssignment | null,
+      InstrumentAssignment | null,
+      InstrumentAssignment | null,
+      InstrumentAssignment | null
+    ];
+    tracks: InstrumentAssignment[];
+  };
+  originalRecording?: {
+    filename: string;
+    contentType: "audio/mpeg";
+    size: number;
+    storagePath: string;
+    downloadUrl: string;
+  };
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
 ```
+
+`InstrumentId` is one of `guit_a`, `guit_b`, `bass`, `drums`, `keys`, `perc`, `horns`, `strings`, `voc`, `xtra_vox`, `lion`, `accordion`, or `notes`. A stored `InstrumentAssignment` is a non-Notes `InstrumentId` or a Notes object containing `{ kind: "notes", id, title, notes }`. The object keeps each draggable Notes tile’s content separate from the song-level `notes` field. Instrument moves and song-order changes update the song document immediately. The five performer slots hold at most one instrument each; the Trax array may contain any number of instruments. Songs without an `instrumentOrder`, including newly created songs, appear after explicitly ordered songs until an administrator reorders the table.
 
 ### `songs/{songId}/parts/{partSlug}`
 
@@ -479,6 +501,15 @@ v1 decision:
 - Visiting `/` shows a list of songs.
 - Visiting `/songs/i-get-around` shows the song title, default parts, and assigned files.
 - Visiting `/songs/i-get-around/player` shows only that song's active player-mix stems and plays them in sync.
+- Visiting `/songs/inst` shows one row for every song, including songs created after the assignment page was introduced.
+- An administrator can drag instrument icons into five single-value performer slots or a multi-value Trax area, move assignments between songs, and remove assignments through a persistent trash target.
+- Holding Alt/Option while dragging an assigned instrument copies it to the destination without clearing its source assignment.
+- Adding a repeated instrument to a song requires confirmation, except for `voc`, which may appear any number of times in one row.
+- Every completed instrument move updates Firestore without a separate save action.
+- An administrator can drag the handle at the left of a song row to reorder the instrument table, and the new order persists without a separate save action.
+- An administrator can upload one original-recording MP3 per song and play it in a dialog; uploading a replacement removes the prior storage object after the new recording is saved.
+- An administrator can open a song-notes dialog from each instrument row, save or cancel edits, and see the empty pencil control become a labeled Notes button after content is saved.
+- The instrument collection includes a draggable Notes tile that can occupy a performer slot or the Ableton tracks area; every assigned tile owns a unique ID, title, and note body, displays its title, and opens its own editor when clicked without changing the song’s general notes.
 - Every song without saved player mixes receives editable `Vocals Mix` and `Instrument Mix` defaults inferred from its uploaded stem filenames.
 - An administrator can change the stems in either default player mix and create, rename, reorder, or remove additional mixes.
 - Changing player mixes downloads and decodes only the new mix's stems, and the selected-part menu contains only selectable stems in that mix.
