@@ -39,9 +39,9 @@ Admin UI is gated two ways:
 
 - Create the two admin users in Firebase Authentication using email/password.
 - Add those two emails to `NEXT_PUBLIC_ADMIN_EMAILS` as a comma-separated list.
-- Create an `admins/{uid}` Firestore document for each admin user's Firebase Auth UID.
+- Create an `admins/{uid}` Firestore document for each admin user's Firebase Auth UID when possible. Firestore and Storage rules also recognize the two configured admin emails as a fallback, so existing admins are not locked out while those documents are being provisioned.
 
-That means Vercel/UI and Firebase rules both know who can administer the library. Public song and part pages remain unauthed/read-only.
+That means Vercel/UI and Firebase rules both know who can administer the library. Keep the email allowlists in `firestore.rules` and `storage.rules` synchronized with `NEXT_PUBLIC_ADMIN_EMAILS`. Public song and part pages remain unauthed/read-only.
 
 ## Routes
 

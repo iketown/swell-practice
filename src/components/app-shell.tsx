@@ -2,8 +2,15 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { SectionTabs } from "@/components/section-tabs";
+import { cn } from "@/lib/utils";
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  variant = "default",
+}: {
+  children: React.ReactNode;
+  variant?: "default" | "workspace";
+}) {
   return (
     <div className="swell-shell min-h-screen text-foreground">
       <header className="swell-header border-b">
@@ -20,7 +27,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <SectionTabs />
         </div>
       </header>
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+      <main
+        className={cn(
+          "mx-auto flex w-full flex-col",
+          variant === "workspace"
+            ? "max-w-none gap-2 px-2 py-2 sm:px-3"
+            : "max-w-6xl gap-5 px-4 py-6 sm:px-6 lg:px-8",
+        )}
+      >
+        {children}
+      </main>
     </div>
   );
 }

@@ -6,9 +6,20 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isAdminEmail() {
+      return signedIn()
+        && request.auth.token.email in [
+          'be@ike.works',
+          'chriscronmusic@gmail.com'
+        ];
+    }
+
     function isAdmin() {
       return signedIn()
-        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+        && (
+          isAdminEmail()
+          || exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        );
     }
 
     match /songs/{songId} {
@@ -58,6 +69,26 @@ service cloud.firestore {
     match /bands/{bandId} {
       allow read: if true;
       allow create, update, delete: if isAdmin();
+    }
+
+    match /setups/{setupId} {
+      allow read, create, update, delete: if isAdmin();
+
+      match /graphs/{graphId} {
+        allow read, create, update, delete: if isAdmin();
+      }
+    }
+
+    match /equipmentTemplates/{templateId} {
+      allow read, create, update, delete: if isAdmin();
+    }
+
+    match /connectorTypes/{connectorTypeId} {
+      allow read, create, update, delete: if isAdmin();
+    }
+
+    match /cableInventory/{inventoryItemId} {
+      allow read, create, update, delete: if isAdmin();
     }
 
     match /memberSongDefaults/{assignmentId} {

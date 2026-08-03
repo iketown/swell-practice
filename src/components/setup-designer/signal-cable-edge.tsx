@@ -1,0 +1,51 @@
+"use client";
+
+import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, type EdgeProps } from "@xyflow/react";
+
+import type { CableEdge } from "@/lib/setup-designer/domain";
+
+export function SignalCableEdge({
+  id,
+  data,
+  selected,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+}: EdgeProps<CableEdge>) {
+  const [path, labelX, labelY] = getSmoothStepPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, borderRadius: 10 });
+  const markerId = `setup-arrow-${id.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const color = data?.color ?? "var(--primary)";
+
+  return (
+    <>
+      <defs>
+        <marker id={markerId} markerWidth="5" markerHeight="5" refX="4.5" refY="2.5" orient="auto" markerUnits="userSpaceOnUse">
+          <path d="M 0 0 L 5 2.5 L 0 5 z" fill={color} />
+        </marker>
+      </defs>
+      <BaseEdge id={`${id}-casing`} path={path} interactionWidth={0} style={{ stroke: "var(--background)", strokeWidth: selected ? 8 : 6 }} />
+      <BaseEdge
+        id={id}
+        path={path}
+        markerEnd={`url(#${markerId})`}
+        interactionWidth={24}
+        className="setup-signal-cable"
+        style={{ stroke: color, strokeWidth: selected ? 4 : 3, strokeDasharray: "7 6" }}
+      />
+      {(data?.estimatedLength || data?.exception) ? (
+        <EdgeLabelRenderer>
+          <div
+            className="pointer-events-none absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-md border bg-card px-1.5 py-0.5 text-[10px] font-semibold shadow-sm"
+            style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
+          >
+            {data?.exception ? <span aria-label="Compatibility exception">⚠</span> : null}
+            {data?.estimatedLength ? `${data.estimatedLength} ${data.lengthUnit}` : "Check"}
+          </div>
+        </EdgeLabelRenderer>
+      ) : null}
+    </>
+  );
+}

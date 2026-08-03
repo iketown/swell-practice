@@ -309,4 +309,184 @@
       transition: none;
     }
   }
+
+  .setup-workspace-grid {
+    display: grid;
+    grid-template-columns: 260px minmax(540px, 1fr) 360px;
+  }
+
+  .setup-library-panel,
+  .setup-parts-panel,
+  .setup-flow-canvas {
+    min-width: 0;
+  }
+
+  .setup-library-panel,
+  .setup-flow-canvas {
+    border-right-width: 1px;
+  }
+
+  .setup-flow-canvas .react-flow__pane {
+    cursor: grab;
+  }
+
+  .setup-flow-canvas .react-flow__pane.dragging {
+    cursor: grabbing;
+  }
+
+  .setup-flow-canvas {
+    box-shadow: inset 0 0 0 0 transparent;
+    transition: box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1), background-color 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .setup-flow-canvas-drop-ready {
+    background-color: color-mix(in oklch, var(--primary) 5%, var(--background));
+    box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--primary) 72%, transparent);
+  }
+
+  .setup-flow-canvas .react-flow__controls,
+  .setup-flow-canvas .react-flow__minimap {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--card);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .setup-flow-canvas .react-flow__controls-button {
+    border-color: var(--border);
+    background: var(--card);
+    color: var(--foreground);
+  }
+
+  .setup-flow-canvas .react-flow__controls-button:hover {
+    background: var(--muted);
+  }
+
+  .setup-port-handle {
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--card);
+    background: var(--primary);
+    box-shadow: 0 0 0 1px var(--primary);
+  }
+
+  .setup-port-handle.connecting {
+    box-shadow: 0 0 0 4px color-mix(in oklch, var(--primary) 24%, transparent);
+  }
+
+  .setup-port-handle.connecting.valid {
+    background: var(--swell-part-3);
+  }
+
+  .setup-port-handle-compact {
+    width: var(--setup-port-hit-size, 24px);
+    height: var(--setup-port-hit-size, 24px);
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    cursor: crosshair;
+    transform: translateY(-50%);
+  }
+
+  .setup-port-handle-compact::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--setup-port-size, 10px);
+    height: calc(var(--setup-port-size, 10px) * 1.25);
+    border: 1px solid var(--card);
+    border-radius: 1px;
+    background: var(--setup-port-color, var(--primary));
+    box-shadow: 0 0 0 1px var(--setup-port-color, var(--primary));
+    clip-path: polygon(0 0, 100% 50%, 0 100%);
+    content: "";
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    transition: filter 180ms cubic-bezier(0.22, 1, 0.36, 1), transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .setup-port-handle-compact.react-flow__handle-left {
+    left: calc(var(--setup-port-hit-size, 24px) * -0.5);
+  }
+
+  .setup-port-handle-compact.react-flow__handle-right {
+    right: calc(var(--setup-port-hit-size, 24px) * -0.5);
+  }
+
+  .setup-port-handle-compact:hover::after,
+  .setup-port-handle-compact.connecting::after {
+    filter: brightness(1.12);
+    transform: translate(-50%, -50%) scale(1.15);
+  }
+
+  .setup-port-handle-compact.connecting {
+    box-shadow: none;
+  }
+
+  .setup-port-handle-compact.connecting.valid {
+    background: transparent;
+  }
+
+  .setup-port-handle-compact.connecting.valid::after {
+    background: var(--swell-part-3);
+  }
+
+  .setup-port-handle-input {
+    --setup-port-color: var(--muted-foreground);
+  }
+
+  .setup-signal-cable {
+    animation: setup-signal-flow 780ms linear infinite;
+  }
+
+  .setup-flow-canvas .react-flow__edge.selected .react-flow__edgeupdater {
+    fill: var(--card);
+    stroke: var(--primary);
+    stroke-width: 2px;
+  }
+
+  .setup-flow-canvas .react-flow__edge.selected .react-flow__edgeupdater:hover,
+  .setup-flow-canvas .react-flow__edge.updating .react-flow__edgeupdater {
+    fill: var(--primary);
+    stroke: var(--card);
+    cursor: grab;
+  }
+
+  @keyframes setup-signal-flow {
+    to {
+      stroke-dashoffset: -26;
+    }
+  }
+
+  @media (max-width: 1180px) {
+    .setup-workspace-grid {
+      grid-template-columns: 220px minmax(480px, 1fr) 320px;
+    }
+  }
+
+  @media (max-width: 900px) {
+    .setup-workspace-grid {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(180px, 30dvh) minmax(560px, 70dvh) minmax(360px, auto);
+      overflow: visible;
+    }
+
+    .setup-library-panel,
+    .setup-flow-canvas {
+      border-right-width: 0;
+      border-bottom-width: 1px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .setup-signal-cable {
+      animation: none;
+    }
+
+    .setup-equipment-node {
+      transition: none;
+    }
+  }
 }

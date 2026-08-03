@@ -546,3 +546,771 @@ v1 decision:
 1. Should `all/general/mix` files auto-assign to all parts or only all vocal parts by default?
 2. Do you want this as a brand-new GitHub/Vercel repo, or nested inside an existing repo?
 3. Do part page URLs need to be exactly `/parts/voc_1`, or should friendly aliases like `/joe` or `/parts/joe` exist later?
+
+## 17. Stage / Setup Designer
+
+Status: Approved for implementation v0.1
+
+Date: 2026-08-02
+
+### 17.1 Purpose
+
+Add a signal-planning workspace to The Swell Parts where an administrator can arrange equipment, expose its physical inputs and outputs, connect those ports with real cables, and see the required cable parts list update with the diagram.
+
+The first planned setup types are a home studio, a live rig, and a video-recording rig. A setup is a reusable plan, not a song and not a scaled architectural floor plan. Its canvas positions communicate approximate stage or signal-flow placement while its ports and cable runs describe the actual patch.
+
+### 17.2 Goals
+
+- Create, name, describe, save, reopen, rename, duplicate, and archive multiple setups.
+- Build reusable equipment templates such as a microphone, Behringer X32, stage box, DI, camera, or computer.
+- Upload an optional image for each equipment template to Firebase Storage.
+- Place any number of instances of a template on a React Flow canvas without re-uploading its image.
+- Configure each node's input and output ports in a modal, including optional labels and visible numbering.
+- Collapse nodes for a compact planning view, then expand them inline to inspect port labels, connector types, genders, specifications, and signal types.
+- Connect one specific output port to one specific input port with a directional, animated, color-configurable cable edge.
+- Describe both physical ends of every cable by connector type and gender.
+- Estimate a cable length and record whether that run is already covered, must be rented, or must be bought.
+- Map every setup node to a specific owned microphone, D.I., instrument, mixer, or other tagged unit when one has been selected.
+- Map each cable run to a specific owned cable label when known, while retaining rent/buy/unplanned fulfillment states.
+- Derive a live, route-aware parts list from the setup's cable edges so the diagram and list cannot drift apart.
+- Preserve the complete graph and viewport in Firestore and restore the same working view later.
+- Warn about physically or electrically suspicious connections while leaving an explicit escape hatch for unusual adapters and intentional exceptions.
+
+### 17.3 Non-Goals for the First Release
+
+- No to-scale stage drawing, room measurements, CAD features, or automatic cable routing around obstacles.
+- No simultaneous multi-user editing or cursor presence.
+- No electrical load, RF-frequency, network-bandwidth, gain-structure, or acoustic simulation.
+- No automatic purchasing or rental-vendor integration.
+- No event calendar or cross-event cable reservations.
+- No automatic propagation of later template edits into already-saved setup nodes.
+- No arbitrary image attachments on every setup instance; images belong to reusable equipment templates in the MVP.
+
+### 17.4 Product Vocabulary
+
+| Term | Meaning |
+| --- | --- |
+| Setup | One named and saved signal plan, such as `Home Studio` or `Live — Small Stage`. |
+| Equipment template | A reusable library definition for a piece of equipment, its image, and its default ports. |
+| Owned equipment unit | A specific physical item associated with a template, such as `SM58 #3` or `Radial JDI #1`, which can be assigned to one setup node. |
+| Equipment node | A setup-specific snapshot of an equipment template with its own position and permitted port overrides. |
+| Port | A physical input or output on equipment. A port has a stable ID, direction, number, optional label, connector, and optional signal type. |
+| Connector type | The physical interface family, such as XLR, 1/4-inch TS, 1/4-inch TRS, RJ45, BNC, HDMI, or USB-C. |
+| Cable end | The plug or socket on one end of a cable. It has a connector type and gender and must mate with the attached equipment port. |
+| Cable run | One physical cable represented by one React Flow edge between two ports. One cable may carry multiple channels, as with an AES50-over-Cat5e run. |
+| Parts list | A live view derived from cable runs, with one route-aware row per required physical cable and an optional grouped summary. |
+
+The interface should call edges **cables** or **cable runs**, not connectors. `Connector` is reserved for a cable end or equipment jack so that phrases such as `XLR female → XLR male cable` remain unambiguous.
+
+### 17.5 Routes and Access
+
+| Route | Purpose |
+| --- | --- |
+| `/setups` | Setup library with create, open, duplicate, rename, and archive actions. |
+| `/setups/[setupId]` | Full setup editor with equipment library, canvas, selected-item inspector, and parts list. |
+| `/setups/equipment` | Reusable equipment-template library and template editor. |
+
+The MVP is admin-only for both reads and writes because setups can expose internal equipment and inventory details. A later read-only mode may be added for signed-in band members without making setups public-by-URL.
+
+`Setups` appears as a top-level navigation item for administrators. The canvas is desktop-first but its parts list and read-only diagram must remain usable on a phone. Editing on a phone is supported for simple field changes but is not the primary authoring experience.
+
+### 17.6 Core Workflows
+
+#### Create and duplicate a setup
+
+1. From `/setups`, choose `New setup`.
+2. Enter a required name and optional description.
+3. Start with an empty canvas or duplicate an existing setup.
+4. A duplicate receives a new setup ID, appends `Copy` to the source name, retains the source description, graph, cable details, and viewport, and reuses the same equipment images.
+5. The duplicate records `sourceSetupId` for provenance but is independent after creation.
+
+#### Add equipment
+
+1. Open the equipment drawer from the editor.
+2. Search or filter reusable templates.
+3. Click a template to add it automatically, or drag it from the equipment list and drop it at an exact canvas position.
+4. The new node snapshots the template name, image reference, port definitions, and display settings. Its resting view is an image-first compact square or short rectangle with triangular input and output handles on opposite sides; expanding it reveals the full labeled patch card.
+5. A node may be renamed or have its ports overridden without changing the reusable template.
+
+An administrator can also create a new equipment template from the drawer: enter its name, optional manufacturer/model/category/notes, upload an image, and define inputs and outputs. Uploads show progress and validation errors. Accepted MVP formats are JPEG, PNG, and WebP up to 10 MiB each. From a node's detail modal, an administrator can drop or browse for a replacement icon, drag and zoom a one-to-one crop, and save a 512 × 512 WebP. The same modal accepts multiple uncropped front, rear-panel, port, or control-surface detail photos and displays them in an inline inspection gallery. Saving updates the reusable equipment definition and the current node's icon snapshot; other existing setup icon snapshots remain unchanged until deliberately replaced.
+
+#### Configure equipment ports
+
+Double-clicking a node or choosing `Edit equipment` opens a modal with:
+
+- Node name and optional notes.
+- Optional image inherited from the template.
+- `Show port numbers` and `Show port labels` toggles, stored per node.
+- Separate Inputs and Outputs sections.
+- Bulk `Number of inputs` and `Number of outputs` controls that add or remove sequential ports.
+- A row for each port with a stable ID, display number, optional label, connector type, connector gender, and optional signal type.
+- Reordering controls that work with keyboard and pointer input.
+
+Inputs render on the left and outputs on the right by default. In compact view, each physical port remains a distinct triangular React Flow handle, with dense banks using smaller evenly distributed triangles. Numbers are one-based within each direction. A label never replaces the stable port ID. Reducing the count or deleting a port that has a cable attached requires confirmation and identifies every cable that will also be removed.
+
+#### Connect equipment
+
+1. Drag from a specific output handle to a specific input handle.
+2. The app validates direction, port capacity, connector mating, and optional signal-type compatibility.
+3. If the connection is permitted, create a directional cable edge and open its editor.
+4. Prefill each cable end so it mates with the connected equipment port. For example, an XLR-male microphone output receives an XLR-female cable end.
+5. Configure the cable name, end A and end B, optional signal type/channel capacity, color, estimated length, length unit, fulfillment status, and notes.
+
+The normal rule is one cable per physical port. A fan-out must be modeled with an explicit splitter, patch panel, or other equipment node. Suspicious connector or signal combinations show a warning. An administrator may choose `Allow exception` and enter a short reason; exceptions remain visibly marked on the canvas and parts list.
+
+Double-clicking a cable or choosing `Edit cable` opens the same editor. A selected cable can be reconnected to another compatible handle. Deleting a cable immediately removes its parts-list requirement after confirmation.
+
+Selecting a cable reveals draggable grips at its source and destination. Dragging either grip to another compatible unoccupied port repatches the existing cable instead of creating a new one. The edge ID, color, length, fulfillment, assigned inventory label, and notes remain unchanged. The moved physical cable end must mate with the new equipment jack; an incompatible or occupied port rejects the drop and leaves the original route intact.
+
+#### Build the parts list
+
+The parts-list panel updates from the in-memory edge array as cables are added, edited, reconnected, or removed. It provides:
+
+- One detailed row per cable run.
+- Cable description in `end A → end B` form.
+- `From` equipment and port.
+- `To` equipment and port.
+- Estimated length and unit.
+- Fulfillment status: `Unplanned`, `Owned`, `Rent`, or `Buy`.
+- Optional inventory match, exception indicator, and notes.
+- A link from a row to select and center its cable on the canvas.
+- A grouped summary by cable-end specification and length for packing or rental counts.
+
+The parts list is not stored as a second editable collection. It is always derived from cables, while fulfillment decisions and optional inventory assignments live on their cable edges.
+
+Example derived row:
+
+```text
+XLR female → XLR male · Vocal 3 / Output 1 → Stage Box / Input 3 · 25 ft · Rent
+```
+
+#### Save and restore
+
+- The editor keeps a controlled in-memory graph and displays `Unsaved`, `Saving`, `Saved`, or `Save failed`.
+- The MVP uses an explicit `Save` action so every drag event does not become a Firestore write.
+- Leaving with unsaved changes prompts the administrator.
+- A small browser-local recovery draft protects against an accidental refresh, but Firestore remains the source of truth.
+- Saving strips transient React Flow state such as selection, dragging, measured dimensions, and hover state.
+- A save writes one versioned graph snapshot containing nodes, edges, and viewport.
+- `revision` prevents one browser tab from silently overwriting a newer save from another tab. A conflict offers reload or save-as-duplicate rather than silently merging graphs.
+
+### 17.7 Canvas and Interaction Requirements
+
+- Use the current `@xyflow/react` package and import its required stylesheet.
+- Use a controlled React Flow with custom `equipment` nodes and custom `signalCable` edges.
+- Every port renders as a uniquely identified React Flow `Handle`; an edge persists the matching `sourceHandle` and `targetHandle` IDs.
+- After a modal adds, removes, reorders, or repositions handles, update React Flow's node internals before relying on edge geometry.
+- The default cable path is `smoothstep`, with an arrow marker at the target and a subtle repeating motion in the source-to-target direction.
+- Each cable persists its own accessible color. Color is never the only indication of direction, selection, warning, or fulfillment state.
+- Honor `prefers-reduced-motion`: stop the repeating animation while retaining the arrow marker and clear source/target labels.
+- Provide zoom in/out, fit view, minimap toggle, snap-to-grid toggle, delete, and selection controls.
+- Node and cable modals must be fully keyboard usable. Handles require useful ARIA labels such as `Stage Box, input 3, XLR female`.
+- Prevent the browser context menu from being the only path to any action.
+- On smaller screens, the canvas and parts list switch between tabs rather than forcing an unusably narrow split view.
+
+### 17.8 Connection Rules
+
+Connection validation uses these rules in order:
+
+1. A source must be an output port and a target must be an input port.
+2. Source and target cannot be the same physical port.
+3. Each physical port accepts at most one cable in the MVP.
+4. The cable end connector type must match the connected equipment port's connector type unless an exception is recorded.
+5. For gendered connector families, the cable end and equipment port normally have opposite genders. `none` is used for genderless or unspecified connectors.
+6. If both ports declare a signal type, incompatible families produce a warning or require an exception.
+7. End A and end B may differ, allowing real adapter cables such as XLR-to-TRS.
+8. Connector order is normalized only for inventory matching; the source-to-target orientation is preserved for display and signal direction.
+
+Initial connector types should include XLR, Combo XLR/TRS, 1/4-inch TS, 1/4-inch TRS, 3.5 mm TS, 3.5 mm TRS, RCA, speakON, RJ45, BNC, HDMI, USB-A, USB-B, USB-C, optical/TOSLINK, MIDI DIN, IEC, Edison, and Other. RJ45 is the connector; Cat5e/Cat6 is stored as optional cable construction/specification. The catalog must not collapse 1/4-inch TS and TRS into one type.
+
+`Combo XLR/TRS` is a fixed-female, port-only connector type. Its port snapshot accepts either an XLR male cable end or a 1/4-inch TRS male cable end. A cable never has a combo end itself; each cable inventory item continues to record the actual XLR or TRS plug it carries.
+
+Initial signal types should include microphone, instrument, analog line, speaker-level, digital audio, network/control, video, MIDI, power, and Other. Signal type is advisory in the MVP; physical connector compatibility is authoritative unless overridden.
+
+### 17.9 Firestore Data Model
+
+The setup metadata and the serialized graph are separate documents. This keeps setup-library queries small while retaining one atomic graph snapshot for save/restore.
+
+#### `setups/{setupId}`
+
+```ts
+{
+  name: string;
+  description?: string;
+  status: "active" | "archived";
+  sourceSetupId?: string;
+  graphSchemaVersion: 1;
+  revision: number;
+  nodeCount: number;
+  cableCount: number;
+  createdBy: string;
+  updatedBy: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+```
+
+#### `setups/{setupId}/graphs/current`
+
+```ts
+{
+  schemaVersion: 1;
+  revision: number;
+  nodes: SetupNode[];
+  edges: CableEdge[];
+  viewport: {
+    x: number;
+    y: number;
+    zoom: number;
+  };
+  updatedAt: Timestamp;
+}
+```
+
+The graph is a versioned, JSON-compatible projection of React Flow's nodes, edges, and viewport, not an unfiltered dump of internal component state. Normal setup saves write the setup metadata and `graphs/current` snapshot in one atomic batch or transaction.
+
+Firestore documents have a 1 MiB hard limit. The client should measure the encoded graph before saving and show a warning at 750 KiB. If real setups approach that threshold, migrate graph nodes and edges to subcollections without changing the setup metadata contract. Uploaded images never live inside the graph document.
+
+#### `equipmentTemplates/{templateId}`
+
+```ts
+{
+  name: string;
+  manufacturer?: string;
+  model?: string;
+  category?: string;
+  notes?: string;
+  image?: {
+    filename: string;
+    contentType: "image/jpeg" | "image/png" | "image/webp";
+    size: number;
+    storagePath: string;
+    downloadUrl: string;
+  };
+  detailImages?: Array<{
+    filename: string;
+    contentType: "image/jpeg" | "image/png" | "image/webp";
+    size: number;
+    storagePath: string;
+    downloadUrl: string;
+  }>;
+  ports: EquipmentPort[];
+  showPortNumbers: boolean;
+  showPortLabels: boolean;
+  version: number;
+  status: "active" | "archived";
+  createdBy: string;
+  updatedBy: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+```
+
+Templates are archived rather than hard-deleted in the MVP so saved setup snapshots never lose their media. Replacing a template icon and adding reusable detail photos write new uniquely named Storage objects. Existing nodes retain their icon snapshot; the node detail gallery reads the current reusable definition photos from the referenced template.
+
+#### `EquipmentPort`
+
+```ts
+type PortDirection = "input" | "output";
+type ConnectorGender = "male" | "female" | "none";
+
+type ConnectorSnapshot = {
+  typeId: string;
+  label: string;
+  gender: ConnectorGender;
+  specification?: string; // for example Cat6, 110 ohm, or 4-pole
+  acceptedCableTypeIds?: string[]; // port-only compatibility, such as XLR or TRS on a combo jack
+};
+
+type EquipmentPort = {
+  id: string; // stable UUID, never derived from the mutable label or number
+  direction: PortDirection;
+  number: number;
+  label?: string;
+  connector: ConnectorSnapshot;
+  signalType?: string;
+  channelCapacity?: number;
+};
+```
+
+#### `SetupNode`
+
+```ts
+type SetupNode = {
+  id: string;
+  type: "equipment";
+  position: { x: number; y: number };
+  zIndex?: number;
+  data: {
+    templateId?: string;
+    templateVersion?: number;
+    name: string;
+    notes?: string;
+    image?: {
+      storagePath: string;
+      downloadUrl: string;
+      contentType: string;
+    };
+    ports: EquipmentPort[];
+    showPortNumbers: boolean;
+    showPortLabels: boolean;
+  };
+};
+```
+
+#### `CableEdge`
+
+```ts
+type CableEdge = {
+  id: string;
+  type: "signalCable";
+  source: string;
+  sourceHandle: string;
+  target: string;
+  targetHandle: string;
+  animated: true;
+  data: {
+    name?: string;
+    color: string;
+    endA: ConnectorSnapshot;
+    endB: ConnectorSnapshot;
+    signalType?: string;
+    channelCapacity?: number;
+    cableSpecification?: string;
+    estimatedLength?: number;
+    lengthUnit: "ft" | "m";
+    fulfillment: "unplanned" | "owned" | "rent" | "buy";
+    inventoryItemId?: string;
+    notes?: string;
+    exception?: {
+      reason: string;
+    };
+  };
+};
+```
+
+React Flow presentation fields such as edge `style` and `markerEnd` are derived from `data.color` and direction at render time rather than duplicated in Firestore.
+
+#### `connectorTypes/{connectorTypeId}`
+
+```ts
+{
+  label: string;
+  family: string;
+  usesGender: boolean;
+  defaultSignalTypes: string[];
+  sortOrder: number;
+  status: "active" | "archived";
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+```
+
+Equipment ports and cable ends retain a label snapshot so archived or renamed catalog entries do not make old setups unreadable.
+
+#### `cableInventory/{inventoryItemId}`
+
+```ts
+{
+  name: string;
+  endA: ConnectorSnapshot;
+  endB: ConnectorSnapshot;
+  cableSpecification?: string;
+  length: number;
+  lengthUnit: "ft" | "m";
+  quantityOwned: number;
+  owner?: string;
+  condition?: "good" | "repair" | "retired";
+  notes?: string;
+  status: "active" | "archived";
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+```
+
+The inventory model uses one quantity record for interchangeable cables of one specification and length, such as `4 × 25 ft XLR female → XLR male`. The current setup's parts list compares required runs with owned quantities and lengths; it does not reserve stock across different saved variants. Individually tagged cable assets may be added later without replacing the quantity model.
+
+### 17.10 Firebase Storage
+
+Equipment icons and reusable detail photos use unique immutable paths:
+
+```text
+setup-designer/equipment/{templateId}/{imageId}-{sanitizedFilename}
+```
+
+Storage rules allow admin reads and writes for setup-designer images, limit each upload to 10 MiB, and allow only JPEG, PNG, or WebP. Setup duplication copies Firestore references and never duplicates image bytes. Archived templates retain their current and historical referenced images; permanent cleanup requires a later reference audit.
+
+### 17.11 React Flow Technical Fit
+
+React Flow directly supports the required primitives:
+
+- Custom nodes can render arbitrary equipment content and any number of `Handle` components.
+- Multiple same-direction handles are distinguished with unique IDs, which map to each edge's `sourceHandle` and `targetHandle`.
+- Dynamic port-count changes require `useUpdateNodeInternals` so connected paths are recalculated.
+- Edges support `animated`, per-edge styles, labels, reconnecting, and arrow markers.
+- A custom edge built on `BaseEdge` and `getSmoothStepPath` can keep the standard interaction target while providing clearer directional animation, warnings, and labels.
+- `ReactFlowJsonObject` is the library's JSON-compatible `nodes`, `edges`, and `viewport` shape. The saved graph follows that structure but persists only stable application fields.
+- `isValidConnection` handles fast pre-connection checks; the cable editor performs the fuller domain validation before commit.
+
+Use an application-level controlled state reducer for nodes, edges, dirty state, and future undo/redo. Do not put the entire graph behind a component subscription that causes every node to rerender on every small change.
+
+### 17.12 Error and Empty States
+
+- `/setups` has a useful empty state with `Create first setup` and a short explanation.
+- An empty setup opens with the equipment drawer prompt and basic canvas instructions.
+- Firebase-not-configured mode may render a non-editable sample setup, but it must not imply that Save succeeded.
+- Image upload failure retains the equipment form and offers retry.
+- Save failure retains the dirty local graph and offers retry or JSON download for recovery.
+- A missing template does not break existing setup nodes because node data is snapshotted.
+- A missing image renders an equipment-category placeholder without hiding ports.
+- Invalid ports, unresolved exceptions, and inventory shortages remain visible in both the canvas and parts list.
+
+### 17.13 MVP Delivery Phases
+
+#### Phase 1: Domain and library
+
+- Add `@xyflow/react` and its stylesheet.
+- Add TypeScript domain types and Firestore converters.
+- Add admin-only Firestore and Storage rules.
+- Add setup list/create/rename/archive/duplicate flows.
+- Add connector catalog and equipment-template library with image upload.
+
+#### Phase 2: Canvas and equipment nodes
+
+- Add the controlled React Flow editor, viewport persistence, controls, and responsive shell.
+- Add equipment drawer and reusable custom node.
+- Add port modal, numbering/label toggles, dynamic handles, and safe connected-port deletion.
+
+#### Phase 3: Cables and parts list
+
+- Add port-capacity and compatibility validation.
+- Add directional animated custom cable edges with per-cable colors.
+- Add cable editor, length, fulfillment, exceptions, reconnecting, and deletion.
+- Add live detailed and grouped parts-list views.
+
+#### Phase 4: Persistence and hardening
+
+- Add normalized graph serialization, explicit save, local recovery, revision conflicts, and duplicate-from-saved behavior.
+- Add reduced-motion, keyboard, focus, ARIA, phone read-only, and failure-state QA.
+- Add print-friendly parts list and CSV export if schedule permits.
+- Run typecheck, lint, production build, Firebase rules tests, and a representative saved-graph round trip.
+
+#### Phase 5: Inventory matching
+
+- Finalize quantity-record versus individually tagged cable inventory.
+- Add cable inventory CRUD, matching by ends/specification/minimum length, allocation within one setup, and shortage summaries.
+- Keep manual `Owned`, `Rent`, and `Buy` statuses available when no inventory record is assigned.
+
+### 17.14 Acceptance Criteria
+
+- An administrator can create `Home Studio`, give it a description, reopen it, rename it, duplicate it as an independent variant, and archive it.
+- An administrator can create a `Behringer X32` equipment template with an image and multiple numbered/labeled input and output ports.
+- The same equipment template can be added to multiple setups without a second image upload.
+- Editing an equipment instance does not unexpectedly mutate its reusable template or other instances.
+- A node can display numbers, labels, both, or neither while retaining accessible port names.
+- Every node preserves its collapsed or expanded state; expanded nodes show the accepted connector and signal details for each input and output.
+- Every input/output handle has a stable unique ID, and save/restore reconnects every cable to the same physical port.
+- Removing a connected port identifies and confirms deletion of its affected cable runs.
+- Dragging from `Vocal 3 / Output 1` to `Stage Box / Input 3` creates one directional cable and one live parts-list row.
+- A cable can have different connector types or genders on each end, its own color, an estimated length, notes, and an `Owned`, `Rent`, or `Buy` state.
+- Either end of an existing cable can be repatched to a compatible unoccupied port without losing the cable's identity or metadata.
+- Signal motion and an arrow agree on source-to-target direction; reduced-motion mode removes continuous animation without obscuring direction.
+- A second cable cannot silently occupy an already-used physical port.
+- Physically suspicious connections are blocked or visibly overridden with a saved reason.
+- Clicking a parts-list row selects and centers the corresponding cable, and editing the cable immediately updates that row.
+- The grouped parts list reports correct cable counts without replacing the route-level rows.
+- Saving and reloading preserves setup metadata, node positions, port definitions, cable endpoints, cable settings, and viewport.
+- Opening the same revision in two tabs cannot silently overwrite a newer saved revision.
+- Duplicating a setup duplicates its graph and cable requirements but does not duplicate Firebase Storage objects.
+- Normal MVP-size diagrams stay below the graph warning threshold and save within Firestore's document limit.
+- Only administrators can read or mutate setup, equipment, connector-catalog, inventory, or setup-image data in the proposed MVP.
+
+### 17.15 Resolved Product Decisions
+
+Approved on 2026-08-02:
+
+1. Every uploaded node becomes a reusable equipment template. Setup nodes snapshot the template so old designs stay stable.
+2. A physical port accepts one cable. Fan-out requires an explicit splitter, patch panel, or similar node.
+3. Individually identifiable equipment can be labeled and assigned from the first release. Cable runs can also record a specific owned-cable label; structured quantity inventory, automatic matching, and shortage allocation remain Phase 5 work.
+4. Setup diagrams, equipment templates, connector types, inventory, and images are admin-only.
+5. The editor uses explicit Save with a dirty-state warning and browser-local recovery.
+6. Canvas placement represents approximate signal flow or stage position, not a measured floor plan.
+7. Suspicious connections may be saved only as visible exceptions with a reason.
+8. 1/4-inch TS and TRS remain distinct connector types. RJ45 is the connector type and Cat5e/Cat6 is a separate cable specification.
+9. The MVP launches with the in-app parts list. Print and CSV remain Phase 4 stretch work.
+
+## 18. Unified Stage Operations and Gear Tracking Blueprint
+
+Approved on 2026-08-03. This section extends the setup designer into a linked Stage Plot, Signal Router, and Gear Tracker. Where this section conflicts with the earlier Section 17 assumptions about approximate placement, quantity-only cable inventory, or one template image, this section takes precedence.
+
+### 18.1 Product Model
+
+One setup is the shared source of truth for three connected views:
+
+- Stage Plot: scaled physical positions, equipment footprints, groups, waypoints, cable corridors, and measured cable requirements.
+- Signal Router: readable logical topology with exact ports, signal direction, expandable groups, and drill-through equipment details.
+- Gear Tracker: fulfillment, individually tagged physical assets, ownership, providers, containers, last-known location, packing verification, shortages, and exports.
+
+The key separation is:
+
+1. A `GearDefinition` describes a model or generic kind of item.
+2. A `SetupItem` asks for that kind of item in one setup.
+3. An `Assignment` says whether an owned asset, an outside provider, or a purchase fulfills the requirement.
+4. An `InventoryAsset` represents one real QR-labeled object owned or tracked by The Swell.
+5. An `InventoryCheckIn` records where an asset was directly observed at a particular time.
+
+Duplicating a setup creates new setup-item identities while preserving the referenced physical asset IDs. Duplicate and swap changes the assignment without changing the requirement, stage position, ports, cables, or routes.
+
+### 18.2 Stage and Signal Positions
+
+Every setup node can store both:
+
+```ts
+{
+  stagePosition: { xFeet: number; yFeet: number; widthFeet?: number; depthFeet?: number };
+  diagramPosition: { x: number; y: number };
+}
+```
+
+The Stage Plot owns physical truth and cable measurement. The Signal Router owns readable logical arrangement. Moving a node in the signal view never changes required cable length.
+
+Groups such as Position 1 or Stage-right rack have a physical footprint and summary on the Stage Plot. The same group can expand into its constituent equipment nodes in the Signal Router.
+
+### 18.3 Cable Routes and Waypoints
+
+A setup cable connects exact source and target ports and stores an ordered list of physical route points. Equipment nodes, groups, and dummy routing waypoints can all be route points.
+
+Required length is calculated from orthogonal stage-coordinate segments plus vertical drops and service slack. Shared waypoint pairs form cable corridors. Cables in the same corridor render with stable visual offsets that do not change physical length.
+
+Moving one waypoint recalculates every cable containing it. If an assigned physical cable becomes too short, the setup flags the assignment and offers another compatible owned asset, outside supply, or purchase.
+
+### 18.4 Gear Definitions, Icons, Detail Photos, and Asset Photos
+
+Images have three distinct purposes:
+
+- A `GearDefinition` has one transparent PNG or WebP icon for the Stage Plot, Signal Router, compact lists, and generic external requirements.
+- A `GearDefinition` can have several reusable JPEG, PNG, or WebP detail photos showing the product front, rear panel, ports, and controls. These help an administrator verify a signal-flow definition even when no physical owned asset has been assigned.
+- An `InventoryAsset` has several JPEG or WebP documentary photos of the actual physical object, including front, back, ports, serial label, QR label, case, wear, damage, and identifying marks.
+
+Duplicated setups reference definition media rather than copying image bytes. Two otherwise identical microphones can share one icon and reusable product-detail gallery while retaining different physical photo galleries.
+
+The definition icon editor accepts drag-and-drop or file browsing. Clicking the current icon opens a square crop interface with pan and zoom controls. The client exports a 512 × 512 WebP, stores it at an immutable equipment-image path, updates the definition, and snapshots that version onto the node being edited.
+
+The node detail modal also provides an inline inspection gallery. Administrators can add up to twelve reusable detail photos, select thumbnails for a larger view, and retain AI-imported web references as a separately labeled source. When a node is assigned to a tagged asset, that asset's documentary photos can later appear in the same viewer as a separate source without being copied into the definition.
+
+### 18.5 Inventory Assets and Assignments
+
+Implementation status: the Signal Router currently supports `Owned`, `Rent`, `Buy`, and `Unplanned` fulfillment plus temporary template-level owned-unit labels. The searchable tagged-asset autocomplete, `Create asset` route, QR codes, location history, and check-in workflow begin with the Gear Tracker build phase and are not yet implemented.
+
+```ts
+type Assignment = {
+  method: "owned_asset" | "external" | "purchase";
+  providedByPartyId: string | null;
+  assetId: string | null;
+  notes?: string;
+};
+
+type Party = {
+  id: string;
+  displayName: string;
+  type: "band_member" | "guest_musician" | "company" | "venue" | "other";
+  memberId?: string;
+  contact?: Record<string, string>;
+  active: boolean;
+};
+
+type InventoryAsset = {
+  id: string;
+  definitionId: string;
+  qrCode?: string;
+  displayName: string;
+  serialNumber?: string;
+  ownerPartyId: string;
+  attributes: Record<string, unknown>;
+  canContainAssets?: boolean;
+  currentPlacement?: AssetPlacement;
+  effectiveLocationId?: string;
+  locationInheritedFromAssetId?: string;
+  ancestorContainerIds?: string[];
+  lastPlacedAt?: Timestamp;
+  active: boolean;
+};
+```
+
+Owners and setup providers use one open-ended `Party` registry rather than hardcoded enums. A party can be a band member, hired musician, venue, backline company, or other person or organization. The same party can own physical assets and be responsible for supplying them to a setup.
+
+A hired guitarist can have specifically tracked guitar, pedal, and cable assets owned by their party record. If Swell does not need to track their exact objects, the same setup requirements can instead use `method: "external"`, the guitarist's `providedByPartyId`, and no `assetId`. Likewise, a drum-kit requirement can be assigned to Cron's tagged kit, a guest drummer's tagged kit, or an untracked backline-company requirement depending on the setup variant.
+
+Shopping list is an assignment method, not an owner. Backline is an outside provider; Swell does not track the backline company's warehouse.
+
+Every cable run is also a setup requirement and can be assigned to one exact tagged cable asset, an outside provider, or a purchase.
+
+### 18.6 Containers and Manifests
+
+Bags, road cases, racks, bins, and trunks are inventory assets with `canContainAssets: true`. A container can be the direct placement destination of another asset.
+
+Expected organization and actual containment remain separate:
+
+- A container manifest lists the assets that belong in the container.
+- Actual contents are the assets whose latest direct placement is inside that container.
+- Comparing the two produces packed, missing, and extra states.
+
+```ts
+type AssetPlacement =
+  | { kind: "location"; locationId: string }
+  | { kind: "container"; containerAssetId: string };
+
+type ContainerManifest = {
+  containerAssetId: string;
+  expectedItems: Array<{
+    assetId: string;
+    required: boolean;
+    sortOrder: number;
+    notes?: string;
+  }>;
+  updatedAt: Timestamp;
+  updatedById: string;
+};
+```
+
+Example workflow:
+
+1. Cable Duffle A has a manifest of 14 assigned cords.
+2. During teardown, scanning the bag opens its manifest.
+3. Each cord is scanned or manually checked into the bag.
+4. The bag reports 14 of 14 verified, plus any unexpected extra items.
+5. Scanning the bag into Ike's car creates one direct check-in for the bag.
+6. Every actual descendant resolves to Ike's car as its effective location through the bag.
+
+Moving a container does not create fake direct-scan events for every child. Child histories may display the inherited movement with provenance such as `Ike's car via Cable Duffle A`. A transaction or trusted server process updates denormalized effective-location snapshots for descendant queries.
+
+Containers may nest, such as pouch to duffle to car. The system rejects containment cycles and initially limits nesting depth to keep resolution and descendant updates predictable.
+
+### 18.7 Check-In Events and Location History
+
+The atomic inventory event remains a check-in observation rather than an asserted move from A to B:
+
+```ts
+type InventoryCheckIn = {
+  id: string;
+  assetId: string;
+  destination:
+    | { kind: "location"; locationId: string }
+    | { kind: "container"; containerAssetId: string };
+  checkedInAt: Timestamp;
+  checkedInById: string;
+  method: "qr_camera" | "manual_single" | "manual_bulk";
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+    accuracyMeters: number;
+    capturedAt: Timestamp;
+  };
+  operationId?: string;
+  setupId?: string;
+  packingSessionId?: string;
+  notes?: string;
+};
+```
+
+QR camera scanning, manual single-item check-in, and bulk manual selection create the same event type. A bulk action creates one immutable event per selected asset with a shared operation ID.
+
+GPS is optional supporting context. The user-selected named location or container is the intentional destination. Check-in remains available when location permission is denied or unavailable.
+
+Check-in history is append-only. Corrections append a new observation instead of rewriting history. Asset documents store denormalized last-known direct placement and effective-location snapshots for fast lists.
+
+### 18.8 Packing Sessions and Derived Views
+
+A packing session binds a setup, provider, and destination location. A scan inside the session both appends the normal check-in and verifies the item for that trip.
+
+Derived views include:
+
+- Ike's packing list for a selected setup.
+- Items verified in the destination during the current packing session.
+- Required items last known somewhere else, including the last observation time.
+- Missing items from a container manifest.
+- Compatible substitutes and unexpected extras.
+- Shopping list requirements.
+- Backline-company advance requirements.
+- Available inventory filtered by definition, owner, condition, and effective location.
+
+An item being last known in the car does not automatically mean it was verified for the current packing session.
+
+### 18.9 Initial Collections and Storage
+
+```text
+/gearDefinitions/{definitionId}
+/inventoryAssets/{assetId}
+/inventoryAssets/{assetId}/checkIns/{checkInId}
+/containerManifests/{containerAssetId}
+/setups/{setupId}
+/setups/{setupId}/items/{setupItemId}
+/setups/{setupId}/cables/{cableId}
+/packingSessions/{sessionId}
+/packingSessions/{sessionId}/verifications/{assetId}
+/locations/{locationId}
+/parties/{partyId}
+```
+
+Firebase Storage paths:
+
+```text
+/setup-designer/equipment/{templateId}/{imageId}-{sanitizedFilename}  # current icons and definition detail photos
+/inventory-photos/{assetId}/{imageId}-{sanitizedFilename}             # planned physical-asset photos
+```
+
+### 18.10 Documentation Route
+
+`/docs` is the living system guide. It begins as a product blueprint with a partner-friendly overview and expandable technical details. As features ship, the same page gains operating instructions, screenshots, common mistakes, and links into the working tools. Its top-level navigation link is shown only to signed-in administrators and local demo-admin sessions; the route itself is not access-restricted by this navigation decision.
+
+Planned operating guides include:
+
+- How to build and duplicate a setup.
+- How to create definitions and register physical assets.
+- How to use Stage Plot waypoints and measured cable paths.
+- How to route and inspect exact signal connections.
+- How to assign owned, backline, and shopping fulfillment.
+- How to maintain container manifests and teardown checklists.
+- How to scan and manually check in gear.
+- How to run a packing session and produce a backline advance.
+
+### 18.11 Delivery Sequence
+
+1. Preserve and harden the working setup editor foundation.
+2. Add the scaled Stage Plot, groups, waypoints, corridor rendering, and length calculation.
+3. Add gear definitions, individually tagged assets, owners, providers, locations, assignments, icons, and photo galleries.
+4. Add containers, manifests, nested placement, mobile camera scanning, manual batch check-in, optional GPS, and item history.
+5. Add packing sessions, shortages, substitutes, shopping lists, member packing lists, backline advances, and exports.
+6. Add offline resilience, correction tooling, date conflict detection, real-device QA, security hardening, and backups.
+
+### 18.12 Resolved Decisions
+
+1. Setup diagrams and inventory editing are admin-only.
+2. Stage and signal views share identities but store independent positions.
+3. Cable measurement comes only from the physical stage route.
+4. Gear definitions own one transparent stage icon and reusable inspection photos; physical assets own separate documentary photo galleries.
+5. Every equipment and cable requirement can use an exact asset, outside provider, or purchase assignment.
+6. Check-in events are append-only observations with optional GPS context.
+7. A container's expected manifest is separate from its actual current contents.
+8. Actual descendants inherit a moved container's effective location without receiving fake direct-scan events.
+9. A location match and a packing-session verification are separate facts.
+10. The `/docs` page remains synchronized with the PRD and evolves into the operating manual.
+11. Gear owners and setup providers come from one open-ended party registry, not a fixed list of band members or companies.
+
+### 18.13 AI-Assisted Equipment Research
+
+An administrator creating reusable equipment may paste a public HTTPS product-page URL into the equipment dialog and request research. The server reads the supplied page, extracts direct reference-photo URLs, and asks an OpenRouter-hosted model for strict structured equipment data. The initial model is `openai/gpt-5.6-terra`, configurable through `OPEN_ROUTER_EQUIPMENT_IMPORT_MODEL`; the credential remains server-only in `OPEN_ROUTER_API_KEY`.
+
+The research result may fill:
+
+- Equipment name, manufacturer, model, category, and an original concise description.
+- Seller, observed purchase price, currency, display price, source URL, and observation time.
+- Exact input and output port groups, including count, label, connector type, connector gender, signal type, channel capacity, and supported specification notes.
+- Reference product-photo URLs found directly in page metadata or structured data.
+- Confidence, warnings, and supporting source URLs.
+
+Research never creates or overwrites equipment automatically. The result populates the existing form for administrator review and editing. The model returns compact port groups, but the trusted server expands every physical connector into an individual `EquipmentPort` record with a stable ID before the draft reaches the editor. The editor operates directly on that exact array and can add another typed bank without flattening mixed connector types into one per-direction default.
+
+Product reference photos remain distinct from both image systems already defined in Section 18.4: they are not the transparent diagram icon and they are not documentary photos of a tagged physical asset. They are source-linked references for the reusable gear definition. A later media-hardening pass may copy approved reference images into Firebase Storage to avoid relying on third-party hotlinks.
+
+The route validates administrator access, permits the demo bypass only on a local non-production origin, blocks private-network source URLs and unsafe redirects, caps downloaded page size, treats page content as untrusted data, uses strict JSON Schema output, and stores model/source provenance with the result. Prices and AI-extracted specifications are observations that must remain visibly reviewable rather than permanent unquestioned facts.

@@ -36,5 +36,17 @@ service firebase.storage {
         && request.resource.contentType == 'image/jpeg';
       allow delete: if isAdmin();
     }
+
+    match /setup-designer/equipment/{templateId}/{fileName} {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType in [
+          'image/jpeg',
+          'image/png',
+          'image/webp'
+        ];
+      allow delete: if isAdmin();
+    }
   }
 }

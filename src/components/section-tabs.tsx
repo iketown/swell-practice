@@ -25,7 +25,12 @@ export function SectionTabs() {
   const admin = useAdmin();
   const pathname = usePathname();
   const tabs = admin.isAdmin
-    ? [...baseTabs, { href: "/assignments", label: "Assignments" }]
+    ? [
+        ...baseTabs,
+        { href: "/assignments", label: "Assignments" },
+        { href: "/setups", label: "Setups" },
+        { href: "/docs", label: "Docs" },
+      ]
     : baseTabs;
 
   return (
@@ -37,7 +42,7 @@ export function SectionTabs() {
           <Link
             aria-current={active ? "page" : undefined}
             className={tabClassName(active)}
-            href={tab.href}
+            href={admin.isDemoAdmin ? `${tab.href}?demo=1` : tab.href}
             key={tab.href}
           >
             {tab.label}
