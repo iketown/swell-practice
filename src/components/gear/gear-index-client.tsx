@@ -9,6 +9,7 @@ import {
   PencilIcon,
   PlusIcon,
   RefreshCwIcon,
+  ScanLineIcon,
   SearchIcon,
   ShoppingCartIcon,
   TruckIcon,
@@ -48,6 +49,7 @@ import {
   listGearParties,
   listInventoryAssets,
   listPurchaseOrders,
+  syncPublicGearAssetRecords,
 } from "@/lib/gear/repository";
 import type { EquipmentTemplate } from "@/lib/setup-designer/domain";
 import { portGroupDisplayName, summarizePortGroups } from "@/lib/setup-designer/ports";
@@ -57,6 +59,7 @@ export function GearIndexClient({ initialQuery = "" }: { initialQuery?: string }
   const admin = useAdmin();
   const router = useRouter();
   const setupsHref = admin.isDemoAdmin ? "/setups?demo=1" : "/setups";
+  const scannerHref = admin.isDemoAdmin ? "/gear/check-in?demo=1" : "/gear/check-in";
   const [definitions, setDefinitions] = useState<EquipmentTemplate[]>([]);
   const [assets, setAssets] = useState<InventoryAsset[]>([]);
   const [parties, setParties] = useState<GearParty[]>([]);
@@ -90,6 +93,9 @@ export function GearIndexClient({ initialQuery = "" }: { initialQuery?: string }
         listGearLocations(),
         listPurchaseOrders(),
       ]);
+      await syncPublicGearAssetRecords(nextAssets).catch((syncError) => {
+        console.warn("Could not update public QR label records.", syncError);
+      });
       setDefinitions(nextDefinitions);
       setAssets(nextAssets);
       setParties(nextParties);
@@ -152,7 +158,8 @@ export function GearIndexClient({ initialQuery = "" }: { initialQuery?: string }
               Define what equipment is, reserve assets before purchase, group them into orders, and check physical items into their first real location.
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
-              <Button onClick={() => beginCreateAsset("planned")}><PackagePlusIcon data-icon="inline-start" />Plan gear</Button>
+              <Link href={scannerHref} className={buttonVariants()}><ScanLineIcon data-icon="inline-start" />Scan gear</Link>
+              <Button variant="secondary" onClick={() => beginCreateAsset("planned")}><PackagePlusIcon data-icon="inline-start" />Plan gear</Button>
               <Button variant="outline" onClick={() => beginCreateAsset("active")}><PackageCheckIcon data-icon="inline-start" />Register owned gear</Button>
               <Button variant="outline" onClick={() => setCreatingDefinition(true)}><PlusIcon data-icon="inline-start" />New definition</Button>
             </div>

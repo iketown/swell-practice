@@ -4,6 +4,7 @@ import { CameraIcon, PackagePlusIcon, SaveIcon } from "lucide-react";
 import Image from "next/image";
 import { FormEvent, useMemo, useState } from "react";
 
+import { GearLabelPrinter } from "@/components/gear/gear-label-printer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -254,6 +255,8 @@ export function GearAssetDialog({
             <FieldLabel htmlFor="gear-asset-notes">Notes</FieldLabel>
             <Textarea id="gear-asset-notes" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Why we need it, condition, identifying marks, or receiving instructions." rows={3} disabled={saving} />
           </Field>
+
+          {asset ? <GearLabelPrinter assetTag={canonicalAssetTag} assetName={label} /> : null}
 
           {saving && photoFiles.length ? <Progress value={progress} aria-label={`Gear photo upload ${progress}% complete`} /> : null}
           {error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}

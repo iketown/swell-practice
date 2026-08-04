@@ -5,8 +5,11 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
+  query,
   serverTimestamp,
   setDoc,
+  where,
   writeBatch,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
@@ -28,6 +31,7 @@ import {
   type InventoryAssetLifecycle,
   type InventoryCheckIn,
   type PaymentStatus,
+  type PublicGearAsset,
   type PurchaseOrder,
   type PurchaseOrderLine,
   type PurchaseOrderStatus,
@@ -204,7 +208,28 @@ function locationFromData(id: string, value: Record<string, unknown>): GearLocat
     kind: kinds.includes(value.kind as GearLocationKind) ? value.kind as GearLocationKind : "other",
     notes: stringValue(value.notes),
     status: value.status === "archived" ? "archived" : "active",
+    lastCheckInAt: value.lastCheckInAt ? timestampMillis(value.lastCheckInAt) : undefined,
     updatedAt: timestampMillis(value.updatedAt),
+  };
+}
+
+function publicGearAssetFromData(value: Record<string, unknown>): PublicGearAsset {
+  return {
+    assetTag: String(value.assetTag ?? ""),
+    label: String(value.label ?? "Unnamed gear"),
+    updatedAt: timestampMillis(value.updatedAt, 0),
+  };
+}
+
+function publicGearAssetId(assetTag: string) {
+  return encodeURIComponent(canonicalizeAssetTag(assetTag).toLowerCase());
+}
+
+function publicGearAssetDocumentValue(asset: Pick<InventoryAsset, "assetTag" | "label">) {
+  return {
+    assetTag: canonicalizeAssetTag(asset.assetTag),
+    label: asset.label,
+    updatedAt: serverTimestamp(),
   };
 }
 
@@ -339,6 +364,51 @@ export async function listInventoryAssets() {
   return snapshots.docs.map((item) => assetFromData(item.id, item.data())).sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
+export async function getPublicGearAssetByTag(assetTag: string): Promise<PublicGearAsset | null> {
+  const canonicalTag = canonicalizeAssetTag(assetTag);
+  if (isDemoMode() || !db) {
+    const asset = readDemoStore().assets.find((item) => canonicalizeAssetTag(item.assetTag) === canonicalTag);
+    return asset ? { assetTag: asset.assetTag, label: asset.label, updatedAt: asset.updatedAt } : null;
+  }
+  const snapshot = await getDoc(doc(db, "gearPublicAssets", publicGearAssetId(canonicalTag)));
+  return snapshot.exists() ? publicGearAssetFromData(snapshot.data()) : null;
+}
+
+export async function getInventoryAssetByTag(assetTag: string): Promise<InventoryAsset | null> {
+  const canonicalTag = canonicalizeAssetTag(assetTag);
+  if (isDemoMode() || !db) {
+    return readDemoStore().assets.find((item) => canonicalizeAssetTag(item.assetTag) === canonicalTag) ?? null;
+  }
+  const snapshots = await getDocs(query(
+    collection(db, "inventoryAssets"),
+    where("assetTag", "==", canonicalTag),
+    limit(1),
+  ));
+  const snapshot = snapshots.docs[0];
+  return snapshot ? assetFromData(snapshot.id, snapshot.data()) : null;
+}
+
+export async function syncPublicGearAssetRecords(assets: InventoryAsset[]) {
+  if (isDemoMode() || !db || !assets.length) return;
+  const existingSnapshots = await getDocs(collection(db, "gearPublicAssets"));
+  const existing = new Map(existingSnapshots.docs.map((item) => [item.id, publicGearAssetFromData(item.data())]));
+  const changed = assets.filter((asset) => {
+    const stored = existing.get(publicGearAssetId(asset.assetTag));
+    return !stored || stored.assetTag !== canonicalizeAssetTag(asset.assetTag) || stored.label !== asset.label;
+  });
+  for (let start = 0; start < changed.length; start += 400) {
+    const batch = writeBatch(db);
+    for (const asset of changed.slice(start, start + 400)) {
+      batch.set(
+        doc(db, "gearPublicAssets", publicGearAssetId(asset.assetTag)),
+        publicGearAssetDocumentValue(asset),
+        { merge: true },
+      );
+    }
+    await batch.commit();
+  }
+}
+
 function fileToDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -456,6 +526,9 @@ export async function saveInventoryAsset(
     createdAt: existingAsset ? existingData?.createdAt ?? serverTimestamp() : serverTimestamp(),
     updatedAt: serverTimestamp(),
   }, { merge: true });
+  await syncPublicGearAssetRecords([storedAsset]).catch((syncError) => {
+    console.warn("Could not update the public QR label record.", syncError);
+  });
   return storedAsset;
 }
 
@@ -572,18 +645,22 @@ export async function checkInInventoryAsset(input: {
   locationId: string;
   method: CheckInMethod;
   actorId: string;
+  operationId?: string;
   latitude?: number;
   longitude?: number;
   accuracyMeters?: number;
   notes?: string;
 }) {
-  const id = createGearId("checkin");
+  const id = input.operationId
+    ? `${input.operationId}-${input.assetId}`
+    : createGearId("checkin");
   const value: InventoryCheckIn = {
     id,
     assetId: input.assetId,
     locationId: input.locationId,
     method: input.method,
     actorId: input.actorId,
+    operationId: input.operationId,
     latitude: input.latitude,
     longitude: input.longitude,
     accuracyMeters: input.accuracyMeters,
@@ -593,13 +670,19 @@ export async function checkInInventoryAsset(input: {
   if (!value.locationId) throw new Error("Choose a check-in location.");
   if (isDemoMode() || !db) {
     const store = readDemoStore();
-    store.checkIns.push(value);
+    if (!store.checkIns.some((checkIn) => checkIn.id === value.id)) {
+      store.checkIns.push(value);
+    }
     store.assets = store.assets.map((asset) => asset.id === input.assetId ? {
       ...asset,
       lifecycleStatus: "active",
       currentLocationId: input.locationId,
       updatedAt: value.checkedInAt,
     } : asset);
+    store.locations = store.locations.map((location) => location.id === input.locationId ? {
+      ...location,
+      lastCheckInAt: value.checkedInAt,
+    } : location);
     writeDemoStore(store);
     return value;
   }
@@ -611,6 +694,7 @@ export async function checkInInventoryAsset(input: {
     locationId: value.locationId,
     method: value.method,
     actorId: value.actorId,
+    operationId: value.operationId ?? "",
     latitude: value.latitude ?? null,
     longitude: value.longitude ?? null,
     accuracyMeters: value.accuracyMeters ?? null,
@@ -622,6 +706,18 @@ export async function checkInInventoryAsset(input: {
     currentLocationId: input.locationId,
     updatedAt: serverTimestamp(),
   });
+  const defaultLocation = DEFAULT_LOCATIONS.find((location) => location.id === input.locationId);
+  batch.set(doc(firestore, "gearLocations", input.locationId), {
+    ...(defaultLocation ? {
+      name: defaultLocation.name,
+      kind: defaultLocation.kind,
+      notes: defaultLocation.notes ?? "",
+      status: defaultLocation.status,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    } : {}),
+    lastCheckInAt: serverTimestamp(),
+  }, { merge: true });
   await batch.commit();
   return value;
 }

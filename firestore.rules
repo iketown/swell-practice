@@ -92,6 +92,19 @@ service cloud.firestore {
       }
     }
 
+    match /gearPublicAssets/{assetTag} {
+      allow read: if true;
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly([
+          'assetTag',
+          'label',
+          'updatedAt'
+        ])
+        && request.resource.data.assetTag is string
+        && request.resource.data.label is string;
+      allow delete: if isAdmin();
+    }
+
     match /gearParties/{partyId} {
       allow read, create, update, delete: if isAdmin();
     }

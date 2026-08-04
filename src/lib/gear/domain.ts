@@ -13,7 +13,12 @@ export type InventoryAssetLifecycle =
   | "cancelled";
 export type PurchaseOrderStatus = "draft" | "cart" | "ordered" | "partially_shipped" | "shipped" | "received" | "cancelled";
 export type PaymentStatus = "not_paid" | "partially_paid" | "paid" | "refunded";
-export type CheckInMethod = "manual" | "qr";
+export type CheckInMethod =
+  | "manual_single"
+  | "manual_bulk"
+  | "qr_camera"
+  | "manual"
+  | "qr";
 
 export interface GearParty {
   id: string;
@@ -30,6 +35,13 @@ export interface GearLocation {
   kind: GearLocationKind;
   notes?: string;
   status: "active" | "archived";
+  lastCheckInAt?: number;
+  updatedAt: number;
+}
+
+export interface PublicGearAsset {
+  assetTag: string;
+  label: string;
   updatedAt: number;
 }
 
@@ -89,6 +101,7 @@ export interface InventoryCheckIn {
   assetId: string;
   locationId: string;
   method: CheckInMethod;
+  operationId?: string;
   latitude?: number;
   longitude?: number;
   accuracyMeters?: number;

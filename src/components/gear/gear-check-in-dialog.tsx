@@ -75,7 +75,7 @@ export function GearCheckInDialog({
       await checkInInventoryAsset({
         assetId: asset.id,
         locationId,
-        method: "manual",
+        method: "manual_single",
         actorId,
         latitude: coordinates?.latitude,
         longitude: coordinates?.longitude,
