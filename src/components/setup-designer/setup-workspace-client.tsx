@@ -10,13 +10,14 @@ import {
   type Connection,
   type EdgeChange,
   type NodeChange,
+  type OnBeforeDelete,
   type Viewport,
   reconnectEdge,
   useEdgesState,
   useNodesState,
   useReactFlow,
 } from "@xyflow/react";
-import { ArrowLeftIcon, FocusIcon, SaveIcon } from "lucide-react";
+import { ArrowLeftIcon, BoxesIcon, FocusIcon, SaveIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type DragEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -33,6 +34,9 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAdmin } from "@/hooks/use-admin";
+import type { GearLocation, GearParty, InventoryAsset } from "@/lib/gear/domain";
+import { listGearLocations, listGearParties, listInventoryAssets } from "@/lib/gear/repository";
+import { findAssetAssignment } from "@/lib/setup-designer/asset-assignments";
 import { CABLE_COLORS } from "@/lib/setup-designer/catalog";
 import { cableEndMatesPort, matingCableEnd, validateConnection } from "@/lib/setup-designer/compatibility";
 import {
@@ -45,8 +49,8 @@ import {
   type SetupNode,
 } from "@/lib/setup-designer/domain";
 import { deriveCableRuns, deriveEquipmentUsage, groupCableRuns } from "@/lib/setup-designer/parts-list";
-import { nodeFromTemplate } from "@/lib/setup-designer/sample-data";
 import { graphByteSize, normalizeSetupGraph, setupGraphFromData } from "@/lib/setup-designer/serialization";
+import { externalCableCount, placementFromTemplate, withTransportChannelLabels } from "@/lib/setup-designer/snake-topology";
 import {
   SetupRevisionConflictError,
   getSetupWorkspace,
@@ -72,11 +76,15 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
   const admin = useAdmin();
   const router = useRouter();
   const setupsHref = admin.isDemoAdmin ? "/setups?demo=1" : "/setups";
+  const gearHref = admin.isDemoAdmin ? "/gear?demo=1" : "/gear";
   const reactFlow = useReactFlow<SetupNode, CableEdge>();
   const [nodes, setNodes, applyNodeChanges] = useNodesState<SetupNode>([]);
   const [edges, setEdges, applyEdgeChanges] = useEdgesState<CableEdge>([]);
   const [metadata, setMetadata] = useState<SetupMetadata | null>(null);
   const [templates, setTemplates] = useState<EquipmentTemplate[]>([]);
+  const [assets, setAssets] = useState<InventoryAsset[]>([]);
+  const [parties, setParties] = useState<GearParty[]>([]);
+  const [locations, setLocations] = useState<GearLocation[]>([]);
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 });
   const [baseRevision, setBaseRevision] = useState(0);
   const [dirty, setDirty] = useState(false);
@@ -100,8 +108,8 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
   useEffect(() => {
     if (!admin.isAdmin) return;
     let active = true;
-    Promise.all([getSetupWorkspace(setupId), listEquipmentTemplates()])
-      .then(([workspace, equipmentTemplates]) => {
+    Promise.all([getSetupWorkspace(setupId), listEquipmentTemplates(), listInventoryAssets(), listGearParties(), listGearLocations()])
+      .then(([workspace, equipmentTemplates, inventoryAssets, gearParties, gearLocations]) => {
         if (!active) return;
         if (!workspace) {
           setError("This setup does not exist or was archived.");
@@ -127,6 +135,9 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
         setEdges(graph.edges);
         setViewport(graph.viewport);
         setTemplates(equipmentTemplates);
+        setAssets(inventoryAssets);
+        setParties(gearParties);
+        setLocations(gearLocations);
         loadedRef.current = true;
       })
       .catch((caught) => setError(caught instanceof Error ? caught.message : "Could not load this setup."))
@@ -165,7 +176,7 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
     try {
       const revision = await saveSetupWorkspace(setupId, graph, baseRevision, actorId);
       setBaseRevision(revision);
-      setMetadata((current) => current ? { ...current, revision, nodeCount: nodes.length, cableCount: edges.length, updatedAt: Date.now() } : current);
+      setMetadata((current) => current ? { ...current, revision, nodeCount: deriveEquipmentUsage(nodes).length, cableCount: externalCableCount(edges), updatedAt: Date.now() } : current);
       setDirty(false);
       window.localStorage.removeItem(recoveryKey);
       toast.success("Setup saved.");
@@ -271,18 +282,19 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
   }, [edges, nodes, setEdges]);
 
   const placeTemplate = useCallback((template: EquipmentTemplate, position: { x: number; y: number }, focusPlacedNode: boolean) => {
-    const node = nodeFromTemplate(template, createSetupId("node"), position.x, position.y);
-    setNodes((current) => [...current, node]);
-    setSelectedNodeId(node.id);
+    const placement = placementFromTemplate(template, position.x, position.y);
+    setNodes((current) => [...current, ...placement.nodes]);
+    if (placement.edges.length) setEdges((current) => [...current, ...placement.edges]);
+    setSelectedNodeId(placement.primaryNodeId);
     setSelectedEdgeId(null);
     setDirty(true);
-    toast.success(`${template.name} added.`);
+    toast.success(placement.nodes.length > 1 ? `${template.name} added as ${placement.nodes.length} linked endpoints.` : `${template.name} added.`);
     if (focusPlacedNode) {
       window.requestAnimationFrame(() => {
-        void reactFlow.fitView({ nodes: [{ id: node.id }], duration: 240, maxZoom: 1.1, padding: 0.6 });
+        void reactFlow.fitView({ nodes: placement.nodes.map((node) => ({ id: node.id })), duration: 240, maxZoom: 1.1, padding: 0.35 });
       });
     }
-  }, [reactFlow, setNodes]);
+  }, [reactFlow, setEdges, setNodes]);
 
   const addTemplate = useCallback((template: EquipmentTemplate) => {
     const preferredPosition = reactFlow.screenToFlowPosition({ x: window.innerWidth * 0.48, y: window.innerHeight * 0.48 });
@@ -315,14 +327,38 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
   }, [draggedTemplate]);
 
   const updateNodeData = useCallback((nodeId: string, data: EquipmentNodeData) => {
+    if (data.fulfillment === "owned" && data.assignedAssetId) {
+      const existingAssignment = findAssetAssignment(nodes, data.assignedAssetId, nodeId);
+      if (existingAssignment) {
+        return `${data.assignedAssetLabel || "This asset"} is already being used in this setup by ${existingAssignment.nodeName}.`;
+      }
+    }
     const previous = nodes.find((node) => node.id === nodeId);
     const nextPortIds = new Set(data.ports.map((port) => port.id));
     const removedPortIds = previous?.data.ports.filter((port) => !nextPortIds.has(port.id)).map((port) => port.id) ?? [];
     const affectedEdges = edges.filter((edge) => removedPortIds.includes(edge.sourceHandle) || removedPortIds.includes(edge.targetHandle));
-    if (affectedEdges.length && !window.confirm(`This removes ${affectedEdges.length} connected cable${affectedEdges.length === 1 ? "" : "s"}. Continue?`)) return;
-    setNodes((current) => current.map((node) => node.id === nodeId ? { ...node, data } : node));
+    if (affectedEdges.length && !window.confirm(`This removes ${affectedEdges.length} connected cable${affectedEdges.length === 1 ? "" : "s"}. Continue?`)) return "Changes were not applied.";
+    const assemblyId = previous?.data.assemblyId;
+    setNodes((current) => current.map((node) => {
+      if (node.id === nodeId) return { ...node, data };
+      if (!assemblyId || node.data.assemblyId !== assemblyId) return node;
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          fulfillment: data.fulfillment,
+          assignedAssetId: data.assignedAssetId,
+          assignedAssetLabel: data.assignedAssetLabel,
+          assignedUnitId: data.assignedUnitId,
+          assignedUnitLabel: data.assignedUnitLabel,
+          providerPartyId: data.providerPartyId,
+          providerPartyName: data.providerPartyName,
+        },
+      };
+    }));
     if (affectedEdges.length) setEdges((current) => current.filter((edge) => !affectedEdges.some((removed) => removed.id === edge.id)));
     setDirty(true);
+    return null;
   }, [edges, nodes, setEdges, setNodes]);
 
   const toggleNodeExpanded = useCallback((nodeId: string) => {
@@ -342,17 +378,42 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
   const equipmentNodeActions = useMemo(() => ({ toggleExpanded: toggleNodeExpanded }), [toggleNodeExpanded]);
 
   const deleteNode = useCallback((nodeId: string) => {
-    const connected = edges.filter((edge) => edge.source === nodeId || edge.target === nodeId);
-    if (connected.length && !window.confirm(`Remove this node and ${connected.length} connected cable${connected.length === 1 ? "" : "s"}?`)) return;
-    setNodes((current) => current.filter((node) => node.id !== nodeId));
-    setEdges((current) => current.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
+    const selected = nodes.find((node) => node.id === nodeId);
+    const assemblyNodeIds = new Set(selected?.data.assemblyId
+      ? nodes.filter((node) => node.data.assemblyId === selected.data.assemblyId).map((node) => node.id)
+      : [nodeId]);
+    const connected = edges.filter((edge) => assemblyNodeIds.has(edge.source) || assemblyNodeIds.has(edge.target));
+    const externalConnected = connected.filter((edge) => !edge.data.internalTransport);
+    const subject = assemblyNodeIds.size > 1 ? `this snake and its ${assemblyNodeIds.size} endpoints` : "this node";
+    if (connected.length && !window.confirm(`Remove ${subject}${externalConnected.length ? ` and ${externalConnected.length} connected cable${externalConnected.length === 1 ? "" : "s"}` : ""}?`)) return;
+    setNodes((current) => current.filter((node) => !assemblyNodeIds.has(node.id)));
+    setEdges((current) => current.filter((edge) => !assemblyNodeIds.has(edge.source) && !assemblyNodeIds.has(edge.target)));
     setSelectedNodeId(null);
     setDirty(true);
-  }, [edges, setEdges, setNodes]);
+  }, [edges, nodes, setEdges, setNodes]);
 
-  const cableRows = useMemo(() => deriveCableRuns(nodes, edges), [edges, nodes]);
+  const beforeKeyboardDelete = useCallback<OnBeforeDelete<SetupNode, CableEdge>>(async ({ nodes: nodesToDelete, edges: edgesToDelete }) => {
+    const assemblyIds = new Set(nodesToDelete.flatMap((node) => node.data.assemblyId ? [node.data.assemblyId] : []));
+    if (!assemblyIds.size) return true;
+
+    const expandedNodes = nodes.filter((node) => nodesToDelete.some((candidate) => candidate.id === node.id) || (node.data.assemblyId && assemblyIds.has(node.data.assemblyId)));
+    const expandedNodeIds = new Set(expandedNodes.map((node) => node.id));
+    const expandedEdges = edges.filter((edge) => (
+      edgesToDelete.some((candidate) => candidate.id === edge.id)
+      || expandedNodeIds.has(edge.source)
+      || expandedNodeIds.has(edge.target)
+    ));
+    const externalCableTotal = expandedEdges.filter((edge) => !edge.data.internalTransport).length;
+    const snakeLabel = assemblyIds.size === 1 ? "this snake" : `these ${assemblyIds.size} snakes`;
+    const cableLabel = externalCableTotal ? ` and ${externalCableTotal} connected cable${externalCableTotal === 1 ? "" : "s"}` : "";
+    if (!window.confirm(`Remove ${snakeLabel}${cableLabel}?`)) return false;
+    return { nodes: expandedNodes, edges: expandedEdges };
+  }, [edges, nodes]);
+
+  const displayNodes = useMemo(() => withTransportChannelLabels(nodes, edges), [edges, nodes]);
+  const cableRows = useMemo(() => deriveCableRuns(displayNodes, edges), [displayNodes, edges]);
   const cableGroups = useMemo(() => groupCableRuns(cableRows), [cableRows]);
-  const equipmentRows = useMemo(() => deriveEquipmentUsage(nodes), [nodes]);
+  const equipmentRows = useMemo(() => deriveEquipmentUsage(displayNodes), [displayNodes]);
   const selectedNode = nodes.find((node) => node.id === selectedNodeId) ?? null;
   const selectedEdge = edges.find((edge) => edge.id === selectedEdgeId) ?? null;
 
@@ -366,6 +427,7 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
   }
 
   function selectEdge(edgeId: string) {
+    if (edges.find((edge) => edge.id === edgeId)?.data.internalTransport) return;
     setSelectedEdgeId(edgeId);
     setSelectedNodeId(null);
     setEdges((current) => current.map((edge) => ({ ...edge, selected: edge.id === edgeId })));
@@ -393,13 +455,17 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
         <Link href={setupsHref} className={buttonVariants({ variant: "ghost", size: "icon-sm" })} aria-label="Back to setups"><ArrowLeftIcon /></Link>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-sm font-semibold">{metadata.name}</h1>
-          <p className="truncate text-xs text-muted-foreground">{metadata.description || `${nodes.length} equipment · ${edges.length} cables`}</p>
+          <p className="truncate text-xs text-muted-foreground">{metadata.description || `${equipmentRows.length} equipment · ${externalCableCount(edges)} cables`}</p>
         </div>
         <Badge variant={dirty ? "secondary" : "outline"}>{saving ? "Saving" : dirty ? "Unsaved" : `Saved · r${baseRevision}`}</Badge>
         <Button variant="outline" size="sm" onClick={() => void reactFlow.fitView({ duration: 240, padding: 0.15 })} disabled={!nodes.length}>
           <FocusIcon data-icon="inline-start" />
           Fit
         </Button>
+        <Link href={gearHref} className={buttonVariants({ variant: "outline", size: "sm" })}>
+          <BoxesIcon data-icon="inline-start" />
+          Gear
+        </Link>
         <Button size="sm" onClick={() => void save()} disabled={!dirty || saving}>
           <SaveIcon data-icon="inline-start" />
           {saving ? "Saving..." : "Save"}
@@ -410,6 +476,14 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
         <EquipmentLibrary
           templates={templates}
           onTemplateCreated={(template) => setTemplates((current) => [...current, template].sort((left, right) => left.name.localeCompare(right.name)))}
+          onTemplateUpdated={(template) => {
+            setTemplates((current) => current.map((item) => item.id === template.id ? template : item).sort((left, right) => left.name.localeCompare(right.name)));
+            toast.success(`${template.name} definition updated. New nodes will use its latest ports.`);
+          }}
+          onTemplateArchived={(template) => {
+            setTemplates((current) => current.filter((item) => item.id !== template.id));
+            toast.success(`${template.name} removed from the equipment rack.`);
+          }}
           onAdd={addTemplate}
           onDragStateChange={setDraggedTemplate}
         />
@@ -424,12 +498,13 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
           ) : null}
           <EquipmentNodeActionsContext.Provider value={equipmentNodeActions}>
           <ReactFlow<SetupNode, CableEdge>
-            nodes={nodes}
+            nodes={displayNodes}
             edges={edges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
+            onBeforeDelete={beforeKeyboardDelete}
             onConnect={onConnect}
             onReconnect={onReconnect}
             onReconnectStart={(_, edge) => {
@@ -448,7 +523,7 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
             isValidConnection={connectionIsValid}
             onNodeClick={(_, node) => { setSelectedNodeId(node.id); setSelectedEdgeId(null); }}
             onNodeDoubleClick={(_, node) => { setSelectedNodeId(node.id); setSelectedEdgeId(null); setNodeDialogOpen(true); }}
-            onEdgeClick={(_, edge) => selectEdge(edge.id)}
+            onEdgeClick={(_, edge) => { if (!edge.data.internalTransport) selectEdge(edge.id); }}
             onPaneClick={() => { setSelectedNodeId(null); setSelectedEdgeId(null); }}
             onDragOver={allowTemplateDrop}
             onDrop={dropTemplate}
@@ -493,12 +568,19 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
       <EquipmentNodeDialog
         key={`${selectedNode?.id ?? "none"}-${nodeDialogOpen ? "open" : "closed"}`}
         node={selectedNode}
+        setupId={setupId}
+        gearHref={gearHref}
         templates={templates}
+        assets={assets}
+        parties={parties}
+        locations={locations}
+        setupNodes={nodes}
         open={nodeDialogOpen}
         onOpenChange={setNodeDialogOpen}
         onSave={updateNodeData}
         onDelete={deleteNode}
         onTemplateUpdated={(updatedTemplate) => setTemplates((current) => current.map((template) => template.id === updatedTemplate.id ? updatedTemplate : template))}
+        onAssetCreated={(asset) => setAssets((current) => [asset, ...current.filter((item) => item.id !== asset.id)])}
       />
     </AppShell>
   );

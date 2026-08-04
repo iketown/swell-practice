@@ -56,7 +56,7 @@ export function PartsListPanel({
       <TabsContent value="equipment" className="min-h-0 overflow-y-auto">
         {equipmentRows.length ? <div className="flex flex-col gap-2 py-2">{equipmentRows.map((row) => (
           <button key={row.nodeId} type="button" onClick={() => onEquipmentSelect(row.nodeId)} className="flex items-center justify-between gap-3 rounded-lg border bg-background p-2 text-left hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-primary">
-            <span className="min-w-0"><span className="block truncate text-xs font-semibold">{row.name}</span><span className="block truncate text-xs text-muted-foreground">{row.assignedUnitLabel || `${row.category} · not mapped`}</span></span>
+            <span className="min-w-0"><span className="block truncate text-xs font-semibold">{row.name}</span><span className="block truncate text-xs text-muted-foreground">{row.detail ?? row.assignedUnitLabel ?? `${row.category} · not mapped`}</span>{row.detail && row.assignedUnitLabel ? <span className="block truncate text-[10px] text-muted-foreground">{row.assignedUnitLabel}</span> : null}</span>
             <Badge variant="secondary" className="shrink-0 capitalize">{row.fulfillment}</Badge>
           </button>
         ))}</div> : <Empty className="border-0 py-12"><EmptyHeader><PackageCheckIcon /><EmptyTitle>No equipment used</EmptyTitle><EmptyDescription>Add nodes from the equipment library.</EmptyDescription></EmptyHeader></Empty>}

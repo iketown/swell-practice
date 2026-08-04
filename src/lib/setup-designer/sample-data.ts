@@ -30,13 +30,14 @@ function samplePorts(
   }));
 }
 
-function template(input: Omit<EquipmentTemplate, "version" | "status" | "showPortNumbers" | "showPortLabels" | "ownedUnits" | "referenceImages"> & Partial<Pick<EquipmentTemplate, "showPortNumbers" | "showPortLabels" | "ownedUnits" | "referenceImages">>): EquipmentTemplate {
+function template(input: Omit<EquipmentTemplate, "version" | "status" | "showPortNumbers" | "showPortLabels" | "ownedUnits" | "referenceImages" | "equipmentKind"> & Partial<Pick<EquipmentTemplate, "showPortNumbers" | "showPortLabels" | "ownedUnits" | "referenceImages" | "equipmentKind">>): EquipmentTemplate {
   return {
     ...input,
     showPortNumbers: input.showPortNumbers ?? true,
     showPortLabels: input.showPortLabels ?? true,
     ownedUnits: input.ownedUnits ?? [],
     referenceImages: input.referenceImages ?? [],
+    equipmentKind: input.equipmentKind ?? "device",
     version: 1,
     status: "active",
   };
@@ -158,6 +159,8 @@ export function nodeFromTemplate(templateValue: EquipmentTemplate, id: string, x
       templateVersion: templateValue.version,
       name,
       category: templateValue.category,
+      equipmentKind: templateValue.equipmentKind,
+      transport: templateValue.transport ? structuredClone(templateValue.transport) : undefined,
       notes: templateValue.notes,
       image: templateValue.image,
       ports: structuredClone(templateValue.ports),

@@ -11,6 +11,8 @@ export interface PortDefaults {
   connectorGender?: ConnectorGender;
   signalType?: string;
   labelPrefix?: string;
+  endpointId?: string;
+  channelKeyPrefix?: string;
 }
 
 export interface EquipmentPortGroupSummary {
@@ -23,6 +25,8 @@ export interface EquipmentPortGroupSummary {
   signalType?: string;
   specification?: string;
   channelCapacity?: number;
+  endpointId?: string;
+  channelKeyPrefix?: string;
 }
 
 export function portGroupDisplayName(group: EquipmentPortGroupSummary) {
@@ -42,6 +46,8 @@ export function createPort(direction: PortDirection, number: number, defaults: P
       defaults.connectorGender ?? (direction === "input" ? "female" : "male"),
     ),
     signalType: defaults.signalType ?? "analog-line",
+    ...(defaults.endpointId ? { endpointId: defaults.endpointId } : {}),
+    ...(defaults.channelKeyPrefix ? { channelKey: `${defaults.channelKeyPrefix}-${number}` } : {}),
   };
 }
 
@@ -69,6 +75,7 @@ export function appendPortBank(
   const bank = Array.from({ length: Math.min(count, 128 - directionPorts.length) }, (_, index) => ({
     ...createPort(direction, directionPorts.length + index + 1, defaults),
     label: count === 1 ? labelPrefix : `${labelPrefix} ${index + 1}`,
+    ...(defaults.channelKeyPrefix ? { channelKey: `${defaults.channelKeyPrefix}-${index + 1}` } : {}),
   }));
   return orderedPorts([...ports, ...bank]);
 }
@@ -91,6 +98,8 @@ export function summarizePortGroups(ports: readonly EquipmentPort[]): EquipmentP
       port.signalType ?? "",
       port.connector.specification ?? "",
       port.channelCapacity ?? "",
+      port.endpointId ?? "",
+      port.channelKey?.replace(/-\d+$/, "") ?? "",
     ].join("|");
     const current = groups.get(key);
     if (current) {
@@ -107,6 +116,8 @@ export function summarizePortGroups(ports: readonly EquipmentPort[]): EquipmentP
       signalType: port.signalType,
       specification: port.connector.specification,
       channelCapacity: port.channelCapacity,
+      endpointId: port.endpointId,
+      channelKeyPrefix: port.channelKey?.replace(/-\d+$/, ""),
     });
   }
 
@@ -143,6 +154,8 @@ export function equipmentPortsFromData(value: unknown): EquipmentPort[] {
       ),
       signalType: typeof data.signalType === "string" && data.signalType ? data.signalType : "other",
       ...(Number.isInteger(channelCapacity) && channelCapacity > 0 ? { channelCapacity } : {}),
+      ...(typeof data.endpointId === "string" && data.endpointId.trim() ? { endpointId: data.endpointId.trim() } : {}),
+      ...(typeof data.channelKey === "string" && data.channelKey.trim() ? { channelKey: data.channelKey.trim() } : {}),
     }];
   });
   return orderedPorts(ports);

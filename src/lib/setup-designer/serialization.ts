@@ -21,16 +21,21 @@ export function normalizeSetupGraph(input: Pick<SetupGraph, "nodes" | "edges" | 
       ports: equipmentPortsFromData(node.data.ports),
     },
   }));
-  const edges = input.edges.map((edge): CableEdge => ({
-    id: String(edge.id),
-    type: "signalCable",
-    source: String(edge.source),
-    sourceHandle: String(edge.sourceHandle),
-    target: String(edge.target),
-    targetHandle: String(edge.targetHandle),
-    animated: true,
-    data: jsonClone(edge.data),
-  }));
+  const edges = input.edges.map((edge): CableEdge => {
+    const data = jsonClone(edge.data);
+    const internalTransport = Boolean(data.internalTransport);
+    return {
+      id: String(edge.id),
+      type: "signalCable",
+      source: String(edge.source),
+      sourceHandle: String(edge.sourceHandle),
+      target: String(edge.target),
+      targetHandle: String(edge.targetHandle),
+      animated: !internalTransport,
+      ...(internalTransport ? { selectable: false, deletable: false, reconnectable: false } : {}),
+      data,
+    };
+  });
   const viewport: Viewport = {
     x: Number.isFinite(input.viewport.x) ? input.viewport.x : 0,
     y: Number.isFinite(input.viewport.y) ? input.viewport.y : 0,

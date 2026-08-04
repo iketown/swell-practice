@@ -10,6 +10,7 @@ import {
   type ConnectorGender,
   type EquipmentPort,
   type EquipmentReferenceImage,
+  type EquipmentTransportTopology,
   type ImportedEquipmentDraft,
   type PortDirection,
 } from "@/lib/setup-designer/domain";
@@ -36,13 +37,29 @@ const PortGroupSchema = z.object({
   specification: z.string().max(160).nullable(),
   channelCapacity: z.number().int().min(1).max(128).nullable(),
   description: z.string().max(500).nullable(),
+  endpointId: z.string().max(80).nullable(),
+  channelKeyPrefix: z.string().max(80).nullable(),
 });
+
+const TransportSchema = z.object({
+  kind: z.enum(["snake", "split-snake"]),
+  length: z.number().positive().nullable(),
+  lengthUnit: z.enum(["ft", "m"]),
+  channelCount: z.number().int().min(1).max(128),
+  endpoints: z.array(z.object({
+    id: z.string().min(1).max(80),
+    label: z.string().min(1).max(120),
+    style: z.enum(["box", "fan", "tail"]),
+  })).min(2).max(3),
+}).nullable();
 
 const EquipmentResearchSchema = z.object({
   name: z.string().min(1).max(160),
   manufacturer: z.string().max(120).nullable(),
   model: z.string().max(120).nullable(),
   category: z.string().min(1).max(80),
+  equipmentKind: z.enum(["device", "snake", "split-snake"]),
+  transport: TransportSchema,
   description: z.string().max(2_500).nullable(),
   price: z.object({
     amount: z.number().nonnegative().nullable(),
@@ -372,9 +389,10 @@ async function fetchProductPage(initialUrl: URL) {
   throw new Error("The product page redirected too many times.");
 }
 
-function importedPorts(groups: EquipmentResearch["portGroups"], warnings: string[]) {
+function importedPorts(groups: EquipmentResearch["portGroups"], warnings: string[], transport?: EquipmentTransportTopology) {
   const ports: EquipmentPort[] = [];
   const directionCounts: Record<PortDirection, number> = { input: 0, output: 0 };
+  const endpointIds = new Set(transport?.endpoints.map((endpoint) => endpoint.id) ?? []);
 
   for (const group of groups) {
     const remaining = MAX_PORTS_PER_DIRECTION - directionCounts[group.direction];
@@ -382,6 +400,8 @@ function importedPorts(groups: EquipmentResearch["portGroups"], warnings: string
     if (count < group.count) {
       warnings.push(`Only the first ${MAX_PORTS_PER_DIRECTION} ${group.direction} ports were imported.`);
     }
+    const endpointId = group.endpointId?.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const channelKeyPrefix = group.channelKeyPrefix?.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
     for (let index = 0; index < count; index += 1) {
       directionCounts[group.direction] += 1;
@@ -401,10 +421,60 @@ function importedPorts(groups: EquipmentResearch["portGroups"], warnings: string
         ),
         signalType: group.signalType,
         ...(group.channelCapacity ? { channelCapacity: group.channelCapacity } : {}),
+        ...(endpointId && endpointIds.has(endpointId) ? { endpointId } : {}),
+        ...(channelKeyPrefix ? { channelKey: `${channelKeyPrefix}-${index + 1}` } : {}),
       });
+    }
+    if (endpointId && !endpointIds.has(endpointId)) {
+      warnings.push(`Port group ${group.labelPrefix} referenced unknown snake endpoint ${group.endpointId}. Assign its endpoint manually.`);
     }
   }
   return ports;
+}
+
+function importedTransport(parsed: EquipmentResearch, warnings: string[]): EquipmentTransportTopology | undefined {
+  if (parsed.equipmentKind === "device") {
+    if (parsed.transport) warnings.push("Transport topology was ignored because this product was classified as a standard device.");
+    return undefined;
+  }
+  if (!parsed.transport) {
+    warnings.push("This product was identified as a snake, but its endpoint topology was not supported. Configure the sides manually.");
+    return undefined;
+  }
+  const expectedEndpoints = parsed.equipmentKind === "split-snake" ? 3 : 2;
+  if (parsed.transport.kind !== parsed.equipmentKind) {
+    warnings.push(`The snake topology kind did not match ${parsed.equipmentKind}; the equipment classification was used.`);
+  }
+  if (parsed.transport.endpoints.length !== expectedEndpoints) {
+    warnings.push(`${parsed.equipmentKind === "split-snake" ? "A split snake" : "A snake"} needs exactly ${expectedEndpoints} endpoints. Review the imported topology.`);
+    return undefined;
+  }
+  const usedIds = new Set<string>();
+  const endpoints = parsed.transport.endpoints.map((endpoint, index) => {
+    const baseId = endpoint.id.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `side-${index + 1}`;
+    const id = usedIds.has(baseId) ? `${baseId}-${index + 1}` : baseId;
+    usedIds.add(id);
+    return { id, label: endpoint.label.trim(), style: endpoint.style };
+  });
+
+  // "Drop snake" consistently describes a stage-box-to-fan assembly. Product
+  // copy sometimes calls the individual connectors a female fanout even when
+  // they are mounted in a box, so normalize that common catalog ambiguity.
+  if (/\bdrop\s+snake\b/i.test(`${parsed.name} ${parsed.description ?? ""}`) && parsed.equipmentKind === "snake") {
+    const inputEndpointIds = new Set(parsed.portGroups
+      .filter((group) => group.direction === "input" && group.endpointId)
+      .map((group) => group.endpointId!.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")));
+    const inputEndpoint = endpoints.find((endpoint) => inputEndpointIds.has(endpoint.id)) ?? endpoints[0];
+    inputEndpoint.style = "box";
+    if (/fan(?:out)?/i.test(inputEndpoint.label)) inputEndpoint.label = "Side A · input box";
+  }
+  return {
+    kind: parsed.equipmentKind,
+    ...(parsed.transport.length ? { length: parsed.transport.length } : {}),
+    lengthUnit: parsed.transport.lengthUnit,
+    channelCount: parsed.transport.channelCount,
+    endpoints,
+  };
 }
 
 function normalizedReferenceImages(snapshot: PageSnapshot | null, selectedUrls: string[], sourceUrl: string) {
@@ -414,11 +484,19 @@ function normalizedReferenceImages(snapshot: PageSnapshot | null, selectedUrls: 
     ...selectedUrls.filter((url) => available.has(url)),
     ...snapshot.imageUrls,
   ];
-  return [...new Set(ranked)].slice(0, 6).map((url): EquipmentReferenceImage => ({
-    url,
-    sourceUrl,
-    altText: snapshot.title,
-  }));
+  const seenImages = new Set<string>();
+  return ranked.flatMap((url): EquipmentReferenceImage[] => {
+    try {
+      const parsed = new URL(url);
+      if (!/\.(?:avif|jpe?g|png|webp)$/i.test(parsed.pathname)) return [];
+      const key = `${parsed.origin}${parsed.pathname}`;
+      if (seenImages.has(key)) return [];
+      seenImages.add(key);
+      return [{ url, sourceUrl, altText: snapshot.title }];
+    } catch {
+      return [];
+    }
+  }).slice(0, 6);
 }
 
 function safeExternalSource(value: { url: string; title: string | null }) {
@@ -447,6 +525,11 @@ async function researchEquipment(sourceUrl: URL, snapshot: PageSnapshot | null, 
     "For combo jacks, choose the closest supported connector ID, explain the combo behavior in specification, and add a warning if the schema cannot represent it exactly.",
     "Numbered connector banks should be a single group with the bank count and a short singular label prefix, such as Local input or AES50.",
     "Use separate one-port groups for individually named or lettered connectors, such as AES50 A and AES50 B, so their exact labels are preserved.",
+    "Classify ordinary gear as device. Classify a two-ended analog multicore cable assembly as snake, including drop snakes and box-to-box extension snakes. Classify one input side feeding two matched output sides as split-snake.",
+    "For snakes, transport must describe the fixed physical length, total routed channel count, and every movable endpoint. Use endpoint IDs such as side-a, side-b, side-b-foh, and side-b-monitors.",
+    "Every snake port group must name its endpointId. Groups that are internally paired must reuse the same channelKeyPrefix. Example: an 8-channel drop snake has eight Side A inputs and eight Side B outputs with channelKeyPrefix channel on both groups.",
+    "For a split snake, the Side A input group and both matched Side B output groups must all use the same channelKeyPrefix so one label carries to both destinations.",
+    "A snake may contain sends and returns. Give separate routes distinct prefixes, such as send and return. Endpoint style is box for a stage box, fan for a connector fanout, and tail for a short bundled tail. A product described as a drop snake normally has a stage box at one end and a fanout at the other; do not label both endpoints as fanouts unless the product is explicitly fan-to-fan or fantail-to-fantail.",
     "The description must be original concise catalog prose, not copied marketing text.",
     `Allowed connectorTypeId values: ${CONNECTOR_TYPES.map((item) => `${item.id} (${item.label})`).join(", ")}.`,
     `Allowed signalType values: ${SIGNAL_TYPES.map((item) => `${item.id} (${item.label})`).join(", ")}.`,
@@ -534,7 +617,11 @@ async function researchEquipment(sourceUrl: URL, snapshot: PageSnapshot | null, 
   const warnings = [...parsed.warnings];
   if (pageWarning) warnings.unshift(pageWarning);
   if (!parsed.portGroups.length) warnings.push("No supported physical ports were found. Add the port map manually.");
-  const ports = importedPorts(parsed.portGroups, warnings);
+  const transport = importedTransport(parsed, warnings);
+  if (parsed.equipmentKind !== "device" && transport && parsed.portGroups.some((group) => !group.endpointId || !group.channelKeyPrefix)) {
+    warnings.push("Some snake ports are missing endpoint or channel-route mappings. Review the channel map before saving.");
+  }
+  const ports = importedPorts(parsed.portGroups, warnings, transport);
   const observedAt = Date.now();
   const canonicalSourceUrl = snapshot?.finalUrl ?? sourceUrl.toString();
   const externalSources = [...parsed.sources, ...citationSources].map(safeExternalSource).filter((item): item is NonNullable<typeof item> => Boolean(item));
@@ -548,6 +635,8 @@ async function researchEquipment(sourceUrl: URL, snapshot: PageSnapshot | null, 
     manufacturer: parsed.manufacturer?.trim() || undefined,
     model: parsed.model?.trim() || undefined,
     category: parsed.category.trim() || "Other",
+    equipmentKind: transport ? parsed.equipmentKind : "device",
+    ...(transport ? { transport } : {}),
     description: parsed.description?.trim() || undefined,
     purchaseSource: {
       url: canonicalSourceUrl,

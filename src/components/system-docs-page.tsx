@@ -32,6 +32,7 @@ const sectionIds = [
   "views",
   "cables",
   "inventory",
+  "procurement",
   "images",
   "research",
   "containers",
@@ -51,15 +52,15 @@ const buildPhases = [
   },
   {
     phase: "Phase 1",
-    title: "Stage plot",
-    status: "Next",
-    detail: "Scaled stage dimensions, separate physical positions, groups, route waypoints, shared cable lanes, and measured cable lengths.",
+    title: "Gear registry and purchasing",
+    status: "Working now",
+    detail: "Reusable definitions, permanent asset IDs, owners, locations, physical photos, purchase queues, grouped orders, payment and shipment details, and first check-in.",
   },
   {
     phase: "Phase 2",
-    title: "Gear tracker",
-    status: "Planned",
-    detail: "Gear definitions, individually tagged assets, owners, providers, locations, images, assignment swapping, and compatibility checks.",
+    title: "Stage plot",
+    status: "Next",
+    detail: "Scaled stage dimensions, separate physical positions, groups, route waypoints, shared cable lanes, and measured cable lengths.",
   },
   {
     phase: "Phase 3",
@@ -116,7 +117,7 @@ function Decision({ children }: { children: React.ReactNode }) {
 }
 
 export function SystemDocsPage() {
-  const [openSections, setOpenSections] = useState<string[]>(["core", "containers", "build"]);
+  const [openSections, setOpenSections] = useState<string[]>(["core", "inventory", "procurement", "build"]);
 
   return (
     <AppShell>
@@ -134,7 +135,7 @@ export function SystemDocsPage() {
               <div className="mt-5 flex flex-wrap gap-2">
                 <Badge variant="secondary">Product blueprint</Badge>
                 <Badge variant="outline">Living documentation</Badge>
-                <Badge variant="outline">Updated August 3, 2026</Badge>
+                <Badge variant="outline">Updated August 4, 2026</Badge>
               </div>
             </div>
             <aside className="border-t bg-secondary/45 p-5 sm:p-7 lg:border-t-0 lg:border-l lg:p-8">
@@ -145,10 +146,16 @@ export function SystemDocsPage() {
               <p className="mt-3 text-sm leading-6 text-muted-foreground">
                 Containers add one more layer: a bag knows what belongs inside it, and everything actually inside inherits the bag&apos;s effective location.
               </p>
-              <Link href="/setups" className={buttonVariants({ variant: "outline", className: "mt-5" })}>
-                <RouteIcon data-icon="inline-start" />
-                Open setups
-              </Link>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <Link href="/setups" className={buttonVariants({ variant: "outline" })}>
+                  <RouteIcon data-icon="inline-start" />
+                  Open setups
+                </Link>
+                <Link href="/gear" className={buttonVariants({ variant: "outline" })}>
+                  <BoxesIcon data-icon="inline-start" />
+                  Open gear
+                </Link>
+              </div>
             </aside>
           </div>
         </section>
@@ -197,7 +204,9 @@ export function SystemDocsPage() {
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">The fulfillment view of what is required, who supplies it, where it belongs, and where it was last observed.</p>
                 <ul className="mt-4 grid gap-2 text-sm text-muted-foreground">
                   <li>Inventory IDs and QR labels</li>
-                  <li>Owned, backline, or shopping assignments</li>
+                  <li>Planned, ordered, in-transit, and on-hand assets</li>
+                  <li>Grouped orders, payment, tracking, and expected delivery</li>
+                  <li>Owned, hired-musician, backline, or shopping assignments</li>
                   <li>Containers and packing manifests</li>
                   <li>History, shortages, and advance lists</li>
                 </ul>
@@ -242,6 +251,55 @@ export function SystemDocsPage() {
           </ol>
         </section>
 
+        <section className="swell-panel p-5 sm:p-7" aria-labelledby="gear-workflow-heading">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-3xl">
+              <div className="flex flex-wrap items-center gap-2"><Badge variant="secondary">Available now</Badge><p className="swell-page-kicker">Using the gear system</p></div>
+              <h2 id="gear-workflow-heading" className="mt-2 text-2xl font-semibold tracking-tight">Create the model once, then follow each real item from plan to possession</h2>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground sm:text-base">A definition describes a product. An asset reserves one permanent inventory identity. An order groups assets for purchasing. A check-in proves a physical item has arrived somewhere.</p>
+            </div>
+            <Link href="/gear" className={buttonVariants({ className: "shrink-0" })}><BoxesIcon data-icon="inline-start" />Open gear system</Link>
+          </div>
+          <ol className="mt-6 grid overflow-hidden rounded-lg border bg-background md:grid-cols-4 md:divide-x">
+            {[
+              ["1", "Define", "Paste a product URL into New definition. The research bot drafts model data, price, photos, and exact ports for review."],
+              ["2", "Reserve", "Create planned gear from /gear or directly inside a setup node. It receives its permanent asset ID immediately."],
+              ["3", "Order", "Select planned assets, group them into one vendor order, and record payer, account label, order status, shipment, and expected arrival."],
+              ["4", "Receive", "Attach the QR label, add physical photos or serial number, and check the item into its first location. The check-in starts its history."],
+            ].map(([number, title, description]) => (
+              <li key={number} className="border-b p-4 last:border-b-0 md:border-b-0 md:p-5">
+                <span className="font-mono text-xs text-muted-foreground">STEP {number}</span>
+                <h3 className="mt-2 font-semibold">{title}</h3>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p>
+              </li>
+            ))}
+          </ol>
+          <div className="mt-4 grid gap-3 rounded-lg bg-muted/45 p-4 md:grid-cols-3">
+            <div><p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">From a setup</p><p className="mt-1 text-sm">Open a node, choose Owned / planned asset, then select an existing match or create planned gear in place.</p></div>
+            <div><p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">From the gear page</p><p className="mt-1 text-sm">Use Plan gear for something not yet purchased, or Register owned gear for something already in hand.</p></div>
+            <div><p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Ownership versus possession</p><p className="mt-1 text-sm">An asset can belong to Cron while still being ordered. Only its first check-in says that Swell physically has it.</p></div>
+          </div>
+        </section>
+
+        <section className="swell-panel p-5 sm:p-7" aria-labelledby="asset-id-heading">
+          <div className="max-w-3xl">
+            <div className="flex flex-wrap items-center gap-2"><Badge variant="secondary">Available now</Badge><p className="swell-page-kicker">Permanent asset IDs</p></div>
+            <h2 id="asset-id-heading" className="mt-2 text-2xl font-semibold tracking-tight">Short enough to type, structured enough to recognize</h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground sm:text-base">
+              Every new asset receives a suggested uppercase ID based on the item. The system finds the highest existing sequence for that three-letter prefix and suggests the next one without reusing retired IDs.
+            </p>
+          </div>
+          <div className="mt-6 grid gap-3 md:grid-cols-3">
+            <Definition term="Ordinary gear"><code className="text-foreground">HXS-01</code> is the first HX Stomp asset. The next HXS item is suggested as <code className="text-foreground">HXS-02</code>.</Definition>
+            <Definition term="Cables"><code className="text-foreground">XLR-04-25</code> means XLR cable 04 at 25 ft. The last segment records length and does not affect the next XLR sequence.</Definition>
+            <Definition term="Forgiving search">Typing <code className="text-foreground">trs31</code>, <code className="text-foreground">TRS-31</code>, or <code className="text-foreground">tRs31</code> finds official ID <code className="text-foreground">TRS-31-15</code>.</Definition>
+          </div>
+          <div className="mt-4 grid gap-3 rounded-lg bg-muted/45 p-4 md:grid-cols-2">
+            <div><p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Cable barcode</p><p className="mt-1 text-sm">Code 128 encodes the bare ID, such as <code>XLR-04-25</code>, to keep the heat-shrink label narrow.</p></div>
+            <div><p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">QR destination</p><p className="mt-1 text-sm">A QR label points to <code>theswell.live/g/xlr-04-25</code>, which opens Gear already filtered to the matching asset.</p></div>
+          </div>
+        </section>
+
         <section className="swell-panel p-5 sm:p-7" aria-labelledby="container-heading">
           <div className="max-w-3xl">
             <div className="flex items-center gap-2">
@@ -261,9 +319,9 @@ export function SystemDocsPage() {
                 <Badge variant="outline">14 items</Badge>
               </div>
               <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                <span className="rounded border bg-card px-2 py-1.5">XLR-001</span>
-                <span className="rounded border bg-card px-2 py-1.5">XLR-002</span>
-                <span className="rounded border bg-card px-2 py-1.5">XLR-003</span>
+                <span className="rounded border bg-card px-2 py-1.5">XLR-01-25</span>
+                <span className="rounded border bg-card px-2 py-1.5">XLR-02-25</span>
+                <span className="rounded border bg-card px-2 py-1.5">XLR-03-50</span>
                 <span className="rounded border bg-card px-2 py-1.5">+ 11 more</span>
               </div>
               <p className="mt-4 flex items-center gap-2 text-xs text-muted-foreground"><ScanLineIcon className="size-4" aria-hidden />Scan or select each cord into the bag.</p>
@@ -280,7 +338,7 @@ export function SystemDocsPage() {
                 <Badge variant="secondary">14 of 14 verified</Badge>
               </div>
               <h3 className="mt-4 font-semibold">Cable Duffle A</h3>
-              <p className="mt-1 text-sm text-muted-foreground">Asset BAG-003, QR labeled</p>
+              <p className="mt-1 text-sm text-muted-foreground">Asset BAG-01, QR labeled</p>
               <Separator className="my-4" />
               <div className="grid gap-2 text-xs text-muted-foreground">
                 <p><span className="font-medium text-foreground">Manifest:</span> what should be inside</p>
@@ -304,7 +362,7 @@ export function SystemDocsPage() {
 
           <div className="mt-5 grid gap-3 rounded-lg bg-muted/55 p-4 md:grid-cols-3">
             <div><p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Direct event</p><p className="mt-1 text-sm">Cable Duffle A checked into Ike&apos;s car.</p></div>
-            <div><p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Inherited answer</p><p className="mt-1 text-sm">XLR-001 is in Ike&apos;s car via Cable Duffle A.</p></div>
+            <div><p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Inherited answer</p><p className="mt-1 text-sm">XLR-01-25 is in Ike&apos;s car via Cable Duffle A.</p></div>
             <div><p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Packing check</p><p className="mt-1 text-sm">The bag manifest still shows missing or extra contents.</p></div>
           </div>
         </section>
@@ -421,6 +479,27 @@ SetupNode {
                     <li>Selecting any segment selects the whole cable and the same parts-list item.</li>
                     <li>A female Combo XLR/TRS equipment port accepts either an XLR male or 1/4-inch TRS male cable end; the cable still records its one actual plug type.</li>
                   </ul>
+                  <div className="flex flex-col gap-3">
+                    <h3 className="text-base font-semibold">Multichannel snakes</h3>
+                    <p className="leading-6 text-muted-foreground">A snake is one physical gear requirement with multiple movable ends. A normal or extension snake creates Side A and Side B nodes. A split snake creates Side A plus matched FOH and monitor outputs.</p>
+                    <pre className="overflow-x-auto rounded-md border bg-muted p-4 text-xs leading-6 text-foreground"><code>{`EquipmentTransportTopology {
+  kind: "snake" | "split-snake",
+  length?, lengthUnit, channelCount,
+  endpoints: [{ id, label, style: "box" | "fan" | "tail" }]
+}
+
+EquipmentPort {
+  ...physicalConnectorData,
+  endpointId,
+  channelKey // shared across internally paired connectors
+}`}</code></pre>
+                    <ul className="grid gap-2 pl-5 text-sm leading-6 text-muted-foreground marker:text-primary">
+                      <li>Connecting Guitar A to channel 1 labels every paired output <strong className="text-foreground">Snake ch 1 (Guitar A)</strong>.</li>
+                      <li>A split snake carries the same label to both Side B channel 1 outputs.</li>
+                      <li>The thick internal trunk shows fixed length and channel count but is not another cable or inventory requirement.</li>
+                      <li>All endpoint nodes share one fulfillment assignment and appear once in the Gear list.</li>
+                    </ul>
+                  </div>
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -429,26 +508,28 @@ SetupNode {
               <AccordionTrigger className="min-h-16"><DetailHeading index="04" title="Inventory assets and fulfillment" note="Owned gear versus outside needs" /></AccordionTrigger>
               <AccordionContent>
                 <div className="flex flex-col gap-4 text-foreground">
-                  <pre className="overflow-x-auto rounded-md border bg-muted p-4 text-xs leading-6 text-foreground"><code>{`Party {
-  id, displayName,
-  type: "band_member" | "guest_musician" |
-        "company" | "venue" | "other",
-  memberId?, contact?, active
+                  <pre className="overflow-x-auto rounded-md border bg-muted p-4 text-xs leading-6 text-foreground"><code>{`GearParty {
+  id, name,
+  kind: "person" | "band" | "company" |
+        "provider" | "vendor",
+  notes?, status
 }
 
 InventoryAsset {
-  id, definitionId, qrCode,
-  displayName, serialNumber?, photos?,
-  ownerPartyId, attributes,
-  currentPlacement,
-  effectiveLocationId?,
-  lastPlacedAt?, active
+  id, assetTag, definitionId, label,
+  // assetTag: HXS-01 or cable form XLR-04-25
+  lifecycleStatus: "planned" | "cart" | "ordered" |
+    "in_transit" | "awaiting_check_in" | "active" |
+    "retired" | "cancelled",
+  ownerPartyId?, currentLocationId?,
+  serialNumber?, photos?, sourceSetupId?,
+  purchaseOrderId?, purchaseOrderLineId?
 }
 
 Assignment {
-  method: "owned_asset" | "external" | "purchase",
-  providedByPartyId: string | null,
-  assetId: string | null,
+  fulfillment: "owned" | "rent" | "buy" | "unplanned",
+  assignedAssetId?: string,
+  providerPartyId?: string,
   notes?: string
 }`}</code></pre>
                   <div className="grid gap-3 md:grid-cols-2">
@@ -457,6 +538,7 @@ Assignment {
                   </div>
                   <ul className="grid gap-2 pl-5 text-sm leading-6 text-muted-foreground marker:text-primary">
                     <li>People and organizations live in one editable party registry. A party can own gear, provide gear for a setup, or do both.</li>
+                    <li>One inventory asset can fulfill only one node in a setup. This applies equally to on-hand, planned, ordered, and in-transit assets; two required mixers need two distinct asset records.</li>
                     <li>A hired guitarist can own tracked guitar, pedal, and cable assets, or fulfill generic external requirements when Swell does not track their exact items.</li>
                     <li>The same drum-kit requirement can use Cron&apos;s tagged kit, a guest drummer&apos;s tagged kit, or an untracked backline assignment in different setup variants.</li>
                     <li>Shopping list is an assignment method, not an owner. Backline is a provider, not a warehouse Swell manages.</li>
@@ -467,8 +549,47 @@ Assignment {
               </AccordionContent>
             </AccordionItem>
 
+            <AccordionItem value="procurement">
+              <AccordionTrigger className="min-h-16"><DetailHeading index="05" title="Planned gear, orders, shipping, and receiving" note="A permanent ID before the physical item exists" /></AccordionTrigger>
+              <AccordionContent>
+                <div className="flex flex-col gap-4 text-foreground">
+                  <p className="leading-6 text-muted-foreground">Planned gear is not a vague shopping-list row. It is an inventory asset with its future owner, definition, source setup, and permanent QR identity already reserved. Procurement status changes without breaking the setup reference.</p>
+                  <pre className="overflow-x-auto rounded-md border bg-muted p-4 text-xs leading-6 text-foreground"><code>{`PurchaseOrder {
+  id, vendor, vendorUrl?,
+  status: "draft" | "cart" | "ordered" |
+    "partially_shipped" | "shipped" | "received" |
+    "cancelled",
+  paymentStatus: "not_paid" | "partially_paid" |
+    "paid" | "refunded",
+  orderedByPartyId?, paidByPartyId?,
+  paymentAccountLabel?, orderNumber?,
+  carrier?, trackingNumber?, expectedArrivalDate?,
+  orderedDate?, shippedDate?, receivedDate?,
+  lines: PurchaseOrderLine[]
+}
+
+PurchaseOrderLine {
+  id, definitionId, description, quantity,
+  assetIds: string[], productUrl?, unitPrice?, currency?
+}`}</code></pre>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <Definition term="Purchase queue">Every asset whose lifecycle is planned, in cart, ordered, in transit, or awaiting first check-in.</Definition>
+                    <Definition term="Grouped order">Cron can call Sweetwater once and attach nine reserved assets to one vendor, payer, account label, order number, and shipment record.</Definition>
+                    <Definition term="Receiving boundary">Delivered means the vendor says it arrived. Checked in means Swell observed the physical item at a named location.</Definition>
+                  </div>
+                  <ol className="grid gap-2 text-sm leading-6 text-muted-foreground sm:grid-cols-2">
+                    <li className="rounded-md border bg-background p-3"><strong className="text-foreground">1. Plan:</strong> create the asset and assign its intended owner.</li>
+                    <li className="rounded-md border bg-background p-3"><strong className="text-foreground">2. Buy:</strong> attach assets to an order and update cart, payment, and order details.</li>
+                    <li className="rounded-md border bg-background p-3"><strong className="text-foreground">3. Track:</strong> add carrier, tracking number, shipped date, and expected arrival.</li>
+                    <li className="rounded-md border bg-background p-3"><strong className="text-foreground">4. Receive:</strong> add serial/photos, attach the QR label, and create the first append-only check-in.</li>
+                  </ol>
+                  <p className="text-sm leading-6 text-muted-foreground">Payment accounts are friendly references such as “Band Amex” or “Cron personal card.” The system never stores card numbers or banking credentials.</p>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
             <AccordionItem value="images">
-              <AccordionTrigger className="min-h-16"><DetailHeading index="05" title="Icons, reference photos, and asset photos" note="Three image roles with different jobs" /></AccordionTrigger>
+              <AccordionTrigger className="min-h-16"><DetailHeading index="06" title="Icons, reference photos, and asset photos" note="Three image roles with different jobs" /></AccordionTrigger>
               <AccordionContent>
                 <div className="flex flex-col gap-4 text-foreground">
                   <div className="grid gap-3 md:grid-cols-3">
@@ -492,10 +613,11 @@ InventoryAsset {
             </AccordionItem>
 
             <AccordionItem value="research">
-              <AccordionTrigger className="min-h-16"><DetailHeading index="06" title="AI-assisted equipment research" note="Paste a product URL, then review the draft" /></AccordionTrigger>
+              <AccordionTrigger className="min-h-16"><DetailHeading index="07" title="AI-assisted equipment research" note="Paste a product URL, then review the draft" /></AccordionTrigger>
               <AccordionContent>
                 <div className="flex flex-col gap-4 text-foreground">
-                  <p className="leading-6 text-muted-foreground">In the New equipment dialog, an administrator can paste a public product page and ask OpenRouter to research it. The importer fills the form but never creates gear until the administrator reviews and saves it.</p>
+                  <p className="leading-6 text-muted-foreground">From the setup equipment rack, an administrator can create a definition or edit an existing one. Paste a public product page and OpenRouter can replace the draft product data, price, reference photos, and exact physical port map. Nothing changes until the administrator reviews and saves it.</p>
+                  <p className="leading-6 text-muted-foreground">Removing a definition archives it from the rack. Existing setup nodes and inventory assets retain their saved references, so cleaning up presets does not damage past plans.</p>
                   <div className="grid gap-3 md:grid-cols-3">
                     <Definition term="Server extraction">Reads the exact page, captures source metadata and direct product-photo candidates, and blocks private-network URLs and oversized responses.</Definition>
                     <Definition term="Structured model draft">The configured OpenRouter model returns identity, description, observed price, exact mixed port groups, confidence, warnings, and sources under a strict schema.</Definition>
@@ -515,7 +637,7 @@ Equipment research stores:
             </AccordionItem>
 
             <AccordionItem value="containers">
-              <AccordionTrigger className="min-h-16"><DetailHeading index="07" title="Containers, manifests, and nested placement" note="What belongs inside versus what is actually inside" /></AccordionTrigger>
+              <AccordionTrigger className="min-h-16"><DetailHeading index="08" title="Containers, manifests, and nested placement" note="What belongs inside versus what is actually inside" /></AccordionTrigger>
               <AccordionContent>
                 <div className="flex flex-col gap-4 text-foreground">
                   <p className="leading-6 text-muted-foreground">Bags, road cases, racks, bins, and trunks are normal inventory assets with a container capability. A manifest is the expected organization. Placement events establish the actual hierarchy.</p>
@@ -551,7 +673,7 @@ ContainerManifest {
             </AccordionItem>
 
             <AccordionItem value="check-ins">
-              <AccordionTrigger className="min-h-16"><DetailHeading index="08" title="Mobile scanning and location history" note="Append-only observations" /></AccordionTrigger>
+              <AccordionTrigger className="min-h-16"><DetailHeading index="09" title="Mobile scanning and location history" note="Append-only observations" /></AccordionTrigger>
               <AccordionContent>
                 <div className="flex flex-col gap-4 text-foreground">
                   <p className="leading-6 text-muted-foreground">The atomic operation is still a check-in observation. Its destination can now be a named location or another inventory asset that acts as a container.</p>
@@ -578,7 +700,7 @@ ContainerManifest {
             </AccordionItem>
 
             <AccordionItem value="packing">
-              <AccordionTrigger className="min-h-16"><DetailHeading index="09" title="Packing sessions, shortages, and lists" note="Useful answers from the same records" /></AccordionTrigger>
+              <AccordionTrigger className="min-h-16"><DetailHeading index="10" title="Packing sessions, shortages, and lists" note="Useful answers from the same records" /></AccordionTrigger>
               <AccordionContent>
                 <div className="flex flex-col gap-4 text-foreground">
                   <pre className="overflow-x-auto rounded-md border bg-muted p-4 text-xs leading-6 text-foreground"><code>{`PackingSession {
@@ -605,23 +727,23 @@ ContainerManifest {
             </AccordionItem>
 
             <AccordionItem value="firestore">
-              <AccordionTrigger className="min-h-16"><DetailHeading index="10" title="Firestore collections and access" note="Implementation-oriented storage" /></AccordionTrigger>
+              <AccordionTrigger className="min-h-16"><DetailHeading index="11" title="Firestore collections and access" note="Implementation-oriented storage" /></AccordionTrigger>
               <AccordionContent>
                 <div className="flex flex-col gap-4 text-foreground">
-                  <pre className="overflow-x-auto rounded-md border bg-muted p-4 text-xs leading-6 text-foreground"><code>{`/gearDefinitions/{definitionId}
+                  <pre className="overflow-x-auto rounded-md border bg-muted p-4 text-xs leading-6 text-foreground"><code>{`/equipmentTemplates/{definitionId}          // reusable gear definitions
 /inventoryAssets/{assetId}
 /inventoryAssets/{assetId}/checkIns/{checkInId}
-/containerManifests/{containerAssetId}
+/gearParties/{partyId}
+/gearLocations/{locationId}
+/purchaseOrders/{orderId}
 /setups/{setupId}
-/setups/{setupId}/items/{setupItemId}
-/setups/{setupId}/cables/{cableId}
-/packingSessions/{sessionId}
-/locations/{locationId}
-/parties/{partyId}
+/setups/{setupId}/graphs/current
+/containerManifests/{containerAssetId}       // planned
+/packingSessions/{sessionId}                 // planned
 
 Firebase Storage:
 /setup-designer/equipment/{templateId}/{...}  // current icon + detail photos
-/inventory-photos/{assetId}/{...}              // planned asset photos`}</code></pre>
+/gear-assets/{assetId}/{...}                   // physical asset photos`}</code></pre>
                   <ul className="grid gap-2 pl-5 text-sm leading-6 text-muted-foreground marker:text-primary">
                     <li>Check-ins are append-only. Asset placement and effective-location fields are query snapshots.</li>
                     <li>A transaction or server function updates descendants when a container moves and rejects containment cycles.</li>
@@ -633,7 +755,7 @@ Firebase Storage:
             </AccordionItem>
 
             <AccordionItem value="build">
-              <AccordionTrigger className="min-h-16"><DetailHeading index="11" title="Recommended build sequence" note="Useful slices without data-model dead ends" /></AccordionTrigger>
+              <AccordionTrigger className="min-h-16"><DetailHeading index="12" title="Recommended build sequence" note="Useful slices without data-model dead ends" /></AccordionTrigger>
               <AccordionContent>
                 <div className="overflow-hidden rounded-md border bg-background text-foreground">
                   {buildPhases.map((phase) => (
@@ -648,13 +770,16 @@ Firebase Storage:
             </AccordionItem>
 
             <AccordionItem value="decisions">
-              <AccordionTrigger className="min-h-16"><DetailHeading index="12" title="Decisions already made" note="Guardrails for implementation" /></AccordionTrigger>
+              <AccordionTrigger className="min-h-16"><DetailHeading index="13" title="Decisions already made" note="Guardrails for implementation" /></AccordionTrigger>
               <AccordionContent>
                 <ul className="grid gap-2 text-foreground">
                   <Decision>Setup diagrams and inventory editing are admin-only.</Decision>
                   <Decision>Stage Plot and Signal Diagram share identities but store separate positions.</Decision>
                   <Decision>Cable length comes from the physical route, never from React Flow screen pixels.</Decision>
                   <Decision>Every equipment and cable requirement can use an exact asset, an outside provider, or a purchase.</Decision>
+                  <Decision>A planned asset receives its permanent asset ID before purchase; ownership and physical possession remain separate facts.</Decision>
+                  <Decision>Asset IDs use a canonical uppercase three-letter prefix and sequence. Cable IDs may add a final two-digit length; lookup ignores case and punctuation.</Decision>
+                  <Decision>Purchase orders group reserved assets and store workflow metadata, while check-in remains the boundary that establishes physical possession and location.</Decision>
                   <Decision>Owners and setup providers come from one open-ended party registry that supports members, hired musicians, venues, and companies.</Decision>
                   <Decision>Combo XLR/TRS is a port-only type that accepts XLR or TRS male cable ends without turning the cable itself into a combo connector.</Decision>
                   <Decision>Each gear definition has one transparent icon and may have reusable inspection photos. Each physical asset has its own documentary photo gallery.</Decision>
@@ -674,7 +799,7 @@ Firebase Storage:
             <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-background text-primary"><ImageIcon className="size-5" aria-hidden /></span>
             <div>
               <h2 id="documentation-roadmap-heading" className="text-lg font-semibold">How this page will evolve</h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Today this is the product blueprint. As each feature ships, its section will gain real instructions, screenshots, examples, common mistakes, and links into the working tool. Planned guides include gear tracking, container packing, stage plotting, signal routing, and show advances.</p>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">This began as the product blueprint. The signal router, AI gear definitions, planned and physical assets, grouped purchasing, and manual check-in sections now describe working tools. As the remaining features ship, this page will gain screenshots, common mistakes, mobile QR instructions, container packing, stage plotting, and show-advance guides.</p>
             </div>
           </div>
         </section>

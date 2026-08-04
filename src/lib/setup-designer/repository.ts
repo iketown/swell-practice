@@ -17,6 +17,7 @@ import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 
 import { sanitizeFilename } from "@/lib/domain";
 import { db, hasFirebaseConfig, storage } from "@/lib/firebase";
+import { duplicateAssetAssignmentMessage, findDuplicateAssetAssignment } from "@/lib/setup-designer/asset-assignments";
 import {
   createSetupId,
   emptySetupGraph,
@@ -25,6 +26,7 @@ import {
   type EquipmentPurchaseSource,
   type EquipmentReferenceImage,
   type EquipmentTemplate,
+  type EquipmentTransportTopology,
   type SetupGraph,
   type SetupMetadata,
   type SetupWorkspace,
@@ -32,6 +34,7 @@ import {
 import { normalizeSetupGraph, setupGraphFromData } from "@/lib/setup-designer/serialization";
 import { SAMPLE_EQUIPMENT_TEMPLATES, SAMPLE_SETUP_WORKSPACE } from "@/lib/setup-designer/sample-data";
 import { equipmentPortsFromData } from "@/lib/setup-designer/ports";
+import { externalCableCount } from "@/lib/setup-designer/snake-topology";
 
 const DEMO_STORE_KEY = "swell-parts:setup-designer:v1";
 
@@ -75,6 +78,8 @@ function readDemoStore(): DemoStore {
       ...parsed,
       templates: parsed.templates.map((template) => ({
         ...template,
+        equipmentKind: template.equipmentKind === "snake" || template.equipmentKind === "split-snake" ? template.equipmentKind : "device",
+        transport: transportFromData(template.transport),
         ports: equipmentPortsFromData(template.ports),
         referenceImages: Array.isArray(template.referenceImages) ? template.referenceImages : [],
       })),
@@ -183,6 +188,29 @@ function aiImportFromData(value: unknown): EquipmentAiImport | undefined {
   };
 }
 
+function transportFromData(value: unknown): EquipmentTransportTopology | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const data = value as Record<string, unknown>;
+  if (data.kind !== "snake" && data.kind !== "split-snake") return undefined;
+  const expectedEndpoints = data.kind === "split-snake" ? 3 : 2;
+  const endpoints = Array.isArray(data.endpoints) ? data.endpoints.flatMap((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+    const endpoint = item as Record<string, unknown>;
+    if (typeof endpoint.id !== "string" || typeof endpoint.label !== "string") return [];
+    const style: "box" | "fan" | "tail" = endpoint.style === "fan" || endpoint.style === "tail" ? endpoint.style : "box";
+    return [{ id: endpoint.id, label: endpoint.label, style }];
+  }) : [];
+  if (endpoints.length !== expectedEndpoints) return undefined;
+  const rawLength = Number(data.length);
+  return {
+    kind: data.kind,
+    ...(Number.isFinite(rawLength) && rawLength > 0 ? { length: rawLength } : {}),
+    lengthUnit: data.lengthUnit === "m" ? "m" : "ft",
+    channelCount: Math.max(1, Math.floor(Number(data.channelCount) || 1)),
+    endpoints,
+  };
+}
+
 function templateFromData(id: string, value: Record<string, unknown>): EquipmentTemplate {
   return {
     id,
@@ -190,6 +218,8 @@ function templateFromData(id: string, value: Record<string, unknown>): Equipment
     manufacturer: typeof value.manufacturer === "string" && value.manufacturer ? value.manufacturer : undefined,
     model: typeof value.model === "string" && value.model ? value.model : undefined,
     category: String(value.category ?? "Other"),
+    equipmentKind: value.equipmentKind === "snake" || value.equipmentKind === "split-snake" ? value.equipmentKind : "device",
+    transport: transportFromData(value.transport),
     description: typeof value.description === "string" && value.description ? value.description : undefined,
     notes: typeof value.notes === "string" && value.notes ? value.notes : undefined,
     purchaseSource: purchaseSourceFromData(value.purchaseSource),
@@ -352,6 +382,10 @@ export async function saveSetupWorkspace(
 ): Promise<number> {
   const nextRevision = expectedRevision + 1;
   const graph = normalizeSetupGraph({ ...graphInput, revision: nextRevision });
+  const equipmentCount = new Set(graph.nodes.map((node) => node.data.assemblyId ?? node.id)).size;
+  const cableCount = externalCableCount(graph.edges);
+  const duplicateAsset = findDuplicateAssetAssignment(graph.nodes);
+  if (duplicateAsset) throw new Error(duplicateAssetAssignmentMessage(duplicateAsset));
   if (isDemoMode() || !db) {
     const store = readDemoStore();
     const index = store.setups.findIndex((setup) => setup.id === setupId);
@@ -361,8 +395,8 @@ export async function saveSetupWorkspace(
       ...store.setups[index],
       ...(sourceSetupId ? { sourceSetupId } : {}),
       revision: nextRevision,
-      nodeCount: graph.nodes.length,
-      cableCount: graph.edges.length,
+      nodeCount: equipmentCount,
+      cableCount,
       updatedAt: Date.now(),
     };
     store.graphs[setupId] = graph;
@@ -381,8 +415,8 @@ export async function saveSetupWorkspace(
     transaction.update(metadataRef, {
       ...(sourceSetupId ? { sourceSetupId } : {}),
       revision: nextRevision,
-      nodeCount: graph.nodes.length,
-      cableCount: graph.edges.length,
+      nodeCount: equipmentCount,
+      cableCount,
       updatedBy: actorId,
       updatedAt: serverTimestamp(),
     });
@@ -448,17 +482,64 @@ function equipmentTemplateDocumentValue(template: EquipmentTemplate) {
     manufacturer: template.manufacturer ?? "",
     model: template.model ?? "",
     category: template.category,
+    equipmentKind: template.equipmentKind,
+    transport: template.transport ? {
+      kind: template.transport.kind,
+      length: template.transport.length ?? null,
+      lengthUnit: template.transport.lengthUnit,
+      channelCount: template.transport.channelCount,
+      endpoints: template.transport.endpoints.map((endpoint) => ({ ...endpoint })),
+    } : null,
     description: template.description ?? "",
     notes: template.notes ?? "",
-    purchaseSource: template.purchaseSource ?? null,
-    referenceImages: template.referenceImages,
-    aiImport: template.aiImport ?? null,
+    purchaseSource: template.purchaseSource ? {
+      url: template.purchaseSource.url,
+      vendor: template.purchaseSource.vendor ?? "",
+      priceAmount: template.purchaseSource.priceAmount ?? null,
+      priceCurrency: template.purchaseSource.priceCurrency ?? "",
+      priceDisplay: template.purchaseSource.priceDisplay ?? "",
+      observedAt: template.purchaseSource.observedAt,
+    } : null,
+    referenceImages: template.referenceImages.map((image) => ({
+      url: image.url,
+      sourceUrl: image.sourceUrl,
+      altText: image.altText ?? "",
+    })),
+    aiImport: template.aiImport ? {
+      model: template.aiImport.model,
+      sourceUrl: template.aiImport.sourceUrl,
+      importedAt: template.aiImport.importedAt,
+      confidence: template.aiImport.confidence ?? "",
+      sources: template.aiImport.sources.map((source) => ({ url: source.url, title: source.title ?? "" })),
+      warnings: template.aiImport.warnings,
+    } : null,
     image: template.image ?? null,
     detailImages: template.detailImages ?? [],
-    ports: template.ports,
+    ports: template.ports.map((port) => ({
+      id: port.id,
+      direction: port.direction,
+      number: port.number,
+      label: port.label ?? "",
+      connector: {
+        typeId: port.connector.typeId,
+        label: port.connector.label,
+        gender: port.connector.gender,
+        specification: port.connector.specification ?? "",
+        acceptedCableTypeIds: port.connector.acceptedCableTypeIds ?? [],
+      },
+      signalType: port.signalType ?? "",
+      channelCapacity: port.channelCapacity ?? null,
+      endpointId: port.endpointId ?? "",
+      channelKey: port.channelKey ?? "",
+    })),
     showPortNumbers: template.showPortNumbers,
     showPortLabels: template.showPortLabels,
-    ownedUnits: template.ownedUnits,
+    ownedUnits: template.ownedUnits.map((unit) => ({
+      id: unit.id,
+      label: unit.label,
+      owner: unit.owner ?? "",
+      notes: unit.notes ?? "",
+    })),
     version: template.version,
     status: template.status,
   };
@@ -547,4 +628,56 @@ export async function createEquipmentTemplate(
     updatedAt: serverTimestamp(),
   });
   return templateValue;
+}
+
+export async function updateEquipmentTemplate(
+  template: EquipmentTemplate,
+  imageFile?: File,
+  onProgress?: (progress: number) => void,
+) {
+  const image = imageFile ? await uploadEquipmentImage(template.id, imageFile, onProgress) : template.image;
+  const updated: EquipmentTemplate = {
+    ...structuredClone(template),
+    ...(image ? { image } : {}),
+    version: template.version + 1,
+    status: "active",
+  };
+
+  if (isDemoMode() || !db) {
+    const store = readDemoStore();
+    const index = store.templates.findIndex((item) => item.id === updated.id);
+    if (index >= 0) store.templates[index] = updated;
+    else store.templates.push(updated);
+    writeDemoStore(store);
+    return updated;
+  }
+
+  await setDoc(doc(firestoreOrThrow(), "equipmentTemplates", updated.id), {
+    ...equipmentTemplateDocumentValue(updated),
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
+  return updated;
+}
+
+export async function archiveEquipmentTemplate(template: EquipmentTemplate) {
+  const archived: EquipmentTemplate = {
+    ...structuredClone(template),
+    version: template.version + 1,
+    status: "archived",
+  };
+
+  if (isDemoMode() || !db) {
+    const store = readDemoStore();
+    const index = store.templates.findIndex((item) => item.id === archived.id);
+    if (index >= 0) store.templates[index] = archived;
+    else store.templates.push(archived);
+    writeDemoStore(store);
+    return archived;
+  }
+
+  await setDoc(doc(firestoreOrThrow(), "equipmentTemplates", archived.id), {
+    ...equipmentTemplateDocumentValue(archived),
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
+  return archived;
 }

@@ -19,6 +19,26 @@ export function SignalCableEdge({
   const markerId = `setup-arrow-${id.replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const color = data?.color ?? "var(--primary)";
 
+  if (data?.internalTransport) {
+    const transport = data.internalTransport;
+    return (
+      <>
+        <BaseEdge id={`${id}-casing`} path={path} interactionWidth={0} style={{ stroke: "var(--background)", strokeWidth: 16 }} />
+        <BaseEdge id={id} path={path} interactionWidth={10} style={{ stroke: color, strokeWidth: 10, strokeLinecap: "round" }} />
+        <EdgeLabelRenderer>
+          <div
+            className="pointer-events-none absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-md border bg-card px-2 py-1 text-[10px] font-semibold text-card-foreground shadow-sm"
+            style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
+          >
+            <span>{transport.channelCount} ch</span>
+            {data.estimatedLength ? <span className="text-muted-foreground">· {data.estimatedLength} {data.lengthUnit}</span> : null}
+            <span className="text-muted-foreground">· {transport.kind === "split-snake" ? "split trunk" : "snake trunk"}</span>
+          </div>
+        </EdgeLabelRenderer>
+      </>
+    );
+  }
+
   return (
     <>
       <defs>

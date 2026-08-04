@@ -29,6 +29,7 @@ export function SectionTabs() {
         ...baseTabs,
         { href: "/assignments", label: "Assignments" },
         { href: "/setups", label: "Setups" },
+        { href: "/gear", label: "Gear" },
         { href: "/docs", label: "Docs" },
       ]
     : baseTabs;

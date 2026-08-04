@@ -1,4 +1,5 @@
-import { portDisplayName, portsByDirection } from "@/lib/setup-designer/ports";
+import { portsByDirection } from "@/lib/setup-designer/ports";
+import { portDisplayNameForNode } from "@/lib/setup-designer/snake-topology";
 import type {
   CableEdge,
   CableRunGroup,
@@ -21,7 +22,7 @@ function normalizedCableKey(edge: CableEdge) {
 export function deriveCableRuns(nodes: readonly SetupNode[], edges: readonly CableEdge[]): CableRunRow[] {
   const nodeMap = new Map(nodes.map((node) => [node.id, node]));
 
-  return edges.map((edge) => {
+  return edges.filter((edge) => !edge.data.internalTransport).map((edge) => {
     const sourceNode = nodeMap.get(edge.source);
     const targetNode = nodeMap.get(edge.target);
     const sourcePort = sourceNode?.data.ports.find((port) => port.id === edge.sourceHandle);
@@ -32,10 +33,10 @@ export function deriveCableRuns(nodes: readonly SetupNode[], edges: readonly Cab
       edgeId: edge.id,
       cable: `${connectorLabel(edge.data.endA)} → ${connectorLabel(edge.data.endB)}`,
       from: sourceNode && sourcePort
-        ? `${sourceNode.data.name} / ${portDisplayName(sourcePort, true, true)}`
+        ? `${sourceNode.data.name} / ${portDisplayNameForNode(sourceNode, sourcePort, true, true)}`
         : "Unresolved source",
       to: targetNode && targetPort
-        ? `${targetNode.data.name} / ${portDisplayName(targetPort, true, true)}`
+        ? `${targetNode.data.name} / ${portDisplayNameForNode(targetNode, targetPort, true, true)}`
         : "Unresolved destination",
       length: edge.data.estimatedLength,
       lengthUnit: edge.data.lengthUnit,
@@ -71,13 +72,32 @@ export function groupCableRuns(rows: readonly CableRunRow[]): CableRunGroup[] {
 }
 
 export function deriveEquipmentUsage(nodes: readonly SetupNode[]): EquipmentUsageRow[] {
-  return nodes.map((node) => ({
-    nodeId: node.id,
-    name: node.data.name,
-    category: node.data.category,
-    assignedUnitLabel: node.data.assignedUnitLabel,
-    fulfillment: node.data.fulfillment,
-    inputCount: portsByDirection(node.data.ports, "input").length,
-    outputCount: portsByDirection(node.data.ports, "output").length,
-  }));
+  const grouped = new Map<string, SetupNode[]>();
+  for (const node of nodes) {
+    const key = node.data.assemblyId ?? node.id;
+    grouped.set(key, [...(grouped.get(key) ?? []), node]);
+  }
+  return [...grouped.values()].map((group) => {
+    const primary = group.find((node) => node.data.transportPrimary) ?? group[0];
+    const transport = primary.data.transport;
+    const baseName = primary.data.assemblyId && primary.data.transportEndpointLabel
+      ? primary.data.name.replace(new RegExp(`\\s*·\\s*${escapeRegExp(primary.data.transportEndpointLabel)}$`), "")
+      : primary.data.name;
+    return {
+      nodeId: primary.id,
+      name: baseName,
+      category: primary.data.category,
+      assignedUnitLabel: primary.data.assignedAssetLabel ?? primary.data.providerPartyName ?? primary.data.assignedUnitLabel,
+      fulfillment: primary.data.fulfillment,
+      inputCount: group.reduce((total, node) => total + portsByDirection(node.data.ports, "input").length, 0),
+      outputCount: group.reduce((total, node) => total + portsByDirection(node.data.ports, "output").length, 0),
+      ...(transport ? {
+        detail: `${transport.channelCount}-channel ${transport.kind === "split-snake" ? "split snake" : "snake"}${transport.length ? ` · ${transport.length} ${transport.lengthUnit}` : ""} · ${transport.endpoints.length} endpoints`,
+      } : {}),
+    };
+  });
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

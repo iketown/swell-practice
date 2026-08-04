@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CONNECTOR_TYPES, SIGNAL_TYPES, connectorSnapshot } from "@/lib/setup-designer/catalog";
-import type { ConnectorGender, EquipmentPort, PortDirection } from "@/lib/setup-designer/domain";
+import type { ConnectorGender, EquipmentPort, EquipmentTransportTopology, PortDirection } from "@/lib/setup-designer/domain";
 import {
   appendPortBank,
   portsByDirection,
@@ -18,14 +18,16 @@ import {
   summarizePortGroups,
   updatePort,
 } from "@/lib/setup-designer/ports";
+import { cn } from "@/lib/utils";
 
 interface EquipmentPortEditorProps {
   ports: EquipmentPort[];
   onChange: (ports: EquipmentPort[]) => void;
   idPrefix: string;
+  transport?: EquipmentTransportTopology;
 }
 
-export function EquipmentPortEditor({ ports, onChange, idPrefix }: EquipmentPortEditorProps) {
+export function EquipmentPortEditor({ ports, onChange, idPrefix, transport }: EquipmentPortEditorProps) {
   const inputs = portsByDirection(ports, "input");
   const outputs = portsByDirection(ports, "output");
 
@@ -36,10 +38,10 @@ export function EquipmentPortEditor({ ports, onChange, idPrefix }: EquipmentPort
         <TabsTrigger value="outputs">Outputs ({outputs.length})</TabsTrigger>
       </TabsList>
       <TabsContent value="inputs" className="flex flex-col gap-4">
-        <PortDirectionEditor direction="input" ports={ports} onChange={onChange} idPrefix={`${idPrefix}-input`} />
+        <PortDirectionEditor direction="input" ports={ports} onChange={onChange} idPrefix={`${idPrefix}-input`} transport={transport} />
       </TabsContent>
       <TabsContent value="outputs" className="flex flex-col gap-4">
-        <PortDirectionEditor direction="output" ports={ports} onChange={onChange} idPrefix={`${idPrefix}-output`} />
+        <PortDirectionEditor direction="output" ports={ports} onChange={onChange} idPrefix={`${idPrefix}-output`} transport={transport} />
       </TabsContent>
     </Tabs>
   );
@@ -50,11 +52,13 @@ function PortDirectionEditor({
   ports,
   onChange,
   idPrefix,
+  transport,
 }: {
   direction: PortDirection;
   ports: EquipmentPort[];
   onChange: (ports: EquipmentPort[]) => void;
   idPrefix: string;
+  transport?: EquipmentTransportTopology;
 }) {
   const directionPorts = portsByDirection(ports, direction);
   const summaries = useMemo(
@@ -78,12 +82,12 @@ function PortDirectionEditor({
             {summaries.map((group) => {
               const signalLabel = SIGNAL_TYPES.find((signal) => signal.id === group.signalType)?.label ?? group.signalType;
               return (
-                <li key={[group.label, group.connectorTypeId, group.gender, group.signalType, group.specification, group.channelCapacity].join("|")} className="rounded-md bg-background px-2.5 py-2 text-sm">
+                <li key={[group.label, group.connectorTypeId, group.gender, group.signalType, group.specification, group.channelCapacity, group.endpointId, group.channelKeyPrefix].join("|")} className="rounded-md bg-background px-2.5 py-2 text-sm">
                   <span className="font-medium">{group.count}× {group.label}</span>
                   <span className="text-muted-foreground"> · {group.connectorLabel}{group.gender === "none" ? "" : ` ${group.gender}`}{signalLabel ? ` · ${signalLabel}` : ""}</span>
-                  {group.channelCapacity || group.specification ? (
+                  {group.endpointId || group.channelKeyPrefix || group.channelCapacity || group.specification ? (
                     <span className="block text-xs text-muted-foreground">
-                      {[group.channelCapacity ? `${group.channelCapacity} channels per port` : null, group.specification].filter(Boolean).join(" · ")}
+                      {[group.endpointId ? `Endpoint ${group.endpointId}` : null, group.channelKeyPrefix ? `Route ${group.channelKeyPrefix}` : null, group.channelCapacity ? `${group.channelCapacity} channels per port` : null, group.specification].filter(Boolean).join(" · ")}
                     </span>
                   ) : null}
                 </li>
@@ -97,13 +101,14 @@ function PortDirectionEditor({
         direction={direction}
         disabled={directionPorts.length >= 128}
         idPrefix={`${idPrefix}-bank`}
+        transport={transport}
         onAdd={(count, defaults) => onChange(appendPortBank(ports, direction, count, defaults))}
       />
 
       {directionPorts.length ? (
         <div className="overflow-x-auto rounded-lg border">
-          <div className="grid min-w-[870px] grid-cols-[5.5rem_1.35fr_1.15fr_0.85fr_1fr_2.5rem] gap-2 bg-muted/60 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            <span>Port</span><span>Label</span><span>Connector</span><span>Gender</span><span>Signal</span><span className="sr-only">Actions</span>
+          <div className={cn("grid gap-2 bg-muted/60 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground", transport ? "min-w-[1120px] grid-cols-[5.5rem_1.2fr_1fr_0.75fr_0.9fr_1fr_1fr_2.5rem]" : "min-w-[870px] grid-cols-[5.5rem_1.35fr_1.15fr_0.85fr_1fr_2.5rem]")}>
+            <span>Port</span><span>Label</span>{transport ? <><span>Endpoint</span><span>Route key</span></> : null}<span>Connector</span><span>Gender</span><span>Signal</span><span className="sr-only">Actions</span>
           </div>
           <div className="divide-y">
             {directionPorts.map((port) => (
@@ -111,6 +116,7 @@ function PortDirectionEditor({
                 key={port.id}
                 port={port}
                 idPrefix={idPrefix}
+                transport={transport}
                 onChange={(nextPort) => onChange(updatePort(ports, nextPort))}
                 onRemove={() => onChange(removePort(ports, port.id))}
               />
@@ -126,16 +132,20 @@ function PortBankForm({
   direction,
   disabled,
   idPrefix,
+  transport,
   onAdd,
 }: {
   direction: PortDirection;
   disabled: boolean;
   idPrefix: string;
+  transport?: EquipmentTransportTopology;
   onAdd: (count: number, defaults: {
     labelPrefix: string;
     connectorTypeId: string;
     connectorGender: ConnectorGender;
     signalType: string;
+    endpointId?: string;
+    channelKeyPrefix?: string;
   }) => void;
 }) {
   const [count, setCount] = useState(1);
@@ -143,6 +153,8 @@ function PortBankForm({
   const [connectorTypeId, setConnectorTypeId] = useState("xlr");
   const [connectorGender, setConnectorGender] = useState<ConnectorGender>(direction === "input" ? "female" : "male");
   const [signalType, setSignalType] = useState(direction === "input" ? "microphone" : "analog-line");
+  const [endpointId, setEndpointId] = useState(transport?.endpoints[direction === "input" ? 0 : 1]?.id ?? "");
+  const [channelKeyPrefix, setChannelKeyPrefix] = useState("channel");
   const noun = direction === "input" ? "input" : "output";
   const connector = CONNECTOR_TYPES.find((item) => item.id === connectorTypeId);
 
@@ -150,11 +162,26 @@ function PortBankForm({
     <FieldSet className="rounded-lg border p-3" disabled={disabled}>
       <FieldLegend variant="label">Add an {noun} bank</FieldLegend>
       <FieldDescription>Add one port or a numbered bank. Every physical connector receives its own stable ID.</FieldDescription>
-      <FieldGroup className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <FieldGroup className={cn("grid gap-3 sm:grid-cols-2", transport ? "xl:grid-cols-7" : "xl:grid-cols-5")}>
         <Field>
           <FieldLabel htmlFor={`${idPrefix}-count`}>Count</FieldLabel>
           <Input id={`${idPrefix}-count`} type="number" min={1} max={128} value={count} onChange={(event) => setCount(Number(event.target.value))} />
         </Field>
+        {transport ? (
+          <>
+            <Field>
+              <FieldLabel htmlFor={`${idPrefix}-endpoint`}>Endpoint</FieldLabel>
+              <Select value={endpointId} onValueChange={(value) => value && setEndpointId(value)}>
+                <SelectTrigger id={`${idPrefix}-endpoint`} className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectGroup>{transport.endpoints.map((endpoint) => <SelectItem key={endpoint.id} value={endpoint.id}>{endpoint.label}</SelectItem>)}</SelectGroup></SelectContent>
+              </Select>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={`${idPrefix}-route`}>Route key</FieldLabel>
+              <Input id={`${idPrefix}-route`} value={channelKeyPrefix} onChange={(event) => setChannelKeyPrefix(event.target.value.replace(/[^a-zA-Z0-9_-]/g, ""))} placeholder="channel" />
+            </Field>
+          </>
+        ) : null}
         <Field>
           <FieldLabel htmlFor={`${idPrefix}-label`}>Label prefix</FieldLabel>
           <Input id={`${idPrefix}-label`} value={labelPrefix} onChange={(event) => setLabelPrefix(event.target.value)} placeholder={direction === "input" ? "Local input" : "XLR out"} />
@@ -197,7 +224,7 @@ function PortBankForm({
         variant="outline"
         className="w-fit"
         disabled={disabled || count < 1}
-        onClick={() => onAdd(count, { labelPrefix, connectorTypeId, connectorGender, signalType })}
+        onClick={() => onAdd(count, { labelPrefix, connectorTypeId, connectorGender, signalType, ...(transport ? { endpointId, channelKeyPrefix: channelKeyPrefix || "channel" } : {}) })}
       >
         <PlusIcon data-icon="inline-start" />
         Add {count > 1 ? `${count} ${noun} ports` : `${noun} port`}
@@ -209,11 +236,13 @@ function PortBankForm({
 function PortRow({
   port,
   idPrefix,
+  transport,
   onChange,
   onRemove,
 }: {
   port: EquipmentPort;
   idPrefix: string;
+  transport?: EquipmentTransportTopology;
   onChange: (port: EquipmentPort) => void;
   onRemove: () => void;
 }) {
@@ -222,7 +251,7 @@ function PortRow({
   const shortId = port.id.length > 20 ? `${port.id.slice(0, 10)}…${port.id.slice(-6)}` : port.id;
 
   return (
-    <div className="grid min-w-[870px] grid-cols-[5.5rem_1.35fr_1.15fr_0.85fr_1fr_2.5rem] items-center gap-2 px-3 py-2">
+    <div className={cn("grid items-center gap-2 px-3 py-2", transport ? "min-w-[1120px] grid-cols-[5.5rem_1.2fr_1fr_0.75fr_0.9fr_1fr_1fr_2.5rem]" : "min-w-[870px] grid-cols-[5.5rem_1.35fr_1.15fr_0.85fr_1fr_2.5rem]")}>
       <div className="min-w-0" title={port.id}>
         <span className="block text-sm font-medium">#{port.number}</span>
         <code className="block truncate text-[10px] text-muted-foreground">{shortId}</code>
@@ -231,6 +260,21 @@ function PortRow({
         <FieldLabel htmlFor={`${rowId}-label`} className="sr-only">{port.direction} {port.number} label</FieldLabel>
         <Input id={`${rowId}-label`} value={port.label ?? ""} onChange={(event) => onChange({ ...port, label: event.target.value })} placeholder={`${port.direction === "input" ? "Input" : "Output"} ${port.number}`} />
       </Field>
+      {transport ? (
+        <>
+          <Field>
+            <FieldLabel htmlFor={`${rowId}-endpoint`} className="sr-only">{port.direction} {port.number} snake endpoint</FieldLabel>
+            <Select value={port.endpointId ?? transport.endpoints[0]?.id} onValueChange={(value) => value && onChange({ ...port, endpointId: value })}>
+              <SelectTrigger id={`${rowId}-endpoint`} className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectGroup>{transport.endpoints.map((endpoint) => <SelectItem key={endpoint.id} value={endpoint.id}>{endpoint.label}</SelectItem>)}</SelectGroup></SelectContent>
+            </Select>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor={`${rowId}-route`} className="sr-only">{port.direction} {port.number} snake route key</FieldLabel>
+            <Input id={`${rowId}-route`} value={port.channelKey ?? ""} onChange={(event) => onChange({ ...port, channelKey: event.target.value.replace(/[^a-zA-Z0-9_-]/g, "") || undefined })} placeholder={`channel-${port.number}`} />
+          </Field>
+        </>
+      ) : null}
       <Field>
         <FieldLabel htmlFor={`${rowId}-connector`} className="sr-only">{port.direction} {port.number} connector</FieldLabel>
         <Select value={port.connector.typeId} onValueChange={(value) => value && onChange({ ...port, connector: connectorSnapshot(value, port.connector.gender, port.connector.specification) })}>

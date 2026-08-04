@@ -83,6 +83,27 @@ service cloud.firestore {
       allow read, create, update, delete: if isAdmin();
     }
 
+    match /inventoryAssets/{assetId} {
+      allow read, create, update, delete: if isAdmin();
+
+      match /checkIns/{checkInId} {
+        allow read, create: if isAdmin();
+        allow update, delete: if false;
+      }
+    }
+
+    match /gearParties/{partyId} {
+      allow read, create, update, delete: if isAdmin();
+    }
+
+    match /gearLocations/{locationId} {
+      allow read, create, update, delete: if isAdmin();
+    }
+
+    match /purchaseOrders/{orderId} {
+      allow read, create, update, delete: if isAdmin();
+    }
+
     match /connectorTypes/{connectorTypeId} {
       allow read, create, update, delete: if isAdmin();
     }

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftIcon, PlusIcon } from "lucide-react";
+import { ArrowLeftIcon, PackageSearchIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -20,6 +20,7 @@ export function EquipmentIndexClient() {
   const admin = useAdmin();
   const router = useRouter();
   const setupsHref = admin.isDemoAdmin ? "/setups?demo=1" : "/setups";
+  const gearHref = admin.isDemoAdmin ? "/gear?demo=1" : "/gear";
   const [templates, setTemplates] = useState<EquipmentTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,11 +42,14 @@ export function EquipmentIndexClient() {
       <section className="swell-panel flex flex-wrap items-start justify-between gap-4 p-4 sm:p-5">
         <div className="grid gap-1">
           <Link href={setupsHref} className={buttonVariants({ variant: "ghost", size: "sm", className: "mb-2 w-fit" })}><ArrowLeftIcon data-icon="inline-start" />Setups</Link>
-          <p className="swell-page-kicker">Reusable inventory</p>
+          <p className="swell-page-kicker">Reusable definitions</p>
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Equipment library</h1>
-          <p className="max-w-2xl text-sm text-muted-foreground">Templates define default ports. Owned-unit labels let setup nodes map to the exact mic, D.I., mixer, or instrument you plan to use.</p>
+          <p className="max-w-2xl text-sm text-muted-foreground">Definitions describe a model, its ports, icon, reference photos, and purchase source. Planned and physical copies of that model live in Gear.</p>
         </div>
-        <Button onClick={() => setCreating(true)}><PlusIcon data-icon="inline-start" />New equipment</Button>
+        <div className="flex flex-wrap gap-2">
+          <Link href={gearHref} className={buttonVariants({ variant: "outline" })}><PackageSearchIcon data-icon="inline-start" />Gear assets</Link>
+          <Button onClick={() => setCreating(true)}><PlusIcon data-icon="inline-start" />New definition</Button>
+        </div>
       </section>
 
       {loading ? <div className="flex flex-col gap-2"><Skeleton className="h-20" /><Skeleton className="h-20" /></div> : error ? (
@@ -64,7 +68,7 @@ export function EquipmentIndexClient() {
                     </Badge>
                   ))}
                   {!portGroups.length ? <Badge variant="secondary">No ports</Badge> : null}
-                  <Badge variant="outline">{template.ownedUnits.length} owned</Badge>
+                  <Badge variant="outline">Definition</Badge>
                 </div>
               </div>
             );

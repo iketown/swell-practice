@@ -1,6 +1,6 @@
 "use client";
 
-import { BoxIcon, GripVerticalIcon, PlusIcon, SearchIcon } from "lucide-react";
+import { BoxIcon, CableIcon, GripVerticalIcon, PencilIcon, PlusIcon, SearchIcon } from "lucide-react";
 import { type DragEvent, useMemo, useRef, useState } from "react";
 
 import { EquipmentTemplateDialog } from "@/components/setup-designer/equipment-template-dialog";
@@ -16,16 +16,21 @@ export const EQUIPMENT_TEMPLATE_DRAG_MIME = "application/x-swell-equipment-templ
 export function EquipmentLibrary({
   templates,
   onTemplateCreated,
+  onTemplateUpdated,
+  onTemplateArchived,
   onAdd,
   onDragStateChange,
 }: {
   templates: EquipmentTemplate[];
   onTemplateCreated: (template: EquipmentTemplate) => void;
+  onTemplateUpdated: (template: EquipmentTemplate) => void;
+  onTemplateArchived: (template: EquipmentTemplate) => void;
   onAdd: (template: EquipmentTemplate) => void;
   onDragStateChange: (template: EquipmentTemplate | null) => void;
 }) {
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<EquipmentTemplate | null>(null);
   const suppressClickRef = useRef<string | null>(null);
   const matching = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -38,7 +43,7 @@ export function EquipmentLibrary({
         <div className="flex items-center justify-between gap-2">
           <div>
             <h2 className="text-sm font-semibold">Equipment</h2>
-            <p className="text-xs text-muted-foreground">Click to add, or drag into place.</p>
+            <p className="text-xs text-muted-foreground">Click or drag to add. Use the pencil to edit.</p>
           </div>
           <Button size="icon-sm" variant="outline" onClick={() => setCreating(true)} aria-label="Create equipment">
             <PlusIcon />
@@ -56,35 +61,43 @@ export function EquipmentLibrary({
           const portSummary = summarizePortGroups(template.ports)
             .map(portGroupDisplayName)
             .join(" · ");
+          const TemplateIcon = template.equipmentKind === "device" ? BoxIcon : CableIcon;
+          const topologySummary = template.transport
+            ? `${template.transport.channelCount}-channel ${template.transport.kind === "split-snake" ? "split snake" : "snake"}${template.transport.length ? ` · ${template.transport.length} ${template.transport.lengthUnit}` : ""}`
+            : undefined;
           return (
-            <button
-              type="button"
-              key={template.id}
-              draggable
-              data-equipment-template-id={template.id}
-              className="group flex w-full cursor-grab items-center gap-2 rounded-lg border border-transparent px-1.5 py-2 text-left transition-[background-color,border-color,opacity,transform] duration-150 hover:border-border hover:bg-muted/60 active:cursor-grabbing active:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
-              title={`Click to add ${template.name}, or drag it onto the canvas`}
-              onClick={() => {
-                if (suppressClickRef.current === template.id) return;
-                onAdd(template);
-              }}
-              onDragStart={(event) => startTemplateDrag(event, template, suppressClickRef, onDragStateChange)}
-              onDragEnd={() => {
-                onDragStateChange(null);
-                window.setTimeout(() => {
-                  if (suppressClickRef.current === template.id) suppressClickRef.current = null;
-                }, 0);
-              }}
-            >
-              <GripVerticalIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground/70 transition-colors group-hover:text-foreground" />
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-md border bg-background text-muted-foreground"><BoxIcon aria-hidden className="size-4" /></span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium">{template.name}</span>
-                <span className="block truncate text-xs text-muted-foreground">{template.manufacturer} {template.model}</span>
-                <span className="block truncate text-[10px] text-muted-foreground" title={portSummary}>{portSummary || "No ports configured"}</span>
-              </span>
-              <Badge variant="secondary" className="shrink-0 font-mono text-[10px]">{inputs}→{outputs}</Badge>
-            </button>
+            <div key={template.id} className="group flex items-center rounded-lg border border-transparent transition-[background-color,border-color] duration-150 hover:border-border hover:bg-muted/60 focus-within:border-border focus-within:bg-muted/60">
+              <button
+                type="button"
+                draggable
+                data-equipment-template-id={template.id}
+                className="flex min-w-0 flex-1 cursor-grab items-center gap-2 rounded-lg px-1.5 py-2 text-left transition-[opacity,transform] duration-150 active:cursor-grabbing active:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+                title={`Click to add ${template.name}, or drag it onto the canvas`}
+                onClick={() => {
+                  if (suppressClickRef.current === template.id) return;
+                  onAdd(template);
+                }}
+                onDragStart={(event) => startTemplateDrag(event, template, suppressClickRef, onDragStateChange)}
+                onDragEnd={() => {
+                  onDragStateChange(null);
+                  window.setTimeout(() => {
+                    if (suppressClickRef.current === template.id) suppressClickRef.current = null;
+                  }, 0);
+                }}
+              >
+                <GripVerticalIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground/70 transition-colors group-hover:text-foreground" />
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-md border bg-background text-muted-foreground"><TemplateIcon aria-hidden className="size-4" /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">{template.name}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{template.manufacturer} {template.model}</span>
+                  <span className="block truncate text-[10px] text-muted-foreground" title={topologySummary ?? portSummary}>{(topologySummary ?? portSummary) || "No ports configured"}</span>
+                </span>
+                <Badge variant="secondary" className="shrink-0 font-mono text-[10px]">{template.transport ? `${template.transport.channelCount}ch` : `${inputs}→${outputs}`}</Badge>
+              </button>
+              <Button type="button" size="icon-sm" variant="ghost" className="mr-1 shrink-0" onClick={() => setEditing(template)} aria-label={`Edit ${template.name}`} title={`Edit ${template.name}`}>
+                <PencilIcon />
+              </Button>
+            </div>
           );
         }) : (
           <Empty className="border-0 py-10">
@@ -93,6 +106,16 @@ export function EquipmentLibrary({
         )}
       </div>
       <EquipmentTemplateDialog open={creating} onOpenChange={setCreating} onCreated={onTemplateCreated} />
+      {editing ? (
+        <EquipmentTemplateDialog
+          key={editing.id}
+          open
+          onOpenChange={(nextOpen) => { if (!nextOpen) setEditing(null); }}
+          template={editing}
+          onSaved={(template) => { onTemplateUpdated(template); setEditing(null); }}
+          onArchived={(template) => { onTemplateArchived(template); setEditing(null); }}
+        />
+      ) : null}
     </aside>
   );
 }

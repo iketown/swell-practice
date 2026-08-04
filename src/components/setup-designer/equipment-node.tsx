@@ -23,7 +23,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SIGNAL_TYPES } from "@/lib/setup-designer/catalog";
 import type { EquipmentPort, FulfillmentStatus, SetupNode } from "@/lib/setup-designer/domain";
-import { portDisplayName, portsByDirection } from "@/lib/setup-designer/ports";
+import { portsByDirection } from "@/lib/setup-designer/ports";
+import { portDisplayNameForNode } from "@/lib/setup-designer/snake-topology";
 import { cn } from "@/lib/utils";
 
 const categoryIcons = {
@@ -33,6 +34,7 @@ const categoryIcons = {
   "direct box": CableIcon,
   "stage box": CircleDotIcon,
   mixer: SlidersHorizontalIcon,
+  snake: CableIcon,
 } as const;
 
 const fulfillmentDisplay = {
@@ -111,8 +113,9 @@ export function EquipmentNode({ id, data, selected, isConnectable }: NodeProps<S
           <h2 className="truncate text-xs font-semibold leading-4">{data.name}</h2>
           <p className="truncate text-[10px] leading-3.5 text-muted-foreground">{inputs.length} in · {outputs.length} out</p>
         </footer>
-        <CompactPortHandles nodeName={data.name} ports={inputs} position={Position.Left} type="target" isConnectable={isConnectable} />
-        <CompactPortHandles nodeName={data.name} ports={outputs} position={Position.Right} type="source" isConnectable={isConnectable} />
+        <CompactPortHandles nodeName={data.name} ports={inputs} position={Position.Left} type="target" isConnectable={isConnectable} channelLabels={data.transportChannelLabels} />
+        <CompactPortHandles nodeName={data.name} ports={outputs} position={Position.Right} type="source" isConnectable={isConnectable} channelLabels={data.transportChannelLabels} />
+        <TransportTrunkHandle data={data} />
       </article>
     );
   }
@@ -135,7 +138,7 @@ export function EquipmentNode({ id, data, selected, isConnectable }: NodeProps<S
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-sm font-semibold">{data.name}</h2>
-          <p className="truncate text-xs text-muted-foreground">{data.assignedUnitLabel || data.category}</p>
+          <p className="truncate text-xs text-muted-foreground">{data.transportEndpointLabel || data.assignedUnitLabel || data.category}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <Badge variant={data.fulfillment === "owned" ? "default" : "secondary"} className="capitalize">
@@ -159,19 +162,21 @@ export function EquipmentNode({ id, data, selected, isConnectable }: NodeProps<S
         </div>
       </header>
       <div className="grid grid-cols-2 gap-px bg-border">
-        <PortColumn nodeName={data.name} ports={inputs} position={Position.Left} type="target" showNumber={data.showPortNumbers} showLabel={data.showPortLabels} isConnectable={isConnectable} />
-        <PortColumn nodeName={data.name} ports={outputs} position={Position.Right} type="source" showNumber={data.showPortNumbers} showLabel={data.showPortLabels} isConnectable={isConnectable} />
+        <PortColumn nodeName={data.name} nodeData={data} ports={inputs} position={Position.Left} type="target" showNumber={data.showPortNumbers} showLabel={data.showPortLabels} isConnectable={isConnectable} />
+        <PortColumn nodeName={data.name} nodeData={data} ports={outputs} position={Position.Right} type="source" showNumber={data.showPortNumbers} showLabel={data.showPortLabels} isConnectable={isConnectable} />
       </div>
       <footer className="nodrag grid grid-cols-2 gap-px rounded-b-[calc(var(--radius-xl)-1px)] border-t bg-border text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
         <span className="rounded-bl-[calc(var(--radius-xl)-1px)] bg-card px-3 py-1.5">{inputs.length} in</span>
         <span className="rounded-br-[calc(var(--radius-xl)-1px)] bg-card px-3 py-1.5 text-right">{outputs.length} out</span>
       </footer>
+      <TransportTrunkHandle data={data} />
     </article>
   );
 }
 
 function PortColumn({
   nodeName,
+  nodeData,
   ports,
   position,
   type,
@@ -180,6 +185,7 @@ function PortColumn({
   isConnectable,
 }: {
   nodeName: string;
+  nodeData: SetupNode["data"];
   ports: EquipmentPort[];
   position: Position;
   type: "source" | "target";
@@ -190,8 +196,8 @@ function PortColumn({
   return (
     <div className="flex min-h-9 flex-col bg-card">
       {ports.length ? ports.map((port) => {
-        const label = portDisplayName(port, showNumber, showLabel);
-        const accessibleLabel = portAccessibleLabel(nodeName, port);
+        const label = portDisplayNameForNode({ data: nodeData }, port, showNumber, showLabel);
+        const accessibleLabel = portAccessibleLabel(nodeName, port, nodeData.transportChannelLabels?.[port.channelKey ?? ""]);
         const signalLabel = SIGNAL_TYPES.find((signal) => signal.id === port.signalType)?.label ?? port.signalType;
         return (
           <div key={port.id} className={cn("relative flex min-h-11 flex-col justify-center px-3 py-1.5 text-[11px]", type === "source" && "items-end text-right")} title={accessibleLabel}>
@@ -220,17 +226,19 @@ function CompactPortHandles({
   position,
   type,
   isConnectable,
+  channelLabels,
 }: {
   nodeName: string;
   ports: EquipmentPort[];
   position: Position;
   type: "source" | "target";
   isConnectable: boolean;
+  channelLabels?: Record<string, string>;
 }) {
   const handleSize = ports.length > 12 ? 6 : ports.length > 7 ? 8 : ports.length > 5 ? 10 : ports.length > 2 ? 13 : 18;
   const hitSize = ports.length > 12 ? 14 : ports.length > 7 ? 16 : ports.length > 5 ? 20 : ports.length > 2 ? 24 : 36;
   return ports.map((port, index) => {
-    const accessibleLabel = portAccessibleLabel(nodeName, port);
+    const accessibleLabel = portAccessibleLabel(nodeName, port, channelLabels?.[port.channelKey ?? ""]);
     const top = 10 + ((index + 1) / (ports.length + 1)) * 84;
     const edgeOffset = `${hitSize * -0.5}px`;
     const style: CSSProperties & {
@@ -266,6 +274,23 @@ function CompactPortHandles({
   });
 }
 
-function portAccessibleLabel(nodeName: string, port: EquipmentPort) {
-  return `${nodeName}, ${port.direction} ${port.number}${port.label ? `, ${port.label}` : ""}, ${port.connector.label} ${port.connector.gender}`;
+function TransportTrunkHandle({ data }: { data: SetupNode["data"] }) {
+  if (!data.assemblyId || !data.transportEndpointId) return null;
+  const primary = Boolean(data.transportPrimary);
+  return (
+    <Handle
+      id={primary ? "transport-trunk-source" : "transport-trunk-target"}
+      type={primary ? "source" : "target"}
+      position={primary ? Position.Right : Position.Left}
+      isConnectable={false}
+      aria-label={`${data.transportEndpointLabel ?? data.name} fixed snake trunk`}
+      title="Fixed multicore snake trunk"
+      className="setup-transport-trunk-handle"
+      style={{ top: "26px", width: "18px", height: "18px", borderWidth: "3px", background: "var(--card)", borderColor: "var(--primary)", cursor: "default" }}
+    />
+  );
+}
+
+function portAccessibleLabel(nodeName: string, port: EquipmentPort, carriedLabel?: string) {
+  return `${nodeName}, ${port.direction} ${port.number}${carriedLabel ? `, Snake channel ${port.number}, ${carriedLabel}` : port.label ? `, ${port.label}` : ""}, ${port.connector.label} ${port.connector.gender}`;
 }

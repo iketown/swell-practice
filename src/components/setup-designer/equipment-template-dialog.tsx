@@ -1,10 +1,21 @@
 "use client";
 
-import { BotIcon, ExternalLinkIcon, ImagePlusIcon, LoaderCircleIcon, PlusIcon, SparklesIcon } from "lucide-react";
+import { ArchiveIcon, BotIcon, ExternalLinkIcon, ImagePlusIcon, LoaderCircleIcon, PlusIcon, SaveIcon, SparklesIcon } from "lucide-react";
 import Image from "next/image";
 import { FormEvent, useEffect, useRef, useState } from "react";
 
 import { EquipmentPortEditor } from "@/components/setup-designer/equipment-port-editor";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -19,11 +30,13 @@ import {
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { auth } from "@/lib/firebase";
-import type { EquipmentPort, EquipmentTemplate, ImportedEquipmentDraft } from "@/lib/setup-designer/domain";
+import type { EquipmentKind, EquipmentPort, EquipmentTemplate, EquipmentTransportTopology, ImportedEquipmentDraft } from "@/lib/setup-designer/domain";
 import { createPort } from "@/lib/setup-designer/ports";
-import { createEquipmentTemplate } from "@/lib/setup-designer/repository";
+import { archiveEquipmentTemplate, createEquipmentTemplate, updateEquipmentTemplate } from "@/lib/setup-designer/repository";
+import { defaultTransportTopology } from "@/lib/setup-designer/snake-topology";
 import { cn } from "@/lib/utils";
 
 const ACCEPTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -39,54 +52,60 @@ function initialPorts(): EquipmentPort[] {
 interface EquipmentTemplateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreated: (template: EquipmentTemplate) => void;
+  template?: EquipmentTemplate;
+  onCreated?: (template: EquipmentTemplate) => void;
+  onSaved?: (template: EquipmentTemplate) => void;
+  onArchived?: (template: EquipmentTemplate) => void;
 }
 
-export function EquipmentTemplateDialog({ open, onOpenChange, onCreated }: EquipmentTemplateDialogProps) {
-  const [name, setName] = useState("");
-  const [manufacturer, setManufacturer] = useState("");
-  const [model, setModel] = useState("");
-  const [category, setCategory] = useState("Other");
-  const [description, setDescription] = useState("");
-  const [notes, setNotes] = useState("");
-  const [productUrl, setProductUrl] = useState("");
-  const [priceAmount, setPriceAmount] = useState("");
-  const [priceCurrency, setPriceCurrency] = useState("");
-  const [priceDisplay, setPriceDisplay] = useState("");
-  const [priceVendor, setPriceVendor] = useState("");
-  const [ports, setPorts] = useState<EquipmentPort[]>(initialPorts);
-  const [ownedUnitLabels, setOwnedUnitLabels] = useState("");
+export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreated, onSaved, onArchived }: EquipmentTemplateDialogProps) {
+  const [name, setName] = useState(template?.name ?? "");
+  const [manufacturer, setManufacturer] = useState(template?.manufacturer ?? "");
+  const [model, setModel] = useState(template?.model ?? "");
+  const [category, setCategory] = useState(template?.category ?? "Other");
+  const [equipmentKind, setEquipmentKind] = useState<EquipmentKind>(template?.equipmentKind ?? "device");
+  const [transport, setTransport] = useState<EquipmentTransportTopology | undefined>(() => template?.transport ? structuredClone(template.transport) : undefined);
+  const [description, setDescription] = useState(template?.description ?? "");
+  const [notes, setNotes] = useState(template?.notes ?? "");
+  const [productUrl, setProductUrl] = useState(template?.purchaseSource?.url ?? "");
+  const [priceAmount, setPriceAmount] = useState(template?.purchaseSource?.priceAmount?.toString() ?? "");
+  const [priceCurrency, setPriceCurrency] = useState(template?.purchaseSource?.priceCurrency ?? "");
+  const [priceDisplay, setPriceDisplay] = useState(template?.purchaseSource?.priceDisplay ?? "");
+  const [priceVendor, setPriceVendor] = useState(template?.purchaseSource?.vendor ?? "");
+  const [ports, setPorts] = useState<EquipmentPort[]>(() => template ? structuredClone(template.ports) : initialPorts());
   const [imageFile, setImageFile] = useState<File | undefined>();
   const [researchResult, setResearchResult] = useState<ImportedEquipmentDraft | null>(null);
-  const [selectedReferenceUrls, setSelectedReferenceUrls] = useState<Set<string>>(new Set());
+  const [selectedReferenceUrls, setSelectedReferenceUrls] = useState<Set<string>>(() => new Set(template?.referenceImages.map((image) => image.url) ?? []));
   const [researching, setResearching] = useState(false);
   const [researchError, setResearchError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const researchStatusRef = useRef<HTMLDivElement>(null);
+  const referenceImages = researchResult?.referenceImages ?? template?.referenceImages ?? [];
 
   useEffect(() => {
     if (researching) researchStatusRef.current?.focus();
   }, [researching]);
 
   function resetForm() {
-    setName("");
-    setManufacturer("");
-    setModel("");
-    setCategory("Other");
-    setDescription("");
-    setNotes("");
-    setProductUrl("");
-    setPriceAmount("");
-    setPriceCurrency("");
-    setPriceDisplay("");
-    setPriceVendor("");
-    setPorts(initialPorts());
-    setOwnedUnitLabels("");
+    setName(template?.name ?? "");
+    setManufacturer(template?.manufacturer ?? "");
+    setModel(template?.model ?? "");
+    setCategory(template?.category ?? "Other");
+    setEquipmentKind(template?.equipmentKind ?? "device");
+    setTransport(template?.transport ? structuredClone(template.transport) : undefined);
+    setDescription(template?.description ?? "");
+    setNotes(template?.notes ?? "");
+    setProductUrl(template?.purchaseSource?.url ?? "");
+    setPriceAmount(template?.purchaseSource?.priceAmount?.toString() ?? "");
+    setPriceCurrency(template?.purchaseSource?.priceCurrency ?? "");
+    setPriceDisplay(template?.purchaseSource?.priceDisplay ?? "");
+    setPriceVendor(template?.purchaseSource?.vendor ?? "");
+    setPorts(template ? structuredClone(template.ports) : initialPorts());
     setImageFile(undefined);
     setResearchResult(null);
-    setSelectedReferenceUrls(new Set());
+    setSelectedReferenceUrls(new Set(template?.referenceImages.map((image) => image.url) ?? []));
     setResearching(false);
     setResearchError(null);
     setProgress(0);
@@ -157,6 +176,8 @@ export function EquipmentTemplateDialog({ open, onOpenChange, onCreated }: Equip
       setManufacturer(result.manufacturer ?? "");
       setModel(result.model ?? "");
       setCategory(result.category || "Other");
+      setEquipmentKind(result.equipmentKind ?? "device");
+      setTransport(result.transport ? structuredClone(result.transport) : undefined);
       setDescription(result.description ?? "");
       setProductUrl(result.purchaseSource.url);
       setPriceAmount(result.purchaseSource.priceAmount?.toString() ?? "");
@@ -179,16 +200,14 @@ export function EquipmentTemplateDialog({ open, onOpenChange, onCreated }: Equip
     setError(null);
     setProgress(0);
     try {
-      const ownedUnits = ownedUnitLabels
-        .split("\n")
-        .map((label) => label.trim())
-        .filter(Boolean)
-        .map((label, index) => ({ id: `unit-${Date.now()}-${index}`, label }));
-      const created = await createEquipmentTemplate({
+      const savedTransport = equipmentKind === "device" ? undefined : transport ?? defaultTransportTopology(equipmentKind);
+      const definition = {
         name: name.trim(),
         manufacturer: manufacturer.trim() || undefined,
         model: model.trim() || undefined,
         category: category.trim() || "Other",
+        equipmentKind,
+        ...(savedTransport ? { transport: structuredClone(savedTransport) } : {}),
         description: description.trim() || undefined,
         notes: notes.trim() || undefined,
         purchaseSource: productUrl.trim() ? {
@@ -199,17 +218,40 @@ export function EquipmentTemplateDialog({ open, onOpenChange, onCreated }: Equip
           priceDisplay: priceDisplay.trim() || undefined,
           observedAt: researchResult?.purchaseSource.observedAt ?? Date.now(),
         } : undefined,
-        referenceImages: researchResult?.referenceImages.filter((image) => selectedReferenceUrls.has(image.url)) ?? [],
-        aiImport: researchResult?.aiImport,
+        referenceImages: referenceImages.filter((image) => selectedReferenceUrls.has(image.url)),
+        aiImport: researchResult?.aiImport ?? template?.aiImport,
         ports: structuredClone(ports),
-        showPortNumbers: true,
-        showPortLabels: true,
-        ownedUnits,
-      }, imageFile, setProgress);
-      onCreated(created);
+        showPortNumbers: template?.showPortNumbers ?? true,
+        showPortLabels: template?.showPortLabels ?? true,
+        ownedUnits: template?.ownedUnits ?? [],
+      };
+      const saved = template
+        ? await updateEquipmentTemplate({
+            ...structuredClone(template),
+            ...definition,
+            detailImages: template.detailImages ?? [],
+          }, imageFile, setProgress)
+        : await createEquipmentTemplate(definition, imageFile, setProgress);
+      if (template) onSaved?.(saved);
+      else onCreated?.(saved);
       changeOpen(false);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not create this equipment.");
+      setError(caught instanceof Error ? caught.message : `Could not ${template ? "update" : "create"} this equipment.`);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function archiveDefinition() {
+    if (!template || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const archived = await archiveEquipmentTemplate(template);
+      onArchived?.(archived);
+      changeOpen(false);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not remove this definition from the equipment rack.");
     } finally {
       setSaving(false);
     }
@@ -219,8 +261,8 @@ export function EquipmentTemplateDialog({ open, onOpenChange, onCreated }: Equip
     <Dialog open={open} onOpenChange={changeOpen}>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>New equipment</DialogTitle>
-          <DialogDescription>Create a reusable node, its default ports, and the owned units you can assign later.</DialogDescription>
+          <DialogTitle>{template ? `Edit ${template.name}` : "New equipment"}</DialogTitle>
+          <DialogDescription>{template ? "Update this reusable definition manually or paste a product URL and let AI replace its product data and physical port map." : "Create a reusable gear definition with product data, exact ports, reference photos, and a diagram icon. Physical and planned assets are created separately."}</DialogDescription>
         </DialogHeader>
         <form id="equipment-template-form" onSubmit={submit} className="flex flex-col gap-5" aria-busy={researching}>
           <FieldGroup className="rounded-lg border bg-muted/30 p-3">
@@ -257,6 +299,7 @@ export function EquipmentTemplateDialog({ open, onOpenChange, onCreated }: Equip
                   <Badge variant="secondary">AI researched</Badge>
                   <Badge variant="outline">{researchResult.confidence} confidence</Badge>
                   <Badge variant="outline">{researchResult.aiImport.model}</Badge>
+                  {researchResult.transport ? <Badge variant="outline">{researchResult.transport.channelCount}-channel {researchResult.transport.kind === "split-snake" ? "split snake" : "snake"}</Badge> : null}
                   <a href={researchResult.purchaseSource.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm font-medium underline underline-offset-4">
                     Open source <ExternalLinkIcon aria-hidden className="size-3.5" />
                   </a>
@@ -290,6 +333,26 @@ export function EquipmentTemplateDialog({ open, onOpenChange, onCreated }: Equip
               <Input id="equipment-category" value={category} onChange={(event) => setCategory(event.target.value)} placeholder="Direct box" />
             </Field>
             <Field>
+              <FieldLabel htmlFor="equipment-kind">Equipment behavior</FieldLabel>
+              <Select value={equipmentKind} onValueChange={(value) => {
+                if (!value) return;
+                const nextKind = value as EquipmentKind;
+                setEquipmentKind(nextKind);
+                setTransport(nextKind === "device" ? undefined : defaultTransportTopology(nextKind));
+                if (nextKind === "device") {
+                  setPorts((current) => current.map((port) => ({ ...port, endpointId: undefined, channelKey: undefined })));
+                }
+              }}>
+                <SelectTrigger id="equipment-kind" className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectGroup>
+                  <SelectItem value="device">Standard device</SelectItem>
+                  <SelectItem value="snake">Snake · two linked sides</SelectItem>
+                  <SelectItem value="split-snake">Split snake · three linked sides</SelectItem>
+                </SelectGroup></SelectContent>
+              </Select>
+              <FieldDescription>Snakes expand into movable endpoints joined by their fixed multicore trunk.</FieldDescription>
+            </Field>
+            <Field>
               <FieldLabel htmlFor="equipment-manufacturer">Manufacturer</FieldLabel>
               <Input id="equipment-manufacturer" value={manufacturer} onChange={(event) => setManufacturer(event.target.value)} placeholder="Radial" />
             </Field>
@@ -298,6 +361,58 @@ export function EquipmentTemplateDialog({ open, onOpenChange, onCreated }: Equip
               <Input id="equipment-model" value={model} onChange={(event) => setModel(event.target.value)} placeholder="JDI" />
             </Field>
           </FieldGroup>
+
+          {transport ? (
+            <FieldGroup className="rounded-lg border bg-muted/30 p-3">
+              <Field>
+                <div className="flex flex-wrap items-center gap-2">
+                  <FieldLabel>Snake topology</FieldLabel>
+                  <Badge variant="secondary">{transport.kind === "split-snake" ? "Split snake" : "Two-sided snake"}</Badge>
+                </div>
+                <FieldDescription>Each side becomes its own movable graph node. Matching channel keys carry labels through the fixed trunk.</FieldDescription>
+              </Field>
+              <FieldGroup className="grid gap-3 sm:grid-cols-3">
+                <Field>
+                  <FieldLabel htmlFor="equipment-snake-channels">Routed channels</FieldLabel>
+                  <Input id="equipment-snake-channels" type="number" min={1} max={128} value={transport.channelCount} onChange={(event) => setTransport({ ...transport, channelCount: Math.max(1, Math.min(128, Number(event.target.value) || 1)) })} />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="equipment-snake-length">Fixed length</FieldLabel>
+                  <Input id="equipment-snake-length" type="number" min={0} step="0.1" value={transport.length ?? ""} onChange={(event) => setTransport({ ...transport, length: event.target.value ? Math.max(0, Number(event.target.value)) : undefined })} placeholder="25" />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="equipment-snake-length-unit">Length unit</FieldLabel>
+                  <Select value={transport.lengthUnit} onValueChange={(value) => value && setTransport({ ...transport, lengthUnit: value as "ft" | "m" })}>
+                    <SelectTrigger id="equipment-snake-length-unit" className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectGroup><SelectItem value="ft">Feet</SelectItem><SelectItem value="m">Meters</SelectItem></SelectGroup></SelectContent>
+                  </Select>
+                </Field>
+              </FieldGroup>
+              <Field>
+                <FieldLabel>Graph endpoints</FieldLabel>
+                <div className="flex flex-wrap gap-2">
+                  {transport.endpoints.map((endpoint) => <Badge key={endpoint.id} variant="outline">{endpoint.label} · {endpoint.style}</Badge>)}
+                </div>
+              </Field>
+              <FieldGroup className="grid gap-3 sm:grid-cols-2">
+                {transport.endpoints.map((endpoint, index) => (
+                  <FieldGroup key={endpoint.id} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_9rem]">
+                    <Field>
+                      <FieldLabel htmlFor={`equipment-snake-endpoint-${index}-label`}>Endpoint {index + 1} label</FieldLabel>
+                      <Input id={`equipment-snake-endpoint-${index}-label`} value={endpoint.label} onChange={(event) => setTransport({ ...transport, endpoints: transport.endpoints.map((item) => item.id === endpoint.id ? { ...item, label: event.target.value } : item) })} />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor={`equipment-snake-endpoint-${index}-style`}>Physical end</FieldLabel>
+                      <Select value={endpoint.style} onValueChange={(value) => value && setTransport({ ...transport, endpoints: transport.endpoints.map((item) => item.id === endpoint.id ? { ...item, style: value as "box" | "fan" | "tail" } : item) })}>
+                        <SelectTrigger id={`equipment-snake-endpoint-${index}-style`} className="w-full"><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectGroup><SelectItem value="box">Box</SelectItem><SelectItem value="fan">Fan</SelectItem><SelectItem value="tail">Tail</SelectItem></SelectGroup></SelectContent>
+                      </Select>
+                    </Field>
+                  </FieldGroup>
+                ))}
+              </FieldGroup>
+            </FieldGroup>
+          ) : null}
 
           <Field>
             <FieldLabel htmlFor="equipment-description">Gear description</FieldLabel>
@@ -335,17 +450,17 @@ export function EquipmentTemplateDialog({ open, onOpenChange, onCreated }: Equip
               </div>
               <FieldDescription>Each row is one physical connector with its own stable ID, direction, label, connector type, gender, and signal. Group totals are derived from these rows.</FieldDescription>
             </Field>
-            <EquipmentPortEditor ports={ports} onChange={setPorts} idPrefix="equipment-template" />
+            <EquipmentPortEditor ports={ports} onChange={setPorts} idPrefix="equipment-template" transport={transport} />
           </FieldGroup>
 
-          {researchResult?.referenceImages.length ? (
+          {referenceImages.length ? (
             <FieldGroup className="rounded-lg border p-3">
               <Field>
                 <FieldLabel>Reference product photos</FieldLabel>
                 <FieldDescription>These are source-page references for the gear description. They are not the transparent stage-plot icon and they are not photos of a specific physical asset.</FieldDescription>
               </Field>
               <FieldGroup className="grid gap-2 sm:grid-cols-2">
-                {researchResult.referenceImages.map((image, index) => {
+                {referenceImages.map((image, index) => {
                   const id = `equipment-reference-image-${index}`;
                   return (
                     <Field key={image.url} orientation="horizontal">
@@ -363,12 +478,7 @@ export function EquipmentTemplateDialog({ open, onOpenChange, onCreated }: Equip
             </FieldGroup>
           ) : null}
 
-          <FieldGroup className="grid gap-4 sm:grid-cols-2">
-            <Field>
-              <FieldLabel htmlFor="equipment-units">Owned units</FieldLabel>
-              <Textarea id="equipment-units" value={ownedUnitLabels} onChange={(event) => setOwnedUnitLabels(event.target.value)} placeholder={"Radial JDI #1\nRadial JDI #2"} rows={4} />
-              <FieldDescription>One physical item or asset label per line.</FieldDescription>
-            </Field>
+          <FieldGroup>
             <Field>
               <FieldLabel htmlFor="equipment-image">Stage-plot icon</FieldLabel>
               <label htmlFor="equipment-image" className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-background px-3 py-4 text-center text-sm font-medium hover:bg-muted/50">
@@ -424,12 +534,32 @@ export function EquipmentTemplateDialog({ open, onOpenChange, onCreated }: Equip
             ) : null}
           </div>
         </form>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => changeOpen(false)} disabled={saving}>Cancel</Button>
-          <Button type="submit" form="equipment-template-form" disabled={researching || saving || !name.trim()}>
-            <PlusIcon data-icon="inline-start" />
-            {saving ? "Creating..." : "Create equipment"}
-          </Button>
+        <DialogFooter className="sm:justify-between">
+          {template ? (
+            <AlertDialog>
+              <AlertDialogTrigger render={<Button type="button" variant="ghost" disabled={saving || researching} />}>
+                <ArchiveIcon data-icon="inline-start" />
+                Remove from rack
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Remove {template.name} from the equipment rack?</AlertDialogTitle>
+                  <AlertDialogDescription>Existing setup nodes and gear assets keep their saved data. This definition will no longer appear as something you can drag onto a setup.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Keep definition</AlertDialogCancel>
+                  <AlertDialogAction variant="destructive" onClick={() => void archiveDefinition()}>Remove from rack</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          ) : <span />}
+          <div className="flex flex-col-reverse gap-2 sm:flex-row">
+            <Button type="button" variant="outline" onClick={() => changeOpen(false)} disabled={saving}>Cancel</Button>
+            <Button type="submit" form="equipment-template-form" disabled={researching || saving || !name.trim()}>
+              {template ? <SaveIcon data-icon="inline-start" /> : <PlusIcon data-icon="inline-start" />}
+              {saving ? "Saving..." : template ? "Save definition" : "Create equipment"}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

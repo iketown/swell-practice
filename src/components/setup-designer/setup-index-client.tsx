@@ -1,6 +1,6 @@
 "use client";
 
-import { ArchiveIcon, CopyIcon, ExternalLinkIcon, PackageOpenIcon, PencilIcon, PlusIcon, RefreshCwIcon } from "lucide-react";
+import { ArchiveIcon, BoxesIcon, CopyIcon, ExternalLinkIcon, PackageOpenIcon, PencilIcon, PlusIcon, RefreshCwIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
@@ -156,6 +156,7 @@ export function SetupIndexClient() {
           <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">Plan every port, cable, and piece of equipment for studio, live, and video rigs.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link href={setupHref("/gear")} className={buttonVariants({ variant: "outline" })}><BoxesIcon data-icon="inline-start" />Gear inventory</Link>
           <Link href={setupHref("/setups/equipment")} className={buttonVariants({ variant: "outline" })}><PackageOpenIcon data-icon="inline-start" />Equipment library</Link>
           <Button onClick={() => setCreating(true)}><PlusIcon data-icon="inline-start" />New setup</Button>
         </div>

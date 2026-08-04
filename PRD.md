@@ -1,12 +1,12 @@
 # The Swell Parts Library PRD
 
-Status: Draft v0.2
-Date: 2026-07-13
+Status: Draft v0.3
+Date: 2026-08-03
 Owner: Brian Eichenberger
 
 ## 1. Purpose
 
-Create a small internal website where The Swell members can quickly find their rehearsal parts by song, assigned role, or band configuration. The product trades the original full band-operations scope for speed: songs, reusable uploaded assets, members, bands, sparse assignment overrides, and a simple admin workflow backed by Firebase.
+Create a practical internal website where The Swell members can quickly find rehearsal parts and administrators can plan the physical systems needed to rehearse, record, and perform. The parts library remains intentionally simple, while linked stage-planning and gear-tracking modules grow in phased, separately usable releases backed by Firebase.
 
 This is not the public marketing site and not the full band OS. It is a practical parts-distribution tool that can be deployed quickly to Vercel.
 
@@ -36,7 +36,7 @@ This is not the public marketing site and not the full band OS. It is a practica
 
 ## 4. Non-Goals
 
-- No payroll, tax, logistics, travel, billing, or capability/proficiency logic.
+- No payroll, tax, travel-booking, billing, or capability/proficiency logic. Gear location, packing, and backline requirements are the only logistics in scope.
 - No show bible, public EPK, or marketing-site work.
 - No complex role hierarchy beyond admin vs viewer.
 - No login-specific personalization; member pages are shareable read-only URLs.
@@ -48,6 +48,7 @@ This is not the public marketing site and not the full band OS. It is a practica
 | Route | Purpose |
 | --- | --- |
 | `/` | Song index with quick links to songs and common parts. |
+| `/docs` | Living system blueprint and, as features ship, operating guides for stage planning, signal routing, inventory, containers, and packing. |
 | `/songs/[songSlug]` | Song page showing all parts and their assigned assets. Admins can upload files and edit assignments here. |
 | `/songs/[songSlug]/player` | Song-scoped multitrack player that loads one administrator-defined stem mix at a time, kept separate from rehearsal assets. |
 | `/songs/inst` | All-song live arrangement table with five single-instrument performer slots, multi-instrument Trax assignments, and original-recording playback. |
@@ -562,7 +563,8 @@ The first planned setup types are a home studio, a live rig, and a video-recordi
 ### 17.2 Goals
 
 - Create, name, describe, save, reopen, rename, duplicate, and archive multiple setups.
-- Build reusable equipment templates such as a microphone, Behringer X32, stage box, DI, camera, or computer.
+- Build reusable equipment templates such as a microphone, Behringer X32, stage box, DI, camera, computer, or multichannel snake.
+- Model regular, extension, and split analog snakes as one inventory item with two or three independently positioned endpoints and a fixed multicore trunk.
 - Upload an optional image for each equipment template to Firebase Storage.
 - Place any number of instances of a template on a React Flow canvas without re-uploading its image.
 - Configure each node's input and output ports in a modal, including optional labels and visible numbering.
@@ -594,6 +596,8 @@ The first planned setup types are a home studio, a live rig, and a video-recordi
 | Equipment template | A reusable library definition for a piece of equipment, its image, and its default ports. |
 | Owned equipment unit | A specific physical item associated with a template, such as `SM58 #3` or `Radial JDI #1`, which can be assigned to one setup node. |
 | Equipment node | A setup-specific snapshot of an equipment template with its own position and permitted port overrides. |
+| Snake assembly | One physical multichannel snake represented by two linked endpoint nodes, or three endpoint nodes for a split snake. It remains one inventory and parts-list requirement. |
+| Channel key | The stable route identity shared by every snake connector that carries the same channel. Matching keys propagate source labels across endpoints. |
 | Port | A physical input or output on equipment. A port has a stable ID, direction, number, optional label, connector, and optional signal type. |
 | Connector type | The physical interface family, such as XLR, 1/4-inch TS, 1/4-inch TRS, RJ45, BNC, HDMI, or USB-C. |
 | Cable end | The plug or socket on one end of a cable. It has a connector type and gender and must mate with the attached equipment port. |
@@ -647,6 +651,16 @@ Double-clicking a node or choosing `Edit equipment` opens a modal with:
 - Reordering controls that work with keyboard and pointer input.
 
 Inputs render on the left and outputs on the right by default. In compact view, each physical port remains a distinct triangular React Flow handle, with dense banks using smaller evenly distributed triangles. Numbers are one-based within each direction. A label never replaces the stable port ID. Reducing the count or deleting a port that has a cable attached requires confirmation and identifies every cable that will also be removed.
+
+#### Configure multichannel snakes
+
+An equipment definition can declare `equipmentKind: "snake"` or `"split-snake"`. A regular or extension snake has two physical endpoints. A split snake has one Side A and two matched Side B endpoints, normally FOH and monitors. The definition stores its fixed physical length, routed channel count, endpoint labels/styles, and exact connector banks.
+
+Every snake port stores an `endpointId` and a `channelKey`. Connectors sharing one channel key are physically joined inside the snake. Connecting `Guitar A` to Side A channel 1 therefore labels every paired connector `Snake ch 1 (Guitar A)`. In a split snake, both Side B channel 1 outputs receive that carried label. Separate send and return paths use different key prefixes.
+
+Adding a snake to a setup creates two or three independently movable React Flow nodes joined by one or two thick, non-editable internal trunk edges. The trunk shows channel count and fixed length, does not animate like a patch cable, and never becomes another cable requirement. External patch cables remain normal selectable edges and determine the derived parts list.
+
+All endpoint nodes share an `assemblyId`, fulfillment source, and exact inventory asset. The Gear list and inventory validator treat the assembly as one physical item. Deleting any endpoint removes the full assembly after confirming its external cables.
 
 #### Connect equipment
 
@@ -830,6 +844,26 @@ type EquipmentPort = {
   connector: ConnectorSnapshot;
   signalType?: string;
   channelCapacity?: number;
+  endpointId?: string; // snake side containing this connector
+  channelKey?: string; // shared internal route, for example channel-1
+};
+```
+
+#### `EquipmentTransportTopology`
+
+```ts
+type EquipmentKind = "device" | "snake" | "split-snake";
+
+type EquipmentTransportTopology = {
+  kind: "snake" | "split-snake";
+  length?: number;
+  lengthUnit: "ft" | "m";
+  channelCount: number;
+  endpoints: Array<{
+    id: string;
+    label: string;
+    style: "box" | "fan" | "tail";
+  }>;
 };
 ```
 
@@ -844,6 +878,13 @@ type SetupNode = {
   data: {
     templateId?: string;
     templateVersion?: number;
+    equipmentKind?: EquipmentKind;
+    transport?: EquipmentTransportTopology;
+    assemblyId?: string;
+    transportEndpointId?: string;
+    transportEndpointLabel?: string;
+    transportPrimary?: boolean;
+    transportChannelLabels?: Record<string, string>; // derived display cache
     name: string;
     notes?: string;
     image?: {
@@ -1121,6 +1162,7 @@ type Party = {
 
 type InventoryAsset = {
   id: string;
+  assetTag: string;
   definitionId: string;
   qrCode?: string;
   displayName: string;
@@ -1136,6 +1178,10 @@ type InventoryAsset = {
   active: boolean;
 };
 ```
+
+`assetTag` is the permanent human-facing inventory ID. New assets use an uppercase three-letter prefix and a sequence of at least two digits, such as `HXS-01`. The creation form derives the prefix from the item, scans every existing asset with that prefix including retired assets, and suggests one greater than the highest middle sequence. Cable tags may add a second dash and a two-digit length in feet: `XLR-04-25` means XLR cable 04, 25 ft. The optional length does not participate in sequence allocation. Tags are unique and compared case-insensitively; saved values are canonical uppercase. Search ignores case, spaces, and punctuation, so `trs31`, `TRS-31`, and `tRs31` all find `TRS-31-15`.
+
+Machine-readable labels preserve the same identity. A Code 128 cable barcode encodes the bare tag, while a QR label points to `https://theswell.live/g/{lowercase-asset-tag}`. The short route canonicalizes the tag and opens `/gear` filtered to that asset.
 
 Owners and setup providers use one open-ended `Party` registry rather than hardcoded enums. A party can be a band member, hired musician, venue, backline company, or other person or organization. The same party can own physical assets and be responsible for supplying them to a setup.
 
@@ -1239,24 +1285,25 @@ An item being last known in the car does not automatically mean it was verified 
 ### 18.9 Initial Collections and Storage
 
 ```text
-/gearDefinitions/{definitionId}
+/equipmentTemplates/{definitionId}  # current reusable gear-definition catalog
 /inventoryAssets/{assetId}
 /inventoryAssets/{assetId}/checkIns/{checkInId}
+/gearParties/{partyId}
+/gearLocations/{locationId}
+/purchaseOrders/{orderId}
 /containerManifests/{containerAssetId}
 /setups/{setupId}
 /setups/{setupId}/items/{setupItemId}
 /setups/{setupId}/cables/{cableId}
 /packingSessions/{sessionId}
 /packingSessions/{sessionId}/verifications/{assetId}
-/locations/{locationId}
-/parties/{partyId}
 ```
 
 Firebase Storage paths:
 
 ```text
 /setup-designer/equipment/{templateId}/{imageId}-{sanitizedFilename}  # current icons and definition detail photos
-/inventory-photos/{assetId}/{imageId}-{sanitizedFilename}             # planned physical-asset photos
+/gear-assets/{assetId}/{imageId}-{sanitizedFilename}                  # physical-asset photos
 ```
 
 ### 18.10 Documentation Route
@@ -1277,8 +1324,8 @@ Planned operating guides include:
 ### 18.11 Delivery Sequence
 
 1. Preserve and harden the working setup editor foundation.
-2. Add the scaled Stage Plot, groups, waypoints, corridor rendering, and length calculation.
-3. Add gear definitions, individually tagged assets, owners, providers, locations, assignments, icons, and photo galleries.
+2. Add gear definitions, planned and physical assets, owners, providers, locations, setup assignment, purchasing, receiving, icons, and photo galleries.
+3. Add the scaled Stage Plot, groups, waypoints, corridor rendering, and length calculation.
 4. Add containers, manifests, nested placement, mobile camera scanning, manual batch check-in, optional GPS, and item history.
 5. Add packing sessions, shortages, substitutes, shopping lists, member packing lists, backline advances, and exports.
 6. Add offline resilience, correction tooling, date conflict detection, real-device QA, security hardening, and backups.
@@ -1296,16 +1343,21 @@ Planned operating guides include:
 9. A location match and a packing-session verification are separate facts.
 10. The `/docs` page remains synchronized with the PRD and evolves into the operating manual.
 11. Gear owners and setup providers come from one open-ended party registry, not a fixed list of band members or companies.
+12. A planned asset receives its permanent inventory ID before purchase. Intended ownership and physical possession are separate facts.
+13. Purchase orders group already-reserved assets; first check-in is the boundary that establishes physical possession and location.
 
 ### 18.13 AI-Assisted Equipment Research
 
 An administrator creating reusable equipment may paste a public HTTPS product-page URL into the equipment dialog and request research. The server reads the supplied page, extracts direct reference-photo URLs, and asks an OpenRouter-hosted model for strict structured equipment data. The initial model is `openai/gpt-5.6-terra`, configurable through `OPEN_ROUTER_EQUIPMENT_IMPORT_MODEL`; the credential remains server-only in `OPEN_ROUTER_API_KEY`.
+
+The same workflow edits existing definitions directly from the setup equipment rack. Saving increments the definition version and affects future nodes created from that definition; existing setup-node snapshots remain stable. Removing a preset archives the definition from the rack rather than deleting it, preserving references from existing setup nodes and inventory assets.
 
 The research result may fill:
 
 - Equipment name, manufacturer, model, category, and an original concise description.
 - Seller, observed purchase price, currency, display price, source URL, and observation time.
 - Exact input and output port groups, including count, label, connector type, connector gender, signal type, channel capacity, and supported specification notes.
+- Equipment behavior (`device`, `snake`, or `split-snake`) plus snake length, channel count, endpoint styles, endpoint assignments, and shared channel-route keys.
 - Reference product-photo URLs found directly in page metadata or structured data.
 - Confidence, warnings, and supporting source URLs.
 
@@ -1314,3 +1366,29 @@ Research never creates or overwrites equipment automatically. The result populat
 Product reference photos remain distinct from both image systems already defined in Section 18.4: they are not the transparent diagram icon and they are not documentary photos of a tagged physical asset. They are source-linked references for the reusable gear definition. A later media-hardening pass may copy approved reference images into Firebase Storage to avoid relying on third-party hotlinks.
 
 The route validates administrator access, permits the demo bypass only on a local non-production origin, blocks private-network source URLs and unsafe redirects, caps downloaded page size, treats page content as untrusted data, uses strict JSON Schema output, and stores model/source provenance with the result. Prices and AI-extracted specifications are observations that must remain visibly reviewable rather than permanent unquestioned facts.
+
+### 18.14 Gear Registry and Procurement Implementation
+
+The first `/gear` vertical slice is implemented around the existing `equipmentTemplates` catalog rather than introducing a duplicate definition collection. The route is admin-only and provides three connected views:
+
+1. **Definitions** — reusable model data, AI research, exact ports, purchase source, icon, and reference/detail photos.
+2. **Assets** — permanent individually identifiable planned or physical gear with owner, lifecycle, serial number, physical photos, latest location, source setup, and purchase linkage.
+3. **Orders** — grouped vendor purchases with reserved asset IDs, payer and account label, payment state, order number, carrier, tracking number, expected arrival, and milestone dates.
+
+Asset lifecycle values are:
+
+```text
+planned -> cart -> ordered -> in_transit -> awaiting_check_in -> active
+                                                     \-> cancelled
+active -> retired
+```
+
+An asset may be assigned to an intended owner while it is still planned or in transit. `currentLocationId` is deliberately absent until a physical observation is available. When the first check-in is recorded, the asset becomes `active`, its current-location snapshot is updated, and an immutable check-in document is appended beneath the asset.
+
+Setup node details query `inventoryAssets` by definition. An administrator can select an existing matching asset, assign an outside provider from `gearParties`, or create a planned asset inside the setup modal. The new asset receives its permanent ID immediately, retains `sourceSetupId`, and is assigned to the node without leaving the setup workflow.
+
+Asset creation suggests the next short human-readable ID from the definition name or model rather than generating a random `SWL-` token. The suggestion remains editable before save, but every newly assigned tag must follow `AAA-01` or the cable form `AAA-01-25`. Existing legacy tags remain readable and editable so deployed labels do not break. Duplicate tags are rejected case-insensitively.
+
+Within one setup, an `inventoryAsset` may fulfill only one equipment node. The invariant applies to every individually reserved lifecycle state, including planned, cart, ordered, in transit, awaiting check-in, and active. The node editor disables assets already assigned elsewhere in the setup and identifies the conflicting node; graph persistence rejects duplicate asset IDs as a final integrity check. Two required units therefore require two distinct asset records, even before purchase.
+
+Current receiving supports manual check-in with a named `gearLocation` and optional browser geolocation. Camera QR scanning, bulk check-in, printable QR sheets, container inheritance, and correction workflows remain later slices built on the same append-only event model.

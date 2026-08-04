@@ -3,6 +3,21 @@ import type { Edge, Node, Viewport } from "@xyflow/react";
 export type PortDirection = "input" | "output";
 export type ConnectorGender = "male" | "female" | "none";
 export type FulfillmentStatus = "unplanned" | "owned" | "rent" | "buy";
+export type EquipmentKind = "device" | "snake" | "split-snake";
+
+export interface EquipmentTransportEndpoint {
+  id: string;
+  label: string;
+  style: "box" | "fan" | "tail";
+}
+
+export interface EquipmentTransportTopology {
+  kind: "snake" | "split-snake";
+  length?: number;
+  lengthUnit: "ft" | "m";
+  channelCount: number;
+  endpoints: EquipmentTransportEndpoint[];
+}
 
 export interface ConnectorSnapshot {
   typeId: string;
@@ -20,6 +35,10 @@ export interface EquipmentPort {
   connector: ConnectorSnapshot;
   signalType?: string;
   channelCapacity?: number;
+  /** Snake endpoint containing this physical connector. */
+  endpointId?: string;
+  /** Stable route key shared by every connector on the same snake channel. */
+  channelKey?: string;
 }
 
 export interface EquipmentImage {
@@ -70,6 +89,8 @@ export interface EquipmentTemplate {
   manufacturer?: string;
   model?: string;
   category: string;
+  equipmentKind: EquipmentKind;
+  transport?: EquipmentTransportTopology;
   description?: string;
   notes?: string;
   purchaseSource?: EquipmentPurchaseSource;
@@ -90,6 +111,8 @@ export interface ImportedEquipmentDraft {
   manufacturer?: string;
   model?: string;
   category: string;
+  equipmentKind: EquipmentKind;
+  transport?: EquipmentTransportTopology;
   description?: string;
   purchaseSource: EquipmentPurchaseSource;
   ports: EquipmentPort[];
@@ -108,12 +131,24 @@ export interface EquipmentNodeData extends Record<string, unknown> {
   templateVersion?: number;
   name: string;
   category: string;
+  equipmentKind?: EquipmentKind;
+  transport?: EquipmentTransportTopology;
+  assemblyId?: string;
+  transportEndpointId?: string;
+  transportEndpointLabel?: string;
+  transportPrimary?: boolean;
+  transportChannelLabels?: Record<string, string>;
   notes?: string;
   image?: Pick<EquipmentImage, "storagePath" | "downloadUrl" | "contentType">;
   ports: EquipmentPort[];
   showPortNumbers: boolean;
   showPortLabels: boolean;
   isExpanded?: boolean;
+  assignedAssetId?: string;
+  assignedAssetLabel?: string;
+  providerPartyId?: string;
+  providerPartyName?: string;
+  // Legacy template-local units remain readable while setups migrate to inventoryAssets.
   assignedUnitId?: string;
   assignedUnitLabel?: string;
   fulfillment: FulfillmentStatus;
@@ -136,6 +171,15 @@ export interface CableEdgeData extends Record<string, unknown> {
   notes?: string;
   exception?: {
     reason: string;
+  };
+  internalTransport?: {
+    assemblyId: string;
+    kind: "snake" | "split-snake";
+    channelCount: number;
+    endpointAId: string;
+    endpointBId: string;
+    endpointALabel: string;
+    endpointBLabel: string;
   };
 }
 
@@ -217,6 +261,7 @@ export interface EquipmentUsageRow {
   fulfillment: FulfillmentStatus;
   inputCount: number;
   outputCount: number;
+  detail?: string;
 }
 
 export function createSetupId(prefix: string) {
