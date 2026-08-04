@@ -66,6 +66,31 @@ const LOCATION_KINDS: Array<{ value: GearLocationKind; label: string }> = [
 type SessionPhase = "setup" | "scanning" | "summary";
 type CameraStatus = "idle" | "starting" | "scanning" | "error";
 type ScanSource = "camera" | "manual";
+type CameraDetectionStatus = "checking" | "recorded";
+
+const CAMERA_DETECTION_LIFETIME_MS = 2200;
+const MAX_VISIBLE_CAMERA_DETECTIONS = 8;
+
+interface CameraFrameSize {
+  width: number;
+  height: number;
+}
+
+interface CameraResultPoint {
+  getX: () => number;
+  getY: () => number;
+}
+
+interface CameraDetectionBox {
+  assetId: string;
+  assetTag: string;
+  status: CameraDetectionStatus;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  lastSeenAt: number;
+}
 
 interface ScannedSessionItem {
   assetId: string;
@@ -74,6 +99,147 @@ interface ScannedSessionItem {
   checkInId: string;
   checkedInAt: number;
   previousLocationName?: string;
+}
+
+function clamp(value: number, minimum: number, maximum: number) {
+  return Math.min(Math.max(value, minimum), maximum);
+}
+
+function cameraBoxFromResultPoints(
+  points: CameraResultPoint[],
+  frame: CameraFrameSize,
+): Omit<CameraDetectionBox, "assetId" | "assetTag" | "status" | "lastSeenAt"> | null {
+  if (points.length < 2 || frame.width <= 0 || frame.height <= 0) return null;
+
+  const xValues = points.map((point) => point.getX()).filter(Number.isFinite);
+  const yValues = points.map((point) => point.getY()).filter(Number.isFinite);
+  if (xValues.length < 2 || yValues.length < 2) return null;
+
+  const minimumX = Math.min(...xValues);
+  const maximumX = Math.max(...xValues);
+  const minimumY = Math.min(...yValues);
+  const maximumY = Math.max(...yValues);
+  const rawWidth = Math.max(maximumX - minimumX, 1);
+  const rawHeight = Math.max(maximumY - minimumY, 1);
+  const centerX = (minimumX + maximumX) / 2;
+  const centerY = (minimumY + maximumY) / 2;
+  const longSide = Math.max(rawWidth, rawHeight);
+  const shortSide = Math.min(rawWidth, rawHeight);
+  const looksLinear = shortSide < longSide * 0.26;
+
+  let boxWidth: number;
+  let boxHeight: number;
+  if (looksLinear) {
+    boxWidth = rawWidth < rawHeight ? Math.max(rawHeight * 0.3, frame.width * 0.07) : rawWidth;
+    boxHeight = rawHeight < rawWidth ? Math.max(rawWidth * 0.3, frame.height * 0.07) : rawHeight;
+    boxWidth += Math.max(boxWidth * 0.12, frame.width * 0.018);
+    boxHeight += Math.max(boxHeight * 0.2, frame.height * 0.018);
+  } else {
+    // QR result points are the finder-pattern centers, not the outer corners.
+    // Expanding by roughly 30% recreates the code's full footprint and quiet zone.
+    const side = Math.max(rawWidth, rawHeight);
+    boxWidth = side * 1.58;
+    boxHeight = side * 1.58;
+  }
+
+  boxWidth = clamp(boxWidth, frame.width * 0.06, frame.width);
+  boxHeight = clamp(boxHeight, frame.height * 0.06, frame.height);
+
+  const x = clamp(centerX - boxWidth / 2, 0, Math.max(frame.width - boxWidth, 0));
+  const y = clamp(centerY - boxHeight / 2, 0, Math.max(frame.height - boxHeight, 0));
+
+  return { x, y, width: boxWidth, height: boxHeight };
+}
+
+function CameraDetectionOverlay({
+  detections,
+  frame,
+}: {
+  detections: CameraDetectionBox[];
+  frame: CameraFrameSize;
+}) {
+  if (!detections.length || frame.width <= 0 || frame.height <= 0) return null;
+
+  return (
+    <svg
+      className="pointer-events-none absolute inset-0 size-full"
+      viewBox={`0 0 ${frame.width} ${frame.height}`}
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden
+    >
+      {detections.map((detection) => {
+        const recorded = detection.status === "recorded";
+        const color = recorded ? "oklch(0.72 0.19 145)" : "oklch(0.84 0.17 84)";
+        const fill = recorded ? "oklch(0.72 0.19 145 / 0.13)" : "oklch(0.84 0.17 84 / 0.15)";
+        const radius = Math.max(8, Math.min(detection.width, detection.height) * 0.07);
+        const centerX = detection.x + detection.width / 2;
+        const centerY = detection.y + detection.height / 2;
+        const statusRadius = clamp(
+          Math.min(detection.width, detection.height) * 0.22,
+          Math.min(frame.width, frame.height) * 0.022,
+          Math.min(frame.width, frame.height) * 0.065,
+        );
+
+        return (
+          <g key={detection.assetId}>
+            <rect
+              x={detection.x}
+              y={detection.y}
+              width={detection.width}
+              height={detection.height}
+              rx={radius}
+              fill={fill}
+              stroke="oklch(0.16 0.01 80 / 0.7)"
+              strokeWidth="8"
+              vectorEffect="non-scaling-stroke"
+            />
+            <rect
+              x={detection.x}
+              y={detection.y}
+              width={detection.width}
+              height={detection.height}
+              rx={radius}
+              fill="none"
+              stroke={color}
+              strokeDasharray="13 9"
+              strokeLinecap="round"
+              strokeWidth="4"
+              vectorEffect="non-scaling-stroke"
+            />
+            {recorded ? (
+              <>
+                <circle
+                  cx={centerX}
+                  cy={centerY}
+                  r={statusRadius}
+                  fill="oklch(0.66 0.2 145 / 0.94)"
+                  stroke="oklch(0.98 0.01 95)"
+                  strokeWidth="3"
+                  vectorEffect="non-scaling-stroke"
+                />
+                <path
+                  d={`M ${centerX - statusRadius * 0.5} ${centerY} L ${centerX - statusRadius * 0.12} ${centerY + statusRadius * 0.36} L ${centerX + statusRadius * 0.56} ${centerY - statusRadius * 0.42}`}
+                  fill="none"
+                  stroke="oklch(0.98 0.01 95)"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={Math.max(statusRadius * 0.22, 3)}
+                />
+              </>
+            ) : (
+              <circle
+                className="motion-safe:animate-pulse"
+                cx={centerX}
+                cy={centerY}
+                r={statusRadius * 0.24}
+                fill={color}
+              />
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
 }
 
 function formatScanTime(value: number) {
@@ -96,6 +262,8 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>("idle");
   const [cameraRequested, setCameraRequested] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [cameraFrame, setCameraFrame] = useState<CameraFrameSize>({ width: 1280, height: 720 });
+  const [cameraDetections, setCameraDetections] = useState<CameraDetectionBox[]>([]);
   const [manualEntryOpen, setManualEntryOpen] = useState(false);
   const [manualAssetTag, setManualAssetTag] = useState("");
   const [manualSubmitting, setManualSubmitting] = useState(false);
@@ -115,6 +283,7 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
   const successfulAssetIdsRef = useRef(new Set<string>());
   const processingAssetIdsRef = useRef(new Set<string>());
   const recentDetectionRef = useRef(new Map<string, number>());
+  const cameraDetectionsRef = useRef(new Map<string, CameraDetectionBox>());
   const initialLocationAppliedRef = useRef(false);
 
   const loadGear = useCallback(async () => {
@@ -161,6 +330,70 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
     assets.map((asset) => [canonicalizeAssetTag(asset.assetTag), asset]),
   ), [assets]);
 
+  const publishCameraDetections = useCallback(() => {
+    const visible = [...cameraDetectionsRef.current.values()]
+      .sort((left, right) => left.lastSeenAt - right.lastSeenAt)
+      .slice(-MAX_VISIBLE_CAMERA_DETECTIONS);
+    setCameraDetections(visible);
+  }, []);
+
+  const clearCameraDetections = useCallback(() => {
+    cameraDetectionsRef.current.clear();
+    setCameraDetections([]);
+  }, []);
+
+  const updateCameraFrame = useCallback((video: HTMLVideoElement) => {
+    if (!video.videoWidth || !video.videoHeight) return;
+    setCameraFrame((current) => (
+      current.width === video.videoWidth && current.height === video.videoHeight
+        ? current
+        : { width: video.videoWidth, height: video.videoHeight }
+    ));
+  }, []);
+
+  const showCameraDetection = useCallback((rawValue: string, points: CameraResultPoint[]) => {
+    const assetTag = assetTagFromScannedValue(rawValue);
+    const asset = assetByTag.get(assetTag);
+    const video = videoRef.current;
+    if (!asset || !video?.videoWidth || !video.videoHeight) return;
+
+    const frame = { width: video.videoWidth, height: video.videoHeight };
+    const geometry = cameraBoxFromResultPoints(points, frame);
+    if (!geometry) return;
+
+    updateCameraFrame(video);
+    const now = Date.now();
+    for (const [assetId, detection] of cameraDetectionsRef.current) {
+      if (now - detection.lastSeenAt > CAMERA_DETECTION_LIFETIME_MS) {
+        cameraDetectionsRef.current.delete(assetId);
+      }
+    }
+    cameraDetectionsRef.current.set(asset.id, {
+      assetId: asset.id,
+      assetTag: asset.assetTag,
+      status: successfulAssetIdsRef.current.has(asset.id) ? "recorded" : "checking",
+      ...geometry,
+      lastSeenAt: now,
+    });
+    publishCameraDetections();
+  }, [assetByTag, publishCameraDetections, updateCameraFrame]);
+
+  const markCameraDetectionRecorded = useCallback((assetId: string) => {
+    const detection = cameraDetectionsRef.current.get(assetId);
+    if (!detection) return;
+    cameraDetectionsRef.current.set(assetId, {
+      ...detection,
+      status: "recorded",
+      lastSeenAt: Date.now(),
+    });
+    publishCameraDetections();
+  }, [publishCameraDetections]);
+
+  const removeCameraDetection = useCallback((assetId: string) => {
+    if (!cameraDetectionsRef.current.delete(assetId)) return;
+    publishCameraDetections();
+  }, [publishCameraDetections]);
+
   const stopCamera = useCallback((updateStatus = true) => {
     cameraAttemptRef.current += 1;
     controlsRef.current?.stop();
@@ -170,8 +403,9 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
       for (const track of video.srcObject.getTracks()) track.stop();
       video.srcObject = null;
     }
+    clearCameraDetections();
     if (updateStatus) setCameraStatus("idle");
-  }, []);
+  }, [clearCameraDetections]);
 
   const primeFeedback = useCallback(async () => {
     if (audioContextRef.current) {
@@ -256,6 +490,7 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
         previousLocationName,
       };
       successfulAssetIdsRef.current.add(asset.id);
+      markCameraDetectionRecorded(asset.id);
       setScannedItems((current) => [...current, item]);
       setLastScan(item);
       setAssets((current) => current.map((currentAsset) => currentAsset.id === asset.id
@@ -279,12 +514,21 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
       toast.error(`Could not check in ${asset.assetTag}.`, {
         description: caught instanceof Error ? caught.message : "Try scanning it again.",
       });
+      removeCameraDetection(asset.id);
       recentDetectionRef.current.delete(detectionKey);
       return false;
     } finally {
       processingAssetIdsRef.current.delete(asset.id);
     }
-  }, [admin.user, assetByTag, locationById, playSuccessFeedback, selectedLocation]);
+  }, [
+    admin.user,
+    assetByTag,
+    locationById,
+    markCameraDetectionRecorded,
+    playSuccessFeedback,
+    removeCameraDetection,
+    selectedLocation,
+  ]);
 
   const startCamera = useCallback(async () => {
     if (!videoRef.current || cameraStatus === "starting" || cameraStatus === "scanning") return;
@@ -334,6 +578,7 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
         videoRef.current,
         (result) => {
           if (result && sessionActiveRef.current) {
+            showCameraDetection(result.getText(), result.getResultPoints());
             void processScannedValue(result.getText(), "camera");
           }
         },
@@ -352,7 +597,7 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
     } finally {
       window.clearTimeout(permissionTimeout);
     }
-  }, [cameraStatus, primeFeedback, processScannedValue]);
+  }, [cameraStatus, primeFeedback, processScannedValue, showCameraDetection]);
 
   useEffect(() => {
     if (phase !== "scanning" || !cameraRequested || !videoRef.current) return;
@@ -362,6 +607,21 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
     }, 0);
     return () => window.clearTimeout(timeout);
   }, [cameraRequested, phase, startCamera]);
+
+  useEffect(() => {
+    if (phase !== "scanning") return;
+    const interval = window.setInterval(() => {
+      const now = Date.now();
+      let changed = false;
+      for (const [assetId, detection] of cameraDetectionsRef.current) {
+        if (now - detection.lastSeenAt <= CAMERA_DETECTION_LIFETIME_MS) continue;
+        cameraDetectionsRef.current.delete(assetId);
+        changed = true;
+      }
+      if (changed) publishCameraDetections();
+    }, 300);
+    return () => window.clearInterval(interval);
+  }, [phase, publishCameraDetections]);
 
   useEffect(() => {
     function pauseHiddenCamera() {
@@ -572,10 +832,12 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
               autoPlay
               muted
               playsInline
+              onLoadedMetadata={(event) => updateCameraFrame(event.currentTarget)}
               className="aspect-[3/4] w-full object-cover sm:aspect-video"
             />
             {cameraStatus === "scanning" ? (
               <>
+                <CameraDetectionOverlay detections={cameraDetections} frame={cameraFrame} />
                 <div className="pointer-events-none absolute inset-[11%] rounded-xl border-2 border-background/80" aria-hidden />
                 <Badge className="absolute left-3 top-3" variant="secondary">
                   <span className="size-2 rounded-full bg-primary" aria-hidden />
