@@ -96,6 +96,7 @@
   --swell-gold: oklch(0.81 0.148 78.6);
   --swell-info: oklch(0.819 0.069 214.8);
   --swell-espresso: oklch(0.334 0.036 35.2);
+  --swell-success: oklch(0.75 0.25 142);
 
   /* Reusable part palette: change these five source colors to retheme every part view. */
   --swell-part-1: #fc440f; /* red */
@@ -141,6 +142,7 @@
   --sidebar-accent-foreground: oklch(0.952 0.018 88);
   --sidebar-border: oklch(0.43 0.028 61);
   --sidebar-ring: oklch(0.819 0.069 214.8);
+  --swell-success: oklch(0.82 0.24 142);
 }
 
 @layer base {
@@ -202,6 +204,41 @@
 
   .swell-soft-chip {
     @apply border bg-secondary text-secondary-foreground shadow-none;
+  }
+
+  .swell-lead-vocal {
+    border-color: var(--swell-gold);
+    box-shadow:
+      0 0 0 2px color-mix(in oklch, var(--swell-gold) 44%, transparent),
+      0 0 12px color-mix(in oklch, var(--swell-gold) 34%, transparent);
+  }
+
+  .swell-recent-assignment {
+    border-color: var(--swell-success);
+    transform: scale(1.08);
+    animation: swell-recent-assignment-pulse 700ms cubic-bezier(0.16, 1, 0.3, 1) 2;
+    box-shadow:
+      0 0 0 5px color-mix(in oklch, var(--swell-success) 88%, transparent),
+      0 0 14px 7px color-mix(in oklch, var(--swell-success) 72%, transparent),
+      0 0 34px 13px color-mix(in oklch, var(--swell-success) 46%, transparent);
+  }
+
+  @keyframes swell-recent-assignment-pulse {
+    0%, 100% {
+      transform: scale(1.06);
+      box-shadow:
+        0 0 0 5px color-mix(in oklch, var(--swell-success) 88%, transparent),
+        0 0 14px 7px color-mix(in oklch, var(--swell-success) 72%, transparent),
+        0 0 34px 13px color-mix(in oklch, var(--swell-success) 46%, transparent);
+    }
+
+    50% {
+      transform: scale(1.13);
+      box-shadow:
+        0 0 0 7px color-mix(in oklch, var(--swell-success) 94%, transparent),
+        0 0 20px 10px color-mix(in oklch, var(--swell-success) 78%, transparent),
+        0 0 44px 18px color-mix(in oklch, var(--swell-success) 54%, transparent);
+    }
   }
 
   .swell-file-link {
@@ -481,6 +518,10 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
+    .swell-recent-assignment {
+      animation: none;
+    }
+
     .setup-signal-cable {
       animation: none;
     }

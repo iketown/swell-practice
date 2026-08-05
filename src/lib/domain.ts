@@ -13,6 +13,11 @@ export const INSTRUMENT_IDS = [
   "xtra_vox",
   "lion",
   "accordion",
+  "cello",
+  "alto_sax",
+  "acoustic",
+  "sax_sect",
+  "horn_sect",
   "notes",
 ] as const;
 
@@ -378,11 +383,36 @@ export interface BandMember {
   notes?: string;
 }
 
+export const VOCAL_PART_SLUGS = [
+  "voc_1",
+  "voc_2",
+  "voc_3",
+  "voc_4",
+  "voc_5",
+] as const;
+
+export type VocalPartSlug = (typeof VOCAL_PART_SLUGS)[number];
+
 export interface Band {
   id: string;
   title: string;
   code: string;
   memberIds: string[];
+  vocalPartByMemberId: Partial<Record<string, VocalPartSlug>>;
+}
+
+export interface SongVocalAssignment {
+  memberId: string;
+  partSlug: VocalPartSlug;
+  lead: boolean;
+}
+
+export interface BandSongArrangement {
+  bandId: string;
+  songId: string;
+  instrumentAssignments?: SongInstrumentAssignments;
+  showVocals: boolean;
+  vocalAssignments?: SongVocalAssignment[];
 }
 
 export interface MemberSongDefault {

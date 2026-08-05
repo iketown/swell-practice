@@ -74,12 +74,26 @@ export const sampleBands: Band[] = [
     title: "Band A · Standard lineup",
     code: "SWELL",
     memberIds: ["member-ike", "member-chris", "member-sam", "member-ben", "member-joe"],
+    vocalPartByMemberId: {
+      "member-ike": "voc_1",
+      "member-chris": "voc_2",
+      "member-sam": "voc_3",
+      "member-ben": "voc_4",
+      "member-joe": "voc_5",
+    },
   },
   {
     id: "band-b",
     title: "Band B · Chuck + Al",
     code: "SUB25",
     memberIds: ["member-ike", "member-chris", "member-sam", "member-chuck", "member-al"],
+    vocalPartByMemberId: {
+      "member-ike": "voc_1",
+      "member-chris": "voc_2",
+      "member-sam": "voc_3",
+      "member-chuck": "voc_4",
+      "member-al": "voc_5",
+    },
   },
 ];
 

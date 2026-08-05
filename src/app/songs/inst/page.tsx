@@ -1,5 +1,5 @@
-import { InstrumentAssignmentsClient } from "@/components/instrument-assignments-client";
+import { redirect } from "next/navigation";
 
-export default function InstrumentAssignmentsPage() {
-  return <InstrumentAssignmentsClient />;
+export default function LegacyInstrumentAssignmentsPage() {
+  redirect("/assignments");
 }

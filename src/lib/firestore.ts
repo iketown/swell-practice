@@ -8,13 +8,16 @@ import {
   getDoc,
   getDocs,
   limit,
+  onSnapshot,
   orderBy,
   query,
   runTransaction,
   serverTimestamp,
+  Timestamp,
   updateDoc,
   where,
   writeBatch,
+  type Unsubscribe,
 } from "firebase/firestore";
 import { deleteObject, getDownloadURL, ref, uploadBytes, uploadBytesResumable } from "firebase/storage";
 
@@ -27,12 +30,15 @@ import {
   fileTypeFromFile,
   inferPartSlugs,
   INSTRUMENT_IDS,
+  VOCAL_PART_SLUGS,
   SONG_MIXER_STATE_NAMES,
   sanitizeFilename,
   slugify,
   sortPartSlugs,
   sortTitle,
   stemDisplayNameFromFilename,
+  type InstrumentId,
+  type BandSongArrangement,
   type Song,
   type SongAsset,
   type SongAnnotation,
@@ -51,6 +57,8 @@ import {
   type PartSongRow,
   type SongInstrumentAssignments,
   type SongOriginalRecording,
+  type SongVocalAssignment,
+  type VocalPartSlug,
 } from "@/lib/domain";
 import { db, hasFirebaseConfig, storage } from "@/lib/firebase";
 import { samplePartRows, sampleSongBundle, sampleSongList } from "@/lib/sample-data";
@@ -89,6 +97,40 @@ function songFromDoc(id: string, data: Record<string, unknown>): Song {
       },
     ),
     originalRecording: originalRecordingFromData(data.originalRecording),
+  };
+}
+
+function bandSongArrangementFromDoc(
+  data: Record<string, unknown>,
+): BandSongArrangement {
+  const vocalAssignments = Array.isArray(data.vocalAssignments)
+    ? data.vocalAssignments.flatMap((value) => {
+        const assignment = objectValue(value);
+        const partSlug = typeof assignment.partSlug === "string"
+          && VOCAL_PART_SLUGS.includes(assignment.partSlug as VocalPartSlug)
+          ? assignment.partSlug as VocalPartSlug
+          : null;
+        return typeof assignment.memberId === "string" && partSlug
+          ? [{
+              memberId: assignment.memberId,
+              partSlug,
+              lead: assignment.lead === true,
+            }]
+          : [];
+      })
+    : undefined;
+
+  return {
+    bandId: String(data.bandId ?? ""),
+    songId: String(data.songId ?? ""),
+    instrumentAssignments: data.instrumentAssignments === undefined
+      ? undefined
+      : instrumentAssignmentsFromData(data.instrumentAssignments, {
+          title: "Notes",
+          notes: "",
+        }),
+    showVocals: data.showVocals === true,
+    vocalAssignments,
   };
 }
 
@@ -396,6 +438,134 @@ export async function listSongs(): Promise<Song[]> {
   }
 }
 
+export function subscribeSongs(
+  onSongs: (songs: Song[]) => void,
+  onError: (error: Error) => void,
+): Unsubscribe {
+  if (!hasFirebaseConfig || !db) {
+    let active = true;
+    queueMicrotask(() => {
+      if (active) onSongs(sampleSongList());
+    });
+    return () => {
+      active = false;
+    };
+  }
+
+  return onSnapshot(
+    query(collection(db, "songs"), orderBy("sortTitle", "asc")),
+    (snapshot) => {
+      onSongs(
+        snapshot.docs.map((songSnapshot) =>
+          songFromDoc(songSnapshot.id, songSnapshot.data()),
+        ),
+      );
+    },
+    (caught) => {
+      warnReadFailure("live songs", caught);
+      onError(
+        caught instanceof Error
+          ? caught
+          : new Error("Could not subscribe to song changes."),
+      );
+    },
+  );
+}
+
+export function subscribeSongMixerStemParts(
+  songIds: readonly string[],
+  onParts: (partsBySongId: Map<string, Set<string>>) => void,
+  onError: (error: Error) => void,
+): Unsubscribe {
+  const uniqueSongIds = [...new Set(songIds)];
+  if (!hasFirebaseConfig || !db || !uniqueSongIds.length) {
+    let active = true;
+    queueMicrotask(() => {
+      if (active) onParts(new Map());
+    });
+    return () => {
+      active = false;
+    };
+  }
+
+  const firestore = db;
+  let active = true;
+  const readySongIds = new Set<string>();
+  const partsBySongId = new Map<string, Set<string>>();
+  const subscriptions = uniqueSongIds.map((songId) => onSnapshot(
+    collection(firestore, "songs", songId, "mixerTracks"),
+    (snapshot) => {
+      const songParts = new Set<string>();
+      snapshot.docs.forEach((trackSnapshot) => {
+        const data = trackSnapshot.data();
+        const partSlug = mixerPartSlugFromData(
+          data,
+          String(data.filename ?? ""),
+        );
+        const playable = data.shown !== false && data.isBackgroundMix !== true;
+        if (!partSlug || !playable) return;
+
+        songParts.add(partSlug);
+      });
+
+      partsBySongId.set(songId, songParts);
+      readySongIds.add(songId);
+      if (active && readySongIds.size === uniqueSongIds.length) {
+        onParts(new Map(partsBySongId));
+      }
+    },
+    (caught) => {
+      warnReadFailure(`live mixer stem parts for song "${songId}"`, caught);
+      if (!active) return;
+      onError(
+        caught instanceof Error
+          ? caught
+          : new Error("Could not subscribe to mixer stem changes."),
+      );
+    },
+  ));
+
+  return () => {
+    active = false;
+    subscriptions.forEach((unsubscribe) => unsubscribe());
+  };
+}
+
+export function subscribeBandSongArrangements(
+  bandId: string,
+  onArrangements: (arrangements: BandSongArrangement[]) => void,
+  onError: (error: Error) => void,
+): Unsubscribe {
+  if (!hasFirebaseConfig || !db) {
+    let active = true;
+    queueMicrotask(() => {
+      if (active) onArrangements([]);
+    });
+    return () => {
+      active = false;
+    };
+  }
+
+  return onSnapshot(
+    query(collection(db, "bandSongArrangements"), where("bandId", "==", bandId)),
+    (snapshot) => {
+      onArrangements(
+        snapshot.docs.map((arrangementSnapshot) =>
+          bandSongArrangementFromDoc(arrangementSnapshot.data()),
+        ),
+      );
+    },
+    (caught) => {
+      warnReadFailure(`live arrangements for band "${bandId}"`, caught);
+      onError(
+        caught instanceof Error
+          ? caught
+          : new Error("Could not subscribe to band arrangement changes."),
+      );
+    },
+  );
+}
+
 export async function getSongBundle(slug: string): Promise<SongBundle | null> {
   if (!hasFirebaseConfig || !db) return sampleSongBundle(slug);
 
@@ -578,9 +748,10 @@ export async function updateSong(song: Song, title: string) {
 export async function deleteSong(song: Song) {
   const { db } = requireFirebase();
   const batch = writeBatch(db);
-  const [partsSnap, assetsSnap] = await Promise.all([
+  const [partsSnap, assetsSnap, arrangementsSnap] = await Promise.all([
     getDocs(collection(db, "songs", song.id, "parts")),
     getDocs(collection(db, "songs", song.id, "assets")),
+    getDocs(query(collection(db, "bandSongArrangements"), where("songId", "==", song.id))),
   ]);
 
   for (const snap of partsSnap.docs) {
@@ -588,6 +759,10 @@ export async function deleteSong(song: Song) {
   }
 
   for (const snap of assetsSnap.docs) {
+    batch.delete(snap.ref);
+  }
+
+  for (const snap of arrangementsSnap.docs) {
     batch.delete(snap.ref);
   }
 
@@ -609,7 +784,342 @@ export type SongMixerTrackUploadOptions = SongAssetUploadOptions & {
   orderIndex?: number;
 };
 
+const INSTRUMENT_ASSIGNMENT_COLLABORATION_DOCUMENT = "instrument-assignments";
+const INSTRUMENT_ASSIGNMENT_LOCK_DURATION_MS = 15_000;
+
+export type InstrumentAssignmentMoveTarget = {
+  kind: "instrument";
+  bandId: string;
+  songId: string;
+  assignmentKey: string;
+  instrumentId: InstrumentId;
+} & (
+  | { zone: "player"; slotIndex: number }
+  | { zone: "tracks"; trackIndex: number }
+);
+
+export type VocalAssignmentMoveTarget = {
+  kind: "vocal";
+  bandId: string;
+  songId: string;
+  assignmentKey: string;
+  partSlug: VocalPartSlug;
+  zone: "vocal";
+  slotIndex: number;
+  removed?: boolean;
+};
+
+export type AssignmentMoveTarget =
+  | InstrumentAssignmentMoveTarget
+  | VocalAssignmentMoveTarget;
+
+export type InstrumentAssignmentLastMove = AssignmentMoveTarget & {
+  changeId: string;
+};
+
+export type InstrumentAssignmentLock = {
+  sessionId: string;
+  userLabel: string;
+  expiresAt: number;
+};
+
+export type InstrumentAssignmentCollaborationState = {
+  lock: InstrumentAssignmentLock | null;
+  lastMove: InstrumentAssignmentLastMove | null;
+};
+
+export class InstrumentAssignmentLockedError extends Error {
+  userLabel: string;
+
+  constructor(userLabel: string) {
+    super(`${userLabel} is already moving an assignment.`);
+    this.name = "InstrumentAssignmentLockedError";
+    this.userLabel = userLabel;
+  }
+}
+
+function instrumentAssignmentCollaborationRef(firestore: NonNullable<typeof db>) {
+  return doc(
+    firestore,
+    "collaboration",
+    INSTRUMENT_ASSIGNMENT_COLLABORATION_DOCUMENT,
+  );
+}
+
+function bandSongArrangementRef(
+  firestore: NonNullable<typeof db>,
+  bandId: string,
+  songId: string,
+) {
+  return doc(firestore, "bandSongArrangements", `${bandId}_${songId}`);
+}
+
+function timestampMilliseconds(value: unknown) {
+  return value instanceof Timestamp ? value.toMillis() : null;
+}
+
+function instrumentAssignmentLockFromData(
+  data: Record<string, unknown>,
+): InstrumentAssignmentLock | null {
+  const sessionId = typeof data.activeSessionId === "string"
+    ? data.activeSessionId
+    : "";
+  const userLabel = typeof data.activeUserLabel === "string"
+    ? data.activeUserLabel
+    : "Another admin";
+  const expiresAt = timestampMilliseconds(data.lockExpiresAt);
+
+  return sessionId && expiresAt !== null
+    ? { sessionId, userLabel, expiresAt }
+    : null;
+}
+
+function instrumentAssignmentLastMoveFromData(
+  value: unknown,
+): InstrumentAssignmentLastMove | null {
+  const data = objectValue(value);
+  const bandId = typeof data.bandId === "string" ? data.bandId : "";
+  const partSlug = typeof data.partSlug === "string"
+    && VOCAL_PART_SLUGS.includes(data.partSlug as VocalPartSlug)
+    ? data.partSlug as VocalPartSlug
+    : null;
+  if (
+    data.kind === "vocal"
+    && typeof data.changeId === "string"
+    && typeof data.songId === "string"
+    && typeof data.assignmentKey === "string"
+    && partSlug
+    && data.zone === "vocal"
+    && typeof data.slotIndex === "number"
+    && Number.isInteger(data.slotIndex)
+  ) {
+    return {
+      kind: "vocal",
+      bandId,
+      changeId: data.changeId,
+      songId: data.songId,
+      assignmentKey: data.assignmentKey,
+      partSlug,
+      zone: "vocal",
+      slotIndex: data.slotIndex,
+      removed: data.removed === true ? true : undefined,
+    };
+  }
+  const instrumentId = typeof data.instrumentId === "string"
+    && INSTRUMENT_IDS.includes(data.instrumentId as InstrumentId)
+    ? data.instrumentId as InstrumentId
+    : null;
+
+  if (
+    typeof data.changeId !== "string"
+    || typeof data.songId !== "string"
+    || typeof data.assignmentKey !== "string"
+    || !instrumentId
+  ) {
+    return null;
+  }
+
+  if (
+    data.zone === "player"
+    && typeof data.slotIndex === "number"
+    && Number.isInteger(data.slotIndex)
+  ) {
+    return {
+      kind: "instrument",
+      bandId,
+      changeId: data.changeId,
+      songId: data.songId,
+      assignmentKey: data.assignmentKey,
+      instrumentId,
+      zone: "player",
+      slotIndex: data.slotIndex,
+    };
+  }
+
+  if (
+    data.zone === "tracks"
+    && typeof data.trackIndex === "number"
+    && Number.isInteger(data.trackIndex)
+  ) {
+    return {
+      kind: "instrument",
+      bandId,
+      changeId: data.changeId,
+      songId: data.songId,
+      assignmentKey: data.assignmentKey,
+      instrumentId,
+      zone: "tracks",
+      trackIndex: data.trackIndex,
+    };
+  }
+
+  return null;
+}
+
+export function subscribeInstrumentAssignmentCollaboration(
+  onState: (state: InstrumentAssignmentCollaborationState) => void,
+  onError: (error: Error) => void,
+): Unsubscribe {
+  if (!hasFirebaseConfig || !db) {
+    let active = true;
+    queueMicrotask(() => {
+      if (active) onState({ lock: null, lastMove: null });
+    });
+    return () => {
+      active = false;
+    };
+  }
+
+  return onSnapshot(
+    instrumentAssignmentCollaborationRef(db),
+    (snapshot) => {
+      const data = snapshot.exists() ? snapshot.data() : {};
+      onState({
+        lock: instrumentAssignmentLockFromData(data),
+        lastMove: instrumentAssignmentLastMoveFromData(data.lastMove),
+      });
+    },
+    (caught) => {
+      onError(
+        caught instanceof Error
+          ? caught
+          : new Error("Could not subscribe to assignment activity."),
+      );
+    },
+  );
+}
+
+export async function acquireInstrumentAssignmentLock(
+  sessionId: string,
+  userLabel: string,
+) {
+  if (!hasFirebaseConfig || !db) return;
+
+  const collaborationRef = instrumentAssignmentCollaborationRef(db);
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(collaborationRef);
+    const currentLock = snapshot.exists()
+      ? instrumentAssignmentLockFromData(snapshot.data())
+      : null;
+    const now = Date.now();
+
+    if (
+      currentLock
+      && currentLock.sessionId !== sessionId
+      && currentLock.expiresAt > now
+    ) {
+      throw new InstrumentAssignmentLockedError(currentLock.userLabel);
+    }
+
+    transaction.set(
+      collaborationRef,
+      {
+        activeSessionId: sessionId,
+        activeUserLabel: userLabel.trim() || "Another admin",
+        lockExpiresAt: Timestamp.fromMillis(
+          now + INSTRUMENT_ASSIGNMENT_LOCK_DURATION_MS,
+        ),
+        lockStartedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+  });
+}
+
+export async function refreshInstrumentAssignmentLock(sessionId: string) {
+  if (!hasFirebaseConfig || !db) return true;
+
+  const collaborationRef = instrumentAssignmentCollaborationRef(db);
+  return runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(collaborationRef);
+    const currentLock = snapshot.exists()
+      ? instrumentAssignmentLockFromData(snapshot.data())
+      : null;
+
+    if (currentLock?.sessionId !== sessionId) return false;
+
+    transaction.update(collaborationRef, {
+      lockExpiresAt: Timestamp.fromMillis(
+        Date.now() + INSTRUMENT_ASSIGNMENT_LOCK_DURATION_MS,
+      ),
+      updatedAt: serverTimestamp(),
+    });
+    return true;
+  });
+}
+
+export async function releaseInstrumentAssignmentLock(sessionId: string) {
+  if (!hasFirebaseConfig || !db) return;
+
+  const collaborationRef = instrumentAssignmentCollaborationRef(db);
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(collaborationRef);
+    const currentLock = snapshot.exists()
+      ? instrumentAssignmentLockFromData(snapshot.data())
+      : null;
+
+    if (currentLock?.sessionId !== sessionId) return;
+
+    transaction.update(collaborationRef, {
+      activeSessionId: null,
+      activeUserLabel: null,
+      lockExpiresAt: null,
+      updatedAt: serverTimestamp(),
+    });
+  });
+}
+
+export async function saveSongInstrumentAssignmentMove(
+  bandId: string,
+  changes: Array<{ songId: string; assignments: SongInstrumentAssignments }>,
+  sessionId: string,
+  lastMove: InstrumentAssignmentLastMove | null,
+) {
+  const { db } = requireFirebase();
+  const collaborationRef = instrumentAssignmentCollaborationRef(db);
+  const latestBySongId = new Map(
+    changes.map((change) => [change.songId, change.assignments]),
+  );
+
+  await runTransaction(db, async (transaction) => {
+    const collaborationSnapshot = await transaction.get(collaborationRef);
+    const currentLock = collaborationSnapshot.exists()
+      ? instrumentAssignmentLockFromData(collaborationSnapshot.data())
+      : null;
+
+    if (currentLock?.sessionId !== sessionId) {
+      throw new InstrumentAssignmentLockedError(
+        currentLock?.userLabel ?? "Another admin",
+      );
+    }
+
+    latestBySongId.forEach((assignments, songId) => {
+      transaction.set(bandSongArrangementRef(db, bandId, songId), {
+        bandId,
+        songId,
+        instrumentAssignments: assignments,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+    });
+    const collaborationUpdate: Record<string, unknown> = {
+      activeSessionId: null,
+      activeUserLabel: null,
+      lockExpiresAt: null,
+      updatedAt: serverTimestamp(),
+    };
+    if (lastMove) {
+      collaborationUpdate.lastMove = {
+        ...lastMove,
+        committedAt: serverTimestamp(),
+      };
+    }
+    transaction.update(collaborationRef, collaborationUpdate);
+  });
+}
+
 export async function saveSongInstrumentAssignments(
+  bandId: string,
   changes: Array<{ songId: string; assignments: SongInstrumentAssignments }>,
 ) {
   const { db } = requireFirebase();
@@ -617,13 +1127,62 @@ export async function saveSongInstrumentAssignments(
   const batch = writeBatch(db);
 
   latestBySongId.forEach((assignments, songId) => {
-    batch.update(doc(db, "songs", songId), {
+    batch.set(bandSongArrangementRef(db, bandId, songId), {
+      bandId,
+      songId,
       instrumentAssignments: assignments,
       updatedAt: serverTimestamp(),
-    });
+    }, { merge: true });
   });
 
   await batch.commit();
+}
+
+export async function saveBandSongVocalAssignments(
+  bandId: string,
+  songId: string,
+  showVocals: boolean,
+  vocalAssignments: SongVocalAssignment[],
+  sessionId: string,
+  lastMove: InstrumentAssignmentLastMove | null = null,
+) {
+  const { db } = requireFirebase();
+  const collaborationRef = instrumentAssignmentCollaborationRef(db);
+
+  await runTransaction(db, async (transaction) => {
+    const collaborationSnapshot = await transaction.get(collaborationRef);
+    const currentLock = collaborationSnapshot.exists()
+      ? instrumentAssignmentLockFromData(collaborationSnapshot.data())
+      : null;
+
+    if (currentLock?.sessionId !== sessionId) {
+      throw new InstrumentAssignmentLockedError(
+        currentLock?.userLabel ?? "Another admin",
+      );
+    }
+
+    transaction.set(bandSongArrangementRef(db, bandId, songId), {
+      bandId,
+      songId,
+      showVocals,
+      vocalAssignments,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+
+    const collaborationUpdate: Record<string, unknown> = {
+      activeSessionId: null,
+      activeUserLabel: null,
+      lockExpiresAt: null,
+      updatedAt: serverTimestamp(),
+    };
+    if (lastMove) {
+      collaborationUpdate.lastMove = {
+        ...lastMove,
+        committedAt: serverTimestamp(),
+      };
+    }
+    transaction.update(collaborationRef, collaborationUpdate);
+  });
 }
 
 export async function saveSongInstrumentOrder(

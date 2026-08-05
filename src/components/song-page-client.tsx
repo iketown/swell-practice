@@ -191,9 +191,9 @@ export function SongPageClient({ slug }: { slug: string }) {
             Test mixer
           </Button>
           {admin.isAdmin ? (
-            <Button render={<Link href={`/assignments/${bundle.song.slug}`} />} variant="secondary" nativeButton={false}>
+            <Button render={<Link href="/assignments" />} variant="secondary" nativeButton={false}>
               <ClipboardListIcon data-icon="inline-start" />
-              Assign members
+              Assign band
             </Button>
           ) : null}
         </div>

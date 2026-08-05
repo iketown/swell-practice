@@ -26,7 +26,53 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAdmin } from "@/hooks/use-admin";
 import { createBand, deleteBand, listBands, listMembers, updateBand } from "@/lib/assignments";
-import type { Band, BandMember } from "@/lib/domain";
+import {
+  partLabel,
+  VOCAL_PART_SLUGS,
+  type Band,
+  type BandMember,
+  type VocalPartSlug,
+} from "@/lib/domain";
+
+const UNASSIGNED_VOCAL_PART = "unassigned";
+const STARTUP_MEMBER_ORDER = ["ike", "jackson", "joe", "sam", "cron"] as const;
+
+function fillVocalPartMap(
+  memberIds: string[],
+  current: Partial<Record<string, VocalPartSlug>> = {},
+  members: BandMember[] = [],
+  bandTitle = "",
+) {
+  const used = new Set<VocalPartSlug>();
+  const next: Partial<Record<string, VocalPartSlug>> = {};
+
+  const memberMap = new Map(members.map((member) => [member.id, member]));
+  const fillOrder = bandTitle.trim().toLowerCase().includes("startup")
+    ? [...memberIds].sort((leftId, rightId) => {
+        const leftName = memberMap.get(leftId)?.displayName.trim().toLowerCase() ?? "";
+        const rightName = memberMap.get(rightId)?.displayName.trim().toLowerCase() ?? "";
+        const leftOrder = STARTUP_MEMBER_ORDER.indexOf(leftName as (typeof STARTUP_MEMBER_ORDER)[number]);
+        const rightOrder = STARTUP_MEMBER_ORDER.indexOf(rightName as (typeof STARTUP_MEMBER_ORDER)[number]);
+        return (leftOrder < 0 ? 99 : leftOrder) - (rightOrder < 0 ? 99 : rightOrder);
+      })
+    : memberIds;
+  fillOrder.forEach((memberId) => {
+    const partSlug = current[memberId];
+    if (partSlug && !used.has(partSlug)) {
+      next[memberId] = partSlug;
+      used.add(partSlug);
+    }
+  });
+  memberIds.forEach((memberId) => {
+    if (next[memberId]) return;
+    const partSlug = VOCAL_PART_SLUGS.find((candidate) => !used.has(candidate));
+    if (!partSlug) return;
+    next[memberId] = partSlug;
+    used.add(partSlug);
+  });
+
+  return next;
+}
 
 export function BandAdminClient() {
   const admin = useAdmin();
@@ -37,6 +83,8 @@ export function BandAdminClient() {
   const [editingBand, setEditingBand] = useState<Band | "new" | null>(null);
   const [title, setTitle] = useState("");
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+  const [vocalPartByMemberId, setVocalPartByMemberId] =
+    useState<Partial<Record<string, VocalPartSlug>>>({});
   const [sourceBandId, setSourceBandId] = useState("blank");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,10 +125,13 @@ export function BandAdminClient() {
   }, [admin.isAdmin]);
 
   function openCreate() {
+    const sourceBand = bands[0];
+    const memberIds = sourceBand?.memberIds ?? [];
     setEditingBand("new");
     setTitle("");
-    setSelectedMemberIds(bands[0]?.memberIds ?? []);
-    setSourceBandId(bands[0]?.id ?? "blank");
+    setSelectedMemberIds(memberIds);
+    setVocalPartByMemberId(fillVocalPartMap(memberIds, sourceBand?.vocalPartByMemberId, members, sourceBand?.title));
+    setSourceBandId(sourceBand?.id ?? "blank");
     setError(null);
   }
 
@@ -88,14 +139,18 @@ export function BandAdminClient() {
     setEditingBand(band);
     setTitle(band.title);
     setSelectedMemberIds(band.memberIds);
+    setVocalPartByMemberId(fillVocalPartMap(band.memberIds, band.vocalPartByMemberId, members, band.title));
     setSourceBandId("blank");
     setError(null);
   }
 
   function useSourceBand(bandId: string | null) {
     const value = bandId ?? "blank";
+    const sourceBand = bands.find((band) => band.id === value);
+    const memberIds = sourceBand?.memberIds ?? [];
     setSourceBandId(value);
-    setSelectedMemberIds(bands.find((band) => band.id === value)?.memberIds ?? []);
+    setSelectedMemberIds(memberIds);
+    setVocalPartByMemberId(fillVocalPartMap(memberIds, sourceBand?.vocalPartByMemberId, members, sourceBand?.title));
   }
 
   async function save(event: FormEvent<HTMLFormElement>) {
@@ -103,8 +158,11 @@ export function BandAdminClient() {
     setSaving(true);
     setError(null);
     try {
-      if (editingBand === "new") await createBand(title, selectedMemberIds);
-      else if (editingBand) await updateBand(editingBand, title, selectedMemberIds);
+      if (editingBand === "new") {
+        await createBand(title, selectedMemberIds, vocalPartByMemberId);
+      } else if (editingBand) {
+        await updateBand(editingBand, title, selectedMemberIds, vocalPartByMemberId);
+      }
       setEditingBand(null);
       await refresh();
     } catch (caught) {
@@ -115,7 +173,33 @@ export function BandAdminClient() {
   }
 
   function toggleMember(memberId: string, checked: boolean) {
-    setSelectedMemberIds((current) => checked ? [...current, memberId] : current.filter((id) => id !== memberId));
+    setSelectedMemberIds((current) => {
+      const next = checked ? [...current, memberId] : current.filter((id) => id !== memberId);
+      setVocalPartByMemberId((parts) => {
+        if (checked) return fillVocalPartMap(
+          next,
+          parts,
+          members,
+          editingBand && editingBand !== "new" ? editingBand.title : title,
+        );
+        return Object.fromEntries(
+          Object.entries(parts).filter(([id]) => id !== memberId),
+        );
+      });
+      return next;
+    });
+  }
+
+  function setMemberVocalPart(memberId: string, value: string | null) {
+    setVocalPartByMemberId((current) => {
+      const next = { ...current };
+      if (!value || value === UNASSIGNED_VOCAL_PART) {
+        delete next[memberId];
+        return next;
+      }
+      next[memberId] = value as VocalPartSlug;
+      return next;
+    });
   }
 
   if (admin.loading || !admin.isAdmin) return null;
@@ -181,9 +265,24 @@ export function BandAdminClient() {
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2" aria-label={`${band.title} members`}>
-                    {band.memberIds.map((memberId) => {
+                    {[...band.memberIds].sort((left, right) => {
+                      const leftPart = band.vocalPartByMemberId[left];
+                      const rightPart = band.vocalPartByMemberId[right];
+                      return (leftPart ? VOCAL_PART_SLUGS.indexOf(leftPart) : 99)
+                        - (rightPart ? VOCAL_PART_SLUGS.indexOf(rightPart) : 99);
+                    }).map((memberId) => {
                       const member = memberMap.get(memberId);
-                      return <MemberThumbnail key={memberId} displayName={member?.displayName ?? "Unknown member"} photoUrl={member?.photoUrl} />;
+                      const vocalPart = band.vocalPartByMemberId[memberId];
+                      return (
+                        <div key={memberId} className="flex items-center gap-1.5 rounded-lg border bg-muted/25 p-1.5 pr-2">
+                          <MemberThumbnail displayName={member?.displayName ?? "Unknown member"} photoUrl={member?.photoUrl} />
+                          {vocalPart ? (
+                            <Badge variant="secondary" className="font-mono text-[10px]">
+                              {partLabel(vocalPart)}
+                            </Badge>
+                          ) : null}
+                        </div>
+                      );
                     })}
                   </div>
                 </article>
@@ -206,7 +305,7 @@ export function BandAdminClient() {
           <DialogHeader>
             <DialogTitle>{editingBand === "new" ? "Create band" : "Edit band"}</DialogTitle>
             <DialogDescription>
-              Defaults follow each member automatically. This roster only decides whose assignments are shown.
+              Choose the lineup and each member’s default vocal part. Vocal part order controls the columns on the assignment board.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={save} className="flex flex-col gap-5">
@@ -235,22 +334,62 @@ export function BandAdminClient() {
                       </SelectGroup>
                     </SelectContent>
                   </Select>
-                  <FieldDescription>Copying the roster does not copy assignment records. Defaults already do that work.</FieldDescription>
+                  <FieldDescription>Copies the roster and its default vocal-part order. Song arrangements stay separate.</FieldDescription>
                 </Field>
               ) : null}
               <FieldSet>
                 <FieldLegend>Members</FieldLegend>
                 <div className="grid gap-2 sm:grid-cols-2">
-                  {members.map((member) => (
-                    <Field key={member.id} orientation="horizontal" className="rounded-lg border bg-card p-3">
-                      <Checkbox id={`band-member-${member.id}`} checked={selectedMemberIds.includes(member.id)} onCheckedChange={(checked) => toggleMember(member.id, checked === true)} />
-                      <FieldContent>
-                        <FieldLabel htmlFor={`band-member-${member.id}`}>{member.displayName}</FieldLabel>
-                        <FieldDescription>{member.firstName} {member.lastName}</FieldDescription>
-                      </FieldContent>
-                    </Field>
-                  ))}
+                  {members.map((member) => {
+                    const selected = selectedMemberIds.includes(member.id);
+                    const selectedPart = vocalPartByMemberId[member.id] ?? UNASSIGNED_VOCAL_PART;
+                    const usedByAnotherMember = new Set(
+                      Object.entries(vocalPartByMemberId).flatMap(([id, partSlug]) =>
+                        id !== member.id && partSlug ? [partSlug] : [],
+                      ),
+                    );
+
+                    return (
+                      <div key={member.id} className="grid gap-2 rounded-lg border bg-card p-3">
+                        <Field orientation="horizontal">
+                          <Checkbox id={`band-member-${member.id}`} checked={selected} onCheckedChange={(checked) => toggleMember(member.id, checked === true)} />
+                          <FieldContent>
+                            <FieldLabel htmlFor={`band-member-${member.id}`}>{member.displayName}</FieldLabel>
+                            <FieldDescription>{member.firstName} {member.lastName}</FieldDescription>
+                          </FieldContent>
+                        </Field>
+                        {selected ? (
+                          <Field>
+                            <FieldLabel htmlFor={`band-vocal-${member.id}`}>Default vocal part</FieldLabel>
+                            <Select
+                              items={[
+                                { label: "Not on assignment board", value: UNASSIGNED_VOCAL_PART },
+                                ...VOCAL_PART_SLUGS.map((partSlug) => ({ label: partLabel(partSlug), value: partSlug })),
+                              ]}
+                              value={selectedPart}
+                              onValueChange={(value) => setMemberVocalPart(member.id, value)}
+                            >
+                              <SelectTrigger id={`band-vocal-${member.id}`} className="w-full"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectGroup>
+                                  <SelectItem value={UNASSIGNED_VOCAL_PART}>Not on assignment board</SelectItem>
+                                  {VOCAL_PART_SLUGS.map((partSlug) => (
+                                    <SelectItem key={partSlug} value={partSlug} disabled={usedByAnotherMember.has(partSlug)}>
+                                      {partLabel(partSlug)}
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              </SelectContent>
+                            </Select>
+                          </Field>
+                        ) : null}
+                      </div>
+                    );
+                  })}
                 </div>
+                <FieldDescription>
+                  The five vocal parts must be unique. Members without a part will not receive a column on /assignments.
+                </FieldDescription>
               </FieldSet>
             </FieldGroup>
             <DialogFooter>

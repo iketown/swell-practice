@@ -24,8 +24,15 @@ import type {
   Song,
   SongAsset,
   SongAssignmentBundle,
+  VocalPartSlug,
 } from "@/lib/domain";
-import { createBandCode, samePartSlugs, slugify, sortPartSlugs } from "@/lib/domain";
+import {
+  createBandCode,
+  samePartSlugs,
+  slugify,
+  sortPartSlugs,
+  VOCAL_PART_SLUGS,
+} from "@/lib/domain";
 import { db, hasFirebaseConfig, storage } from "@/lib/firebase";
 import { getSongBundle, listSongs } from "@/lib/firestore";
 import {
@@ -89,7 +96,14 @@ function readDemoStore() {
   }
 
   try {
-    return JSON.parse(stored) as DemoAssignmentStore;
+    const parsed = JSON.parse(stored) as DemoAssignmentStore;
+    return {
+      ...parsed,
+      bands: parsed.bands.map((band) => ({
+        ...band,
+        vocalPartByMemberId: band.vocalPartByMemberId ?? {},
+      })),
+    };
   } catch {
     const seed = seedStore();
     window.localStorage.setItem(DEMO_STORE_KEY, JSON.stringify(seed));
@@ -126,12 +140,47 @@ function blobToDataUrl(blob: Blob) {
 }
 
 function bandFromDoc(id: string, data: Record<string, unknown>): Band {
+  const vocalPartData = data.vocalPartByMemberId && typeof data.vocalPartByMemberId === "object"
+    ? data.vocalPartByMemberId as Record<string, unknown>
+    : {};
+  const vocalPartByMemberId = Object.fromEntries(
+    Object.entries(vocalPartData).flatMap(([memberId, value]) =>
+      typeof value === "string" && VOCAL_PART_SLUGS.includes(value as VocalPartSlug)
+        ? [[memberId, value as VocalPartSlug]]
+        : [],
+    ),
+  );
+
   return {
     id,
     title: String(data.title ?? ""),
     code: String(data.code ?? ""),
     memberIds: Array.isArray(data.memberIds) ? data.memberIds.map(String) : [],
+    vocalPartByMemberId,
   };
+}
+
+function cleanVocalPartMap(
+  memberIds: string[],
+  vocalPartByMemberId: Partial<Record<string, VocalPartSlug>>,
+) {
+  const memberIdSet = new Set(memberIds);
+  const usedParts = new Set<VocalPartSlug>();
+
+  return Object.fromEntries(
+    Object.entries(vocalPartByMemberId).flatMap(([memberId, partSlug]) => {
+      if (
+        !memberIdSet.has(memberId)
+        || !partSlug
+        || !VOCAL_PART_SLUGS.includes(partSlug)
+        || usedParts.has(partSlug)
+      ) {
+        return [];
+      }
+      usedParts.add(partSlug);
+      return [[memberId, partSlug]];
+    }),
+  ) as Partial<Record<string, VocalPartSlug>>;
 }
 
 function defaultFromDoc(data: Record<string, unknown>): MemberSongDefault {
@@ -309,6 +358,9 @@ export async function deleteMember(memberId: string) {
     store.bands = store.bands.map((band) => ({
       ...band,
       memberIds: band.memberIds.filter((id) => id !== memberId),
+      vocalPartByMemberId: Object.fromEntries(
+        Object.entries(band.vocalPartByMemberId).filter(([id]) => id !== memberId),
+      ),
     }));
     store.defaults = store.defaults.filter((item) => item.memberId !== memberId);
     store.overrides = store.overrides.filter((item) => item.memberId !== memberId);
@@ -323,7 +375,16 @@ export async function deleteMember(memberId: string) {
     getDocs(query(collection(firestore, "bandSongOverrides"), where("memberId", "==", memberId))),
   ]);
   const batch = writeBatch(firestore);
-  bands.docs.forEach((band) => batch.update(band.ref, { memberIds: arrayRemove(memberId), updatedAt: serverTimestamp() }));
+  bands.docs.forEach((bandSnapshot) => {
+    const band = bandFromDoc(bandSnapshot.id, bandSnapshot.data());
+    batch.update(bandSnapshot.ref, {
+      memberIds: arrayRemove(memberId),
+      vocalPartByMemberId: Object.fromEntries(
+        Object.entries(band.vocalPartByMemberId).filter(([id]) => id !== memberId),
+      ),
+      updatedAt: serverTimestamp(),
+    });
+  });
   defaults.docs.forEach((item) => batch.delete(item.ref));
   overrides.docs.forEach((item) => batch.delete(item.ref));
   batch.delete(doc(firestore, "memberPrivate", memberId));
@@ -354,13 +415,25 @@ async function uniqueBandCode(ignoredBandId?: string) {
   throw new Error("Could not generate a unique band code. Try again.");
 }
 
-export async function createBand(title: string, memberIds: string[]) {
+export async function createBand(
+  title: string,
+  memberIds: string[],
+  vocalPartByMemberId: Partial<Record<string, VocalPartSlug>> = {},
+) {
   const code = await uniqueBandCode();
   const cleanTitle = title.trim();
+  const uniqueMemberIds = [...new Set(memberIds)];
+  const cleanVocalParts = cleanVocalPartMap(uniqueMemberIds, vocalPartByMemberId);
 
   if (isDemoAssignments() || !db) {
     const store = readDemoStore();
-    const band: Band = { id: `band-${code.toLowerCase()}`, title: cleanTitle, code, memberIds: [...new Set(memberIds)] };
+    const band: Band = {
+      id: `band-${code.toLowerCase()}`,
+      title: cleanTitle,
+      code,
+      memberIds: uniqueMemberIds,
+      vocalPartByMemberId: cleanVocalParts,
+    };
     store.bands.push(band);
     writeDemoStore(store);
     return band;
@@ -368,13 +441,29 @@ export async function createBand(title: string, memberIds: string[]) {
 
   const firestore = requireDb();
   const bandRef = doc(collection(firestore, "bands"));
-  const band = { title: cleanTitle, code, memberIds: [...new Set(memberIds)] };
+  const band = {
+    title: cleanTitle,
+    code,
+    memberIds: uniqueMemberIds,
+    vocalPartByMemberId: cleanVocalParts,
+  };
   await setDoc(bandRef, { ...band, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
   return { ...band, id: bandRef.id };
 }
 
-export async function updateBand(band: Band, title: string, memberIds: string[]) {
-  const next = { ...band, title: title.trim(), memberIds: [...new Set(memberIds)] };
+export async function updateBand(
+  band: Band,
+  title: string,
+  memberIds: string[],
+  vocalPartByMemberId: Partial<Record<string, VocalPartSlug>> = {},
+) {
+  const uniqueMemberIds = [...new Set(memberIds)];
+  const next = {
+    ...band,
+    title: title.trim(),
+    memberIds: uniqueMemberIds,
+    vocalPartByMemberId: cleanVocalPartMap(uniqueMemberIds, vocalPartByMemberId),
+  };
   if (isDemoAssignments() || !db) {
     const store = readDemoStore();
     store.bands = store.bands.map((item) => (item.id === band.id ? next : item));
@@ -385,6 +474,7 @@ export async function updateBand(band: Band, title: string, memberIds: string[])
   await updateDoc(doc(requireDb(), "bands", band.id), {
     title: next.title,
     memberIds: next.memberIds,
+    vocalPartByMemberId: next.vocalPartByMemberId,
     updatedAt: serverTimestamp(),
   });
 }
@@ -399,9 +489,13 @@ export async function deleteBand(bandId: string) {
   }
 
   const firestore = requireDb();
-  const overrides = await getDocs(query(collection(firestore, "bandSongOverrides"), where("bandId", "==", bandId)));
+  const [overrides, arrangements] = await Promise.all([
+    getDocs(query(collection(firestore, "bandSongOverrides"), where("bandId", "==", bandId))),
+    getDocs(query(collection(firestore, "bandSongArrangements"), where("bandId", "==", bandId))),
+  ]);
   const batch = writeBatch(firestore);
   overrides.docs.forEach((item) => batch.delete(item.ref));
+  arrangements.docs.forEach((item) => batch.delete(item.ref));
   batch.delete(doc(firestore, "bands", bandId));
   await batch.commit();
 }

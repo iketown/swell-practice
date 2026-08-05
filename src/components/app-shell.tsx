@@ -7,9 +7,11 @@ import { cn } from "@/lib/utils";
 export function AppShell({
   children,
   variant = "default",
+  contentClassName,
 }: {
   children: React.ReactNode;
   variant?: "default" | "workspace";
+  contentClassName?: string;
 }) {
   return (
     <div className="swell-shell min-h-screen text-foreground">
@@ -33,6 +35,7 @@ export function AppShell({
           variant === "workspace"
             ? "max-w-none gap-2 px-2 py-2 sm:px-3"
             : "max-w-6xl gap-5 px-4 py-6 sm:px-6 lg:px-8",
+          contentClassName,
         )}
       >
         {children}

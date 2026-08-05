@@ -51,7 +51,8 @@ That means Vercel/UI and Firebase rules both know who can administer the library
 - `/admin` create song
 - `/admin/members` create and edit members
 - `/admin/bands` create bands and manage their rosters
-- `/assignments/[songSlug]` assign a song's parts for a selected band
+- `/assignments` manage live instrument and vocal assignments for the selected band
+- `/songs/inst` and `/assignments/[songSlug]` redirect to `/assignments`
 - `/members/[memberSlug]` show one member's effective parts for a selected band
 
 ## Assignment Model
