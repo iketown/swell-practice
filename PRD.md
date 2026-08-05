@@ -21,6 +21,7 @@ This is not the public marketing site and not the full band OS. It is a practica
 - Give every song a detail page at `/songs/[songSlug]`.
 - Give every song a separate test mixer at `/songs/[songSlug]/player`.
 - Give administrators a live instrument assignment table at `/songs/inst`.
+- Give administrators a percentage-based timing workspace at `/songs/timing` for totaling arbitrary attributes across every song.
 - Give every part a detail page at `/parts/[partSlug]`.
 - Upload audio, PDFs, videos, zip files, and related rehearsal files once.
 - Assign each uploaded asset to one or more parts for the song.
@@ -149,10 +150,43 @@ Part pages group by song and show only assets assigned to that part for that son
     storagePath: string;
     downloadUrl: string;
   };
+  timingDurationSeconds?: number;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
 ```
+
+`timingDurationSeconds` is the whole-song length used by `/songs/timing`. The timing workspace can populate it from the original recording metadata or accept a manually entered `m:ss` value.
+
+### `timingAttributes/{attributeId}`
+
+```ts
+{
+  label: string;
+  visible: boolean;
+  orderIndex: number;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+```
+
+Timing attributes are deliberately open-ended. An administrator can use people such as `Brian`, `Chris`, and `Jackson`, or categories such as `guitar`, `sax`, and `keys`. Visibility changes presentation and totals without deleting saved assignments.
+
+### `songs/{songId}/timingAssignments/{attributeId}`
+
+```ts
+{
+  segments: Array<{
+    startPercent: number; // 0–100
+    endPercent: number | null; // null while On is waiting for Off
+  }>;
+  updatedAt: Timestamp;
+}
+```
+
+Each segment stores percentages rather than seconds so every song timeline fills the available width. Displayed seconds equal each completed segment's percentage width multiplied by `timingDurationSeconds`. An On boundary with a null Off boundary remains visible and editable but contributes zero sections and zero seconds to every summary. Attribute totals sum completed seconds across all songs; overlaps between different attributes count toward each attribute independently.
+
+Every expanded song uses its existing `originalRecording` MP3 in a custom player. Administrators can upload a missing recording or replace the current one directly from the timing player through the same original-recording upload system used by `/songs/inst`; both pages read and update the same song field and Storage object lifecycle. The player seek track and every attribute slider share the same horizontal span. Clicking or dragging anywhere on the MP3 seek track moves the playhead continuously so a user can scan the recording. Interacting with a song marks it as the active player, and Space toggles playback for that active song without intercepting text entry or native button behavior. Administrators can pause at a boundary and capture `On`, seek or play forward, then capture `Off`. While paused, dragging a timing handle within three percentage points of the playhead snaps the handle exactly to that playhead position.
 
 `InstrumentId` is one of `guit_a`, `guit_b`, `bass`, `drums`, `keys`, `perc`, `horns`, `strings`, `voc`, `xtra_vox`, `lion`, `accordion`, or `notes`. A stored `InstrumentAssignment` is a non-Notes `InstrumentId` or a Notes object containing `{ kind: "notes", id, title, notes }`. The object keeps each draggable Notes tile’s content separate from the song-level `notes` field. Instrument moves and song-order changes update the song document immediately. The five performer slots hold at most one instrument each; the Trax array may contain any number of instruments. Songs without an `instrumentOrder`, including newly created songs, appear after explicitly ordered songs until an administrator reorders the table.
 
@@ -503,6 +537,14 @@ v1 decision:
 - Visiting `/songs/i-get-around` shows the song title, default parts, and assigned files.
 - Visiting `/songs/i-get-around/player` shows only that song's active player-mix stems and plays them in sync.
 - Visiting `/songs/inst` shows one row for every song, including songs created after the assignment page was introduced.
+- Visiting `/songs/timing` shows one accordion row for every song, with collapsed per-attribute summaries and full-width percentage timelines when expanded.
+- An administrator can create, rename, hide, show, and delete arbitrary timing attributes without deleting assignments when an attribute is merely hidden.
+- Capturing Off completes the pending section with an end handle; changing either handle immediately updates the song summary and cumulative totals in seconds.
+- Capturing On at the MP3 playhead creates one pending handle that contributes no time until Off is captured later in the song.
+- The MP3 seek track and every attribute slider occupy the same horizontal span, and a paused playhead provides a three-percentage-point snap target for timing handles.
+- Clicking or dragging the MP3 seek track moves the playhead, and Space toggles play or pause for the most recently interacted-with song without replacing spaces typed into a field.
+- An administrator can upload or replace each song's original MP3 from `/songs/timing`; the change immediately updates the shared original recording shown by `/songs/inst`.
+- Cumulative timing totals include every visible attribute across every song and count overlapping assignments independently.
 - An administrator can drag instrument icons into five single-value performer slots or a multi-value Trax area, move assignments between songs, and remove assignments through a persistent trash target.
 - Holding Alt/Option while dragging an assigned instrument copies it to the destination without clearing its source assignment.
 - Adding a repeated instrument to a song requires confirmation, except for `voc`, which may appear any number of times in one row.

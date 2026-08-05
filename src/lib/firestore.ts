@@ -74,6 +74,12 @@ function songFromDoc(id: string, data: Record<string, unknown>): Song {
       typeof data.instrumentOrder === "number" && Number.isFinite(data.instrumentOrder)
         ? data.instrumentOrder
         : undefined,
+    timingDurationSeconds:
+      typeof data.timingDurationSeconds === "number"
+      && Number.isFinite(data.timingDurationSeconds)
+      && data.timingDurationSeconds > 0
+        ? data.timingDurationSeconds
+        : undefined,
     instrumentAssignments: instrumentAssignmentsFromData(
       data.instrumentAssignments,
       {

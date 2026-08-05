@@ -31,6 +31,7 @@ export const sampleBundles: SongBundle[] = [
       title: "California Girls",
       slug: "california-girls",
       sortTitle: "california girls",
+      timingDurationSeconds: 165,
       instrumentAssignments: createEmptyInstrumentAssignments(),
     },
     parts: DEFAULT_PARTS.map((part) => ({ ...part, assetIds: [] })),
@@ -42,6 +43,7 @@ export const sampleBundles: SongBundle[] = [
       title: "I Get Around",
       slug: "i-get-around",
       sortTitle: "i get around",
+      timingDurationSeconds: 132,
       instrumentAssignments: createEmptyInstrumentAssignments(),
     },
     parts: DEFAULT_PARTS.map((part) => ({
@@ -74,6 +76,7 @@ export const sampleBundles: SongBundle[] = [
       title: "Help Me, Rhonda",
       slug: "rhonda",
       sortTitle: "help me rhonda",
+      timingDurationSeconds: 166,
       instrumentAssignments: createEmptyInstrumentAssignments(),
     },
     parts: DEFAULT_PARTS.map((part) => ({

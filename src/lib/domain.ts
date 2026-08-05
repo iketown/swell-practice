@@ -55,8 +55,32 @@ export interface Song {
   sortTitle: string;
   notes?: string;
   instrumentOrder?: number;
+  timingDurationSeconds?: number;
   instrumentAssignments: SongInstrumentAssignments;
   originalRecording?: SongOriginalRecording;
+}
+
+export interface TimingSegment {
+  startPercent: number;
+  endPercent: number | null;
+}
+
+export interface TimingAttribute {
+  id: string;
+  label: string;
+  visible: boolean;
+  orderIndex: number;
+}
+
+export type SongTimingAssignments = Record<
+  string,
+  Record<string, TimingSegment[]>
+>;
+
+export interface SongTimingWorkspace {
+  songs: Song[];
+  attributes: TimingAttribute[];
+  assignments: SongTimingAssignments;
 }
 
 export function createEmptyInstrumentAssignments(): SongInstrumentAssignments {

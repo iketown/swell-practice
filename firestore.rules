@@ -51,6 +51,11 @@ service cloud.firestore {
         allow create, update, delete: if isAdmin();
       }
 
+      match /timingAssignments/{attributeId} {
+        allow read: if true;
+        allow create, update, delete: if isAdmin();
+      }
+
       match /mixerSettings/{settingsId} {
         allow read: if true;
         allow create, update, delete: if isAdmin();
@@ -58,6 +63,11 @@ service cloud.firestore {
     }
 
     match /members/{memberId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /timingAttributes/{attributeId} {
       allow read: if true;
       allow create, update, delete: if isAdmin();
     }

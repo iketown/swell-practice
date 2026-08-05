@@ -5,11 +5,20 @@ import { cn } from "@/lib/utils"
 function Slider({
   className,
   defaultValue,
+  getThumbAriaLabel,
+  getThumbAriaValueText,
   value,
   min = 0,
   max = 100,
   ...props
-}: SliderPrimitive.Root.Props) {
+}: SliderPrimitive.Root.Props & {
+  getThumbAriaLabel?: (index: number) => string
+  getThumbAriaValueText?: (
+    formattedValue: string,
+    value: number,
+    index: number
+  ) => string
+}) {
   const _values = Array.isArray(value)
     ? value
     : Array.isArray(defaultValue)
@@ -41,6 +50,9 @@ function Slider({
           <SliderPrimitive.Thumb
             data-slot="slider-thumb"
             key={index}
+            index={index}
+            getAriaLabel={getThumbAriaLabel}
+            getAriaValueText={getThumbAriaValueText}
             className="relative block size-3 shrink-0 rounded-full border border-ring bg-background ring-ring/50 transition-[color,box-shadow] select-none after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:opacity-50"
           />
         ))}

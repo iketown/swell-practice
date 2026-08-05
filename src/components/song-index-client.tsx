@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { MusicIcon } from "lucide-react";
+import { Clock3Icon, MusicIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
@@ -11,12 +11,14 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAdmin } from "@/hooks/use-admin";
 import type { Song } from "@/lib/domain";
 import { rankSongsForQuery } from "@/lib/domain";
 import { listSongs } from "@/lib/firestore";
 import { cn } from "@/lib/utils";
 
 export function SongIndexClient() {
+  const admin = useAdmin();
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [songQuery, setSongQuery] = useState("");
@@ -48,9 +50,20 @@ export function SongIndexClient() {
             <h1 className="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">Songs</h1>
             <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">Pick a song to see every assigned part.</p>
           </div>
-          <Badge variant="secondary" className="mt-1">
-            {loading ? "Loading" : `${songs.length} songs`}
-          </Badge>
+          <div className="flex items-center gap-2">
+            {admin.isAdmin ? (
+              <Link
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+                href={admin.isDemoAdmin ? "/songs/timing?demo=1" : "/songs/timing"}
+              >
+                <Clock3Icon data-icon="inline-start" />
+                Timing
+              </Link>
+            ) : null}
+            <Badge variant="secondary" className="mt-1">
+              {loading ? "Loading" : `${songs.length} songs`}
+            </Badge>
+          </div>
         </div>
         <SongFilterInput id="public-song-search" songs={songs} value={songQuery} onChange={setSongQuery} matchCount={matchingSongCount} />
       </section>
