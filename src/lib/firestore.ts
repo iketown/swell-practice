@@ -46,6 +46,7 @@ import {
   type SongInstrumentAssignment,
   type SongMixerBundle,
   type SongMixerConfiguration,
+  type SongMixerDownload,
   type SongMixerSettings,
   type SongMixerStateName,
   type SongMixerStateOverride,
@@ -61,6 +62,17 @@ import {
   type VocalPartSlug,
 } from "@/lib/domain";
 import { db, hasFirebaseConfig, storage } from "@/lib/firebase";
+import {
+  createStoredLyricAlignment,
+  isElevenLabsAlignment,
+  isStoredLyricAlignment,
+  type ElevenLabsAlignment,
+  type LyricAlignmentAudio,
+  type LyricAlignmentSong,
+  type LyricAlignmentStatus,
+  type LyricAlignmentWorkspace,
+  type StoredLyricAlignment,
+} from "@/lib/lyric-alignment";
 import { samplePartRows, sampleSongBundle, sampleSongList } from "@/lib/sample-data";
 
 function requireFirebase() {
@@ -278,6 +290,25 @@ function mixerVideoFromDoc(id: string, data: Record<string, unknown>): SongMixer
     displayName: storedDisplayName || stemDisplayNameFromFilename(filename),
     partSlug: mixerPartSlugFromData(data, filename),
     contentType: String(data.contentType ?? "video/mp4"),
+    size: Number(data.size ?? 0),
+    storagePath: String(data.storagePath ?? ""),
+    downloadUrl: typeof data.downloadUrl === "string" ? data.downloadUrl : undefined,
+  };
+}
+
+function mixerDownloadFromDoc(id: string, data: Record<string, unknown>): SongMixerDownload {
+  const filename = String(data.filename ?? "");
+  const storedDisplayName = typeof data.displayName === "string" ? data.displayName.trim() : "";
+  const fileType = data.fileType === "zip" ? "zip" : "midi";
+
+  return {
+    id,
+    filename,
+    displayName: storedDisplayName || stemDisplayNameFromFilename(filename),
+    contentType: String(
+      data.contentType ?? (fileType === "zip" ? "application/zip" : "audio/midi"),
+    ),
+    fileType,
     size: Number(data.size ?? 0),
     storagePath: String(data.storagePath ?? ""),
     downloadUrl: typeof data.downloadUrl === "string" ? data.downloadUrl : undefined,
@@ -597,6 +628,7 @@ export async function getSongMixerBundle(slug: string): Promise<SongMixerBundle 
           song: bundle.song,
           tracks: [],
           videos: [],
+          downloads: [],
           configurations: createDefaultSongMixerConfigurations([]),
           settings: createDefaultSongMixerSettings(),
           annotations: [],
@@ -610,10 +642,14 @@ export async function getSongMixerBundle(slug: string): Promise<SongMixerBundle 
     const songSnap = songSnaps.docs[0];
     if (!songSnap) return null;
 
-    const [tracksSnap, videosSnap, settingsSnap, annotationsSnap] = await Promise.all([
+    const [tracksSnap, videosSnap, downloadsSnap, settingsSnap, annotationsSnap] = await Promise.all([
       getDocs(collection(firestore, "songs", songSnap.id, "mixerTracks")),
       getDocs(collection(firestore, "songs", songSnap.id, "mixerVideos")).catch((caught) => {
         warnReadFailure(`mixer videos for song "${slug}"`, caught);
+        return null;
+      }),
+      getDocs(collection(firestore, "songs", songSnap.id, "mixerDownloads")).catch((caught) => {
+        warnReadFailure(`mixer downloads for song "${slug}"`, caught);
         return null;
       }),
       getDoc(doc(firestore, "songs", "global-mixer-defaults", "mixerSettings", "main")),
@@ -641,6 +677,9 @@ export async function getSongMixerBundle(slug: string): Promise<SongMixerBundle 
       tracks,
       videos: (videosSnap?.docs ?? [])
         .map((snap) => mixerVideoFromDoc(snap.id, snap.data()))
+        .sort((left, right) => left.displayName.localeCompare(right.displayName)),
+      downloads: (downloadsSnap?.docs ?? [])
+        .map((snap) => mixerDownloadFromDoc(snap.id, snap.data()))
         .sort((left, right) => left.displayName.localeCompare(right.displayName)),
       configurations: savedConfigurations.length
         ? savedConfigurations
@@ -1478,6 +1517,87 @@ export async function uploadSongMixerTrack(
   return trackRef.id;
 }
 
+export async function uploadSongMixerDownload(
+  bundle: SongMixerBundle,
+  file: File,
+  options: SongAssetUploadOptions = {},
+) {
+  const { db, storage } = requireFirebase();
+  const { onProgress, signal } = options;
+  const lowerName = file.name.toLowerCase();
+  const fileType: SongMixerDownload["fileType"] | null = lowerName.endsWith(".zip")
+    ? "zip"
+    : lowerName.endsWith(".mid") || lowerName.endsWith(".midi")
+      ? "midi"
+      : null;
+
+  if (!fileType) {
+    throw new Error("Download-only mixer files must be MIDI or ZIP files.");
+  }
+
+  const downloadRef = doc(collection(db, "songs", bundle.song.id, "mixerDownloads"));
+  const filename = sanitizeFilename(file.name);
+  const storagePath = `songs/${bundle.song.slug}/mixer-downloads/${downloadRef.id}-${filename}`;
+  const uploadRef = ref(storage, storagePath);
+  const fallbackContentType = fileType === "zip" ? "application/zip" : "audio/midi";
+  const uploadTask = uploadBytesResumable(uploadRef, file, {
+    contentType: file.type || fallbackContentType,
+    cacheControl: "public,max-age=31536000,immutable",
+  });
+  const cancelUpload = () => uploadTask.cancel();
+
+  if (signal?.aborted) cancelUpload();
+  signal?.addEventListener("abort", cancelUpload, { once: true });
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => onProgress?.({
+          bytesTransferred: snapshot.bytesTransferred,
+          totalBytes: snapshot.totalBytes,
+        }),
+        reject,
+        resolve,
+      );
+    });
+  } finally {
+    signal?.removeEventListener("abort", cancelUpload);
+  }
+
+  const ensureNotCanceled = async () => {
+    if (!signal?.aborted) return;
+
+    try {
+      await deleteObject(uploadRef);
+    } catch (caught) {
+      if (!isMissingStorageObject(caught)) throw caught;
+    }
+
+    throw new DOMException("The upload was canceled.", "AbortError");
+  };
+
+  await ensureNotCanceled();
+  const downloadUrl = await getDownloadURL(uploadRef);
+  await ensureNotCanceled();
+
+  await writeBatch(db)
+    .set(downloadRef, {
+      filename,
+      displayName: stemDisplayNameFromFilename(file.name),
+      contentType: file.type || fallbackContentType,
+      fileType,
+      size: file.size,
+      storagePath,
+      downloadUrl,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    })
+    .commit();
+
+  return downloadRef.id;
+}
+
 function configurationForUploadedStem(
   configurations: SongMixerConfiguration[],
   partSlug: string | null,
@@ -1692,6 +1812,23 @@ export async function deleteSongMixerVideo(bundle: SongMixerBundle, video: SongM
 
   const batch = writeBatch(db);
   batch.delete(doc(db, "songs", bundle.song.id, "mixerVideos", video.id));
+  await batch.commit();
+}
+
+export async function deleteSongMixerDownload(
+  bundle: SongMixerBundle,
+  download: SongMixerDownload,
+) {
+  const { db, storage } = requireFirebase();
+
+  try {
+    await deleteObject(ref(storage, download.storagePath));
+  } catch (caught) {
+    if (!isMissingStorageObject(caught)) throw caught;
+  }
+
+  const batch = writeBatch(db);
+  batch.delete(doc(db, "songs", bundle.song.id, "mixerDownloads", download.id));
   await batch.commit();
 }
 
@@ -1922,4 +2059,318 @@ export async function saveVideoThumbnail(bundle: SongBundle, asset: SongAsset, t
   });
 
   return { thumbnailStoragePath, thumbnailUrl, thumbnailTime };
+}
+
+function lyricAlignmentSongFromDoc(
+  id: string,
+  data: Record<string, unknown>,
+): LyricAlignmentSong {
+  const audioData = objectValue(data.audio);
+  const audio: LyricAlignmentAudio = {
+    filename: String(audioData.filename ?? ""),
+    contentType: String(audioData.contentType ?? "audio/mpeg"),
+    size: Number(audioData.size ?? 0),
+    storagePath: String(audioData.storagePath ?? ""),
+    downloadUrl: String(audioData.downloadUrl ?? ""),
+  };
+  const storedStatus = String(data.status ?? "ready");
+  const status: LyricAlignmentStatus = [
+    "ready",
+    "aligning",
+    "aligned",
+    "error",
+  ].includes(storedStatus)
+    ? (storedStatus as LyricAlignmentStatus)
+    : "ready";
+
+  return {
+    id,
+    title: String(data.title ?? ""),
+    slug: String(data.slug ?? id),
+    sortTitle: String(data.sortTitle ?? data.title ?? ""),
+    lyrics: String(data.lyrics ?? ""),
+    audio,
+    status,
+    errorMessage:
+      typeof data.errorMessage === "string" && data.errorMessage
+        ? data.errorMessage
+        : undefined,
+  };
+}
+
+async function nextAvailableLyricAlignmentSlug(baseSlug: string) {
+  const { db } = requireFirebase();
+  let candidate = baseSlug;
+  let suffix = 2;
+
+  while (
+    (
+      await getDoc(doc(db, "lyricAlignments", candidate))
+    ).exists()
+  ) {
+    candidate = `${baseSlug}-${suffix}`;
+    suffix += 1;
+  }
+
+  return candidate;
+}
+
+export async function listLyricAlignmentSongs(): Promise<
+  LyricAlignmentSong[]
+> {
+  if (!hasFirebaseConfig || !db) return [];
+
+  const snaps = await getDocs(
+    query(collection(db, "lyricAlignments"), orderBy("sortTitle", "asc")),
+  );
+  return snaps.docs.map((snap) =>
+    lyricAlignmentSongFromDoc(snap.id, snap.data()),
+  );
+}
+
+export async function getLyricAlignmentWorkspace(
+  slug: string,
+): Promise<LyricAlignmentWorkspace | null> {
+  if (!hasFirebaseConfig || !db) return null;
+
+  const [songSnap, originalSnap, currentSnap] = await Promise.all([
+    getDoc(doc(db, "lyricAlignments", slug)),
+    getDoc(doc(db, "lyricAlignments", slug, "versions", "original")),
+    getDoc(doc(db, "lyricAlignments", slug, "versions", "current")),
+  ]);
+
+  if (!songSnap.exists()) return null;
+
+  const originalValue = originalSnap.data()?.alignment;
+  const currentValue = currentSnap.data()?.alignment;
+
+  return {
+    song: lyricAlignmentSongFromDoc(songSnap.id, songSnap.data()),
+    original: isElevenLabsAlignment(originalValue) ? originalValue : null,
+    current: isStoredLyricAlignment(currentValue) ? currentValue : null,
+  };
+}
+
+export async function createLyricAlignmentSong(
+  title: string,
+  lyrics: string,
+  file: File,
+  options: SongAssetUploadOptions = {},
+) {
+  const { db, storage } = requireFirebase();
+  const trimmedTitle = title.trim();
+  const trimmedLyrics = lyrics.trim();
+  const baseSlug = slugify(trimmedTitle);
+
+  if (!baseSlug) {
+    throw new Error("Song title must include at least one letter or number.");
+  }
+  if (!trimmedLyrics) {
+    throw new Error("Paste the song lyrics before creating the alignment.");
+  }
+
+  const slug = await nextAvailableLyricAlignmentSlug(baseSlug);
+  const audio = await uploadLyricAlignmentAudio(slug, file, options);
+  const uploadRef = ref(storage, audio.storagePath);
+
+  try {
+    await writeBatch(db)
+      .set(doc(db, "lyricAlignments", slug), {
+        title: trimmedTitle,
+        slug,
+        sortTitle: sortTitle(trimmedTitle),
+        lyrics: trimmedLyrics,
+        audio,
+        status: "ready",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+      .commit();
+  } catch (caught) {
+    await deleteObject(uploadRef).catch(() => undefined);
+    throw caught;
+  }
+
+  return slug;
+}
+
+export async function uploadLyricAlignmentAudio(
+  slug: string,
+  file: File,
+  options: SongAssetUploadOptions = {},
+): Promise<LyricAlignmentAudio> {
+  const { storage } = requireFirebase();
+  const { onProgress, signal } = options;
+
+  if (!file.name.toLowerCase().endsWith(".mp3") && file.type !== "audio/mpeg") {
+    throw new Error("Lyric alignment audio must be an MP3 file.");
+  }
+  if (file.size >= 200 * 1024 * 1024) {
+    throw new Error("The MP3 must be smaller than 200 MB.");
+  }
+
+  const filename = sanitizeFilename(file.name);
+  const storagePath = `lyric-alignments/${slug}/source/${crypto.randomUUID()}-${filename}`;
+  const uploadRef = ref(storage, storagePath);
+  const uploadTask = uploadBytesResumable(uploadRef, file, {
+    contentType: "audio/mpeg",
+    cacheControl: "public,max-age=31536000,immutable",
+  });
+  const cancelUpload = () => uploadTask.cancel();
+
+  if (signal?.aborted) cancelUpload();
+  signal?.addEventListener("abort", cancelUpload, { once: true });
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      uploadTask.on(
+        "state_changed",
+        (snapshot) =>
+          onProgress?.({
+            bytesTransferred: snapshot.bytesTransferred,
+            totalBytes: snapshot.totalBytes,
+          }),
+        reject,
+        resolve,
+      );
+    });
+  } finally {
+    signal?.removeEventListener("abort", cancelUpload);
+  }
+
+  if (signal?.aborted) {
+    await deleteObject(uploadRef).catch(() => undefined);
+    throw new DOMException("The upload was canceled.", "AbortError");
+  }
+
+  return {
+    filename,
+    contentType: "audio/mpeg",
+    size: file.size,
+    storagePath,
+    downloadUrl: await getDownloadURL(uploadRef),
+  };
+}
+
+export async function deleteLyricAlignmentAudio(storagePath: string) {
+  const { storage } = requireFirebase();
+  await deleteObject(ref(storage, storagePath));
+}
+
+export async function setLyricAlignmentStatus(
+  slug: string,
+  status: LyricAlignmentStatus,
+  errorMessage = "",
+) {
+  const { db } = requireFirebase();
+  await updateDoc(doc(db, "lyricAlignments", slug), {
+    status,
+    errorMessage,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function saveLyricAlignmentResult(
+  song: LyricAlignmentSong,
+  alignment: ElevenLabsAlignment,
+) {
+  const { db } = requireFirebase();
+  const originalRef = doc(
+    db,
+    "lyricAlignments",
+    song.slug,
+    "versions",
+    "original",
+  );
+  const existingOriginal = await getDoc(originalRef);
+  if (existingOriginal.exists()) {
+    throw new Error(
+      "This song already has an original ElevenLabs alignment.",
+    );
+  }
+
+  const current = createStoredLyricAlignment(alignment, song.lyrics);
+  const batch = writeBatch(db);
+  batch.set(originalRef, {
+    alignment,
+    createdAt: serverTimestamp(),
+  });
+  batch.set(
+    doc(db, "lyricAlignments", song.slug, "versions", "current"),
+    {
+      alignment: current,
+      savedAt: serverTimestamp(),
+    },
+  );
+  batch.update(doc(db, "lyricAlignments", song.slug), {
+    status: "aligned",
+    errorMessage: "",
+    alignedAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  await batch.commit();
+
+  return current;
+}
+
+export async function replaceLyricAlignmentResult(
+  song: LyricAlignmentSong,
+  audio: LyricAlignmentAudio,
+  alignment: ElevenLabsAlignment,
+) {
+  const { db, storage } = requireFirebase();
+  const current = createStoredLyricAlignment(alignment, song.lyrics);
+  const batch = writeBatch(db);
+
+  batch.set(
+    doc(db, "lyricAlignments", song.slug, "versions", "original"),
+    {
+      alignment,
+      createdAt: serverTimestamp(),
+    },
+  );
+  batch.set(
+    doc(db, "lyricAlignments", song.slug, "versions", "current"),
+    {
+      alignment: current,
+      savedAt: serverTimestamp(),
+    },
+  );
+  batch.update(doc(db, "lyricAlignments", song.slug), {
+    audio,
+    status: "aligned",
+    errorMessage: "",
+    alignedAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  await batch.commit();
+
+  if (song.audio.storagePath !== audio.storagePath) {
+    await deleteObject(ref(storage, song.audio.storagePath)).catch(
+      () => undefined,
+    );
+  }
+
+  return current;
+}
+
+export async function saveLyricAlignmentDraft(
+  slug: string,
+  alignment: StoredLyricAlignment,
+) {
+  const { db } = requireFirebase();
+  const batch = writeBatch(db);
+  batch.set(
+    doc(db, "lyricAlignments", slug, "versions", "current"),
+    {
+      alignment,
+      savedAt: serverTimestamp(),
+    },
+  );
+  batch.update(doc(db, "lyricAlignments", slug), {
+    status: "aligned",
+    errorMessage: "",
+    updatedAt: serverTimestamp(),
+  });
+  await batch.commit();
 }

@@ -3,7 +3,9 @@
 import {
   ArrowDownIcon,
   ArrowUpIcon,
+  FileArchiveIcon,
   FileAudioIcon,
+  FileMusicIcon,
   FileVideoIcon,
   GripVerticalIcon,
   LoaderCircleIcon,
@@ -53,6 +55,7 @@ import { DEFAULT_PARTS, DEFAULT_SONG_MIXER_CONFIGURATION_IDS, partLabel } from "
 import { cn } from "@/lib/utils";
 import type {
   SongMixerConfiguration,
+  SongMixerDownload,
   SongMixerSettings,
   SongMixerStateOverrides,
   SongMixerTrack,
@@ -62,22 +65,28 @@ import type {
 export function StemManagerDialog({
   tracks,
   videos,
+  downloads,
   configurations,
   settings,
   deletingTrackId,
   deletingVideoId,
+  deletingDownloadId,
   onDeleteTrack,
   onDeleteVideo,
+  onDeleteDownload,
   onSave,
 }: {
   tracks: SongMixerTrack[];
   videos: SongMixerVideo[];
+  downloads: SongMixerDownload[];
   configurations: SongMixerConfiguration[];
   settings: SongMixerSettings;
   deletingTrackId: string | null;
   deletingVideoId: string | null;
+  deletingDownloadId: string | null;
   onDeleteTrack: (track: SongMixerTrack) => Promise<boolean>;
   onDeleteVideo: (video: SongMixerVideo) => Promise<boolean>;
+  onDeleteDownload: (download: SongMixerDownload) => Promise<boolean>;
   onSave: (
     tracks: SongMixerTrack[],
     videos: SongMixerVideo[],
@@ -88,6 +97,7 @@ export function StemManagerDialog({
   const [open, setOpen] = useState(false);
   const [draftTracks, setDraftTracks] = useState(tracks);
   const [draftVideos, setDraftVideos] = useState(videos);
+  const [draftDownloads, setDraftDownloads] = useState(downloads);
   const [draftConfigurations, setDraftConfigurations] = useState(configurations);
   const [draftSettings, setDraftSettings] = useState(settings);
   const [activeTab, setActiveTab] = useState("stems");
@@ -118,6 +128,7 @@ export function StemManagerDialog({
     if (nextOpen) {
       setDraftTracks(tracks);
       setDraftVideos(videos);
+      setDraftDownloads(downloads);
       setDraftConfigurations(configurations);
       setDraftSettings(settings);
       setActiveTab("stems");
@@ -218,6 +229,16 @@ export function StemManagerDialog({
     setAnnouncement(`${video.displayName} was permanently deleted.`);
   };
 
+  const deleteDownload = async (download: SongMixerDownload) => {
+    const deleted = await onDeleteDownload(download);
+    if (!deleted) return;
+
+    setDraftDownloads((current) =>
+      current.filter((currentDownload) => currentDownload.id !== download.id),
+    );
+    setAnnouncement(`${download.displayName} was permanently deleted.`);
+  };
+
   const save = async () => {
     setSaving(true);
     try {
@@ -254,11 +275,13 @@ export function StemManagerDialog({
             <DialogTitle>Stem manager</DialogTitle>
             <Badge variant="secondary">
               {draftConfigurations.length} mix{draftConfigurations.length === 1 ? "" : "es"} ·{" "}
-              {draftTracks.length} stem{draftTracks.length === 1 ? "" : "s"} · {draftVideos.length} video{draftVideos.length === 1 ? "" : "s"}
+              {draftTracks.length} stem{draftTracks.length === 1 ? "" : "s"} ·{" "}
+              {draftVideos.length} video{draftVideos.length === 1 ? "" : "s"} ·{" "}
+              {draftDownloads.length} file{draftDownloads.length === 1 ? "" : "s"}
             </Badge>
           </div>
           <DialogDescription>
-            Upload stems once, then choose which stems load in each player mix.
+            Manage playable stems, linked videos, and download-only files.
           </DialogDescription>
         </DialogHeader>
 
@@ -267,8 +290,8 @@ export function StemManagerDialog({
           onValueChange={(value) => setActiveTab(String(value))}
           className="min-h-0 gap-0 overflow-hidden"
         >
-          <div className="border-b bg-secondary/45 px-4 py-2">
-            <TabsList className="h-9">
+          <div className="overflow-x-auto border-b bg-secondary/45 px-4 py-2">
+            <TabsList className="h-9 w-max">
               <TabsTrigger value="stems" className="px-4 py-1.5">
                 Stems
               </TabsTrigger>
@@ -280,6 +303,9 @@ export function StemManagerDialog({
               </TabsTrigger>
               <TabsTrigger value="videos" className="px-4 py-1.5">
                 Videos
+              </TabsTrigger>
+              <TabsTrigger value="downloads" className="px-4 py-1.5">
+                Downloads
               </TabsTrigger>
             </TabsList>
           </div>
@@ -596,6 +622,82 @@ export function StemManagerDialog({
             ) : (
               <p className="rounded-md border border-dashed bg-secondary/30 px-4 py-8 text-center text-sm text-muted-foreground">
                 Upload an MP4 above, then link it to the part that should see it in the player.
+              </p>
+            )}
+          </TabsContent>
+
+          <TabsContent value="downloads" className="min-h-0 overflow-y-auto p-4">
+            {draftDownloads.length ? (
+              <ol className="grid gap-2" aria-label="Uploaded download-only mixer files">
+                {draftDownloads.map((download) => {
+                  const deleting = deletingDownloadId === download.id;
+
+                  return (
+                    <li
+                      key={download.id}
+                      className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border bg-card p-3"
+                    >
+                      <span className="grid size-9 place-items-center rounded-md bg-secondary text-primary">
+                        {download.fileType === "zip" ? (
+                          <FileArchiveIcon aria-hidden />
+                        ) : (
+                          <FileMusicIcon aria-hidden />
+                        )}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">{download.displayName}</p>
+                        <p
+                          className="truncate text-xs text-muted-foreground"
+                          title={download.filename}
+                        >
+                          {download.filename} · {formatBytes(download.size)}
+                        </p>
+                      </div>
+
+                      <AlertDialog>
+                        <AlertDialogTrigger
+                          render={
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`Permanently delete ${download.displayName}`}
+                              disabled={deleting}
+                              className="text-muted-foreground hover:text-destructive"
+                            />
+                          }
+                        >
+                          {deleting ? (
+                            <LoaderCircleIcon className="animate-spin" aria-hidden />
+                          ) : (
+                            <Trash2Icon aria-hidden />
+                          )}
+                        </AlertDialogTrigger>
+                        <AlertDialogContent size="sm">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete this download permanently?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              “{download.displayName}” will be removed from this song and deleted from Firebase Storage.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Keep file</AlertDialogCancel>
+                            <AlertDialogAction
+                              variant="destructive"
+                              onClick={() => void deleteDownload(download)}
+                            >
+                              Delete file
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </li>
+                  );
+                })}
+              </ol>
+            ) : (
+              <p className="rounded-md border border-dashed bg-secondary/30 px-4 py-8 text-center text-sm text-muted-foreground">
+                Upload a MIDI or ZIP file above to make it available in the song’s download dialog.
               </p>
             )}
           </TabsContent>

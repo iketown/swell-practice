@@ -20,7 +20,7 @@ This is not the public marketing site and not the full band OS. It is a practica
 - List every song on the front page.
 - Give every song a detail page at `/songs/[songSlug]`.
 - Give every song a separate test mixer at `/songs/[songSlug]/player`.
-- Give administrators a live instrument assignment table at `/songs/inst`.
+- Give administrators a live band assignment table at `/assignments`.
 - Give administrators a percentage-based timing workspace at `/songs/timing` for totaling arbitrary attributes across every song.
 - Give every part a detail page at `/parts/[partSlug]`.
 - Upload audio, PDFs, videos, zip files, and related rehearsal files once.
@@ -52,13 +52,17 @@ This is not the public marketing site and not the full band OS. It is a practica
 | `/docs` | Living system blueprint and, as features ship, operating guides for stage planning, signal routing, inventory, containers, and packing. |
 | `/songs/[songSlug]` | Song page showing all parts and their assigned assets. Admins can upload files and edit assignments here. |
 | `/songs/[songSlug]/player` | Song-scoped multitrack player that loads one administrator-defined stem mix at a time, kept separate from rehearsal assets. |
-| `/songs/inst` | All-song live arrangement table with five single-instrument performer slots, multi-instrument Trax assignments, and original-recording playback. |
+| `/assignments` | Canonical band-aware live arrangement table with member-ordered instrument and vocal assignments, multi-instrument Trax assignments, original-recording playback, and stem-player shortcuts. |
+| `/songs/inst` | Compatibility redirect to `/assignments`. |
+| `/songs/timing` | All-song timeline workspace for assigning arbitrary attributes to percentage ranges and totaling their seconds across the library. |
+| `/songs/align` | Admin lyric-alignment library and create flow for a title, pasted lyrics, and source MP3. |
+| `/songs/align/[songSlug]` | Song-specific lyric timing editor with ElevenLabs forced alignment, waveform auditioning, autosave, and source resets. |
 | `/parts/[partSlug]` | Part page showing every song that has assets assigned to that part. |
 | `/admin/songs/new` | Create a new song. |
 | `/admin` | Lightweight admin index with create-song action and song list. |
 | `/admin/members` | Member CRUD and contact details. |
 | `/admin/bands` | Band CRUD and roster editing. |
-| `/assignments/[songSlug]` | Admin assignment board for one song and selected band. |
+| `/assignments/[songSlug]` | Legacy compatibility redirect to the canonical `/assignments` board. |
 | `/members/[memberSlug]` | Read-only member page with a band picker and effective parts by song. |
 
 Admin controls may appear inline on song pages when the current user is an admin.
@@ -186,9 +190,17 @@ Timing attributes are deliberately open-ended. An administrator can use people s
 
 Each segment stores percentages rather than seconds so every song timeline fills the available width. Displayed seconds equal each completed segment's percentage width multiplied by `timingDurationSeconds`. An On boundary with a null Off boundary remains visible and editable but contributes zero sections and zero seconds to every summary. Attribute totals sum completed seconds across all songs; overlaps between different attributes count toward each attribute independently.
 
-Every expanded song uses its existing `originalRecording` MP3 in a custom player. Administrators can upload a missing recording or replace the current one directly from the timing player through the same original-recording upload system used by `/songs/inst`; both pages read and update the same song field and Storage object lifecycle. The player seek track and every attribute slider share the same horizontal span. Clicking or dragging anywhere on the MP3 seek track moves the playhead continuously so a user can scan the recording. Interacting with a song marks it as the active player, and Space toggles playback for that active song without intercepting text entry or native button behavior. Administrators can pause at a boundary and capture `On`, seek or play forward, then capture `Off`. While paused, dragging a timing handle within three percentage points of the playhead snaps the handle exactly to that playhead position.
+Every expanded song uses its existing `originalRecording` MP3 in a custom player. Administrators can upload a missing recording or replace the current one directly from the timing player through the same original-recording upload system used by `/assignments`; both pages read and update the same song field and Storage object lifecycle. The player seek track and every attribute slider share the same horizontal span. Clicking or dragging anywhere on the MP3 seek track moves the playhead continuously so a user can scan the recording. Interacting with a song marks it as the active player, and Space toggles playback for that active song without intercepting text entry or native button behavior. Administrators can pause at a boundary and capture `On`, seek or play forward, then capture `Off`. While paused, dragging a timing handle within three percentage points of the playhead snaps the handle exactly to that playhead position.
 
-`InstrumentId` is one of `guit_a`, `guit_b`, `bass`, `drums`, `keys`, `perc`, `horns`, `strings`, `voc`, `xtra_vox`, `lion`, `accordion`, or `notes`. A stored `InstrumentAssignment` is a non-Notes `InstrumentId` or a Notes object containing `{ kind: "notes", id, title, notes }`. The object keeps each draggable Notes tile’s content separate from the song-level `notes` field. Instrument moves and song-order changes update the song document immediately. The five performer slots hold at most one instrument each; the Trax array may contain any number of instruments. Songs without an `instrumentOrder`, including newly created songs, appear after explicitly ordered songs until an administrator reorders the table.
+`InstrumentId` is one of `guit_a`, `guit_b`, `bass`, `drums`, `keys`, `perc`, `horns`, `strings`, `voc`, `xtra_vox`, `lion`, `accordion`, `cello`, `alto_sax`, `acoustic`, `sax_sect`, `horn_sect`, or `notes`. A stored `InstrumentAssignment` is a non-Notes `InstrumentId` or a Notes object containing `{ kind: "notes", id, title, notes }`. The object keeps each draggable Notes tile’s content separate from the song-level `notes` field. Song-order changes update the song document immediately. Band-specific instrument moves update `bandSongArrangements`; an arrangement without stored instruments initially displays the legacy song-level instrument assignments as its seed. Each member column holds at most one instrument, and the Trax array may contain any number of instruments. Songs without an `instrumentOrder`, including newly created songs, appear after explicitly ordered songs until an administrator reorders the table.
+
+`/assignments` selects a band, orders its member columns by the band’s unique `voc_1` through `voc_5` defaults, and subscribes to both the song collection and that band’s `bandSongArrangements`. The board grows automatically with the viewport up to its wide desktop maximum, avoiding horizontal scrolling whenever the window can accommodate the full table; narrower viewports retain the table’s own horizontal overflow. Every member column shows its vocal part as a compact label or a dash when that member has no vocal assignment. Each song has a persisted Edit vocals toggle, stored in the `showVocals` compatibility field. Turning it on makes assigned vocal labels draggable and renders missing vocals as empty drop boxes. Dropping one assigned part onto another in the same song swaps their parts; dropping it into an empty vocal box moves it there, and dropping it into the shared trash target removes it from the song. Alt/Option-clicking a label while editing toggles its `lead` flag, and any number of parts may be leads. Lead labels use a persistent orange outline without additional text.
+
+The assignment board is publicly readable and appears in the primary navigation for every visitor. Non-admin viewers receive the live table and stem shortcuts in a compact view-only presentation without reorder handles, vocal edit controls, the instrument collection, or active drag-and-drop targets. Firestore independently enforces admin-only writes.
+
+Assigned `guit_a`, `guit_b`, `bass`, `keys`, and `drums` icons are associated with identically named instrument stems. Every assigned `voc_1` through `voc_5` tile is associated with its corresponding vocal stem. The board subscribes to all mixer-track documents so these associations reflect uploaded, shown, non-background stems in real time. While a user hovers an assigned tile, holding Control or Command replaces an available tile with a real “Go to part” link that opens a new browser tab at `/songs/{songSlug}?mix={inst|voc}&part={partSlug}&member={memberSlug}`. For example, Cron’s bass assignment on California Girls links to `/songs/california-girls?mix=inst&part=bass&member=cron`. A visible `?` badge marks an assignment whose mapped stem is not playable or whose specialty instrument has no stem mapping; loading or subscription failures do not falsely mark every stem as missing. A narrow, rightmost Unassigned column after Trax shows each playable mapped instrument stem that is not covered by a band-member slot. These smaller display-only icons use 70% opacity and remain visible when the corresponding tile is in Trax, because Trax does not count as a person assignment.
+
+The page also subscribes to `collaboration/instrument-assignments`. A transactional, renewable 15-second lock in the collaboration document allows only one administrator to change the board at a time. Other open clients keep the page geometry fixed while a small “Assignment in progress” overlay blocks and blurs the table. Completing a move clears the lock and records its exact band and destination in `lastMove`. Every connected client viewing that band outlines the destination icon with a green glow for two seconds. An abandoned lock expires automatically so a disconnected browser cannot leave the board permanently disabled.
 
 ### `songs/{songId}/parts/{partSlug}`
 
@@ -265,6 +277,47 @@ Every expanded song uses its existing `originalRecording` MP3 in a custom player
 }
 ```
 
+### `songs/{songId}/mixerDownloads/{downloadId}`
+
+```ts
+{
+  filename: string;
+  displayName: string;
+  contentType: string;
+  fileType: "midi" | "zip";
+  size: number;
+  storagePath: string;
+  downloadUrl: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+```
+
+### `lyricAlignments/{songSlug}`
+
+```ts
+{
+  title: string;
+  slug: string;
+  sortTitle: string;
+  lyrics: string;
+  audio: {
+    filename: string;
+    contentType: "audio/mpeg";
+    size: number;
+    storagePath: string;
+    downloadUrl: string;
+  };
+  status: "ready" | "aligning" | "aligned" | "error";
+  errorMessage?: string;
+  createdAt: Timestamp;
+  alignedAt?: Timestamp;
+  updatedAt: Timestamp;
+}
+```
+
+`lyricAlignments/{songSlug}/versions/original` stores the immutable JSON returned by ElevenLabs for the current source MP3. `lyricAlignments/{songSlug}/versions/current` stores the editable word and optional syllable timing map plus the global offset. Keeping the two versions separate allows whole-song and line-level resets without changing the original alignment. Replacing the source MP3 creates a new original/current pair only after the replacement upload has received a successful ElevenLabs alignment; until then, the active audio and timing maps remain unchanged.
+
 ### `songs/{songId}.mixerMixes`
 
 ```ts
@@ -307,6 +360,8 @@ Annotations label shared sections of the synchronized mixer timeline. Sections m
 Mixer tracks are intentionally not referenced by song parts and never appear on `/songs/[songSlug]` or `/parts/[partSlug]`. They are isolated stems for synchronized test playback only. Each track has an editable player-facing name that starts as its uploaded filename without the extension; the source filename remains immutable for storage and audit context. Admins can choose which uploaded tracks are available, mark backing tracks as background mixes, drag tracks into playback order, assign them to player mixes, or permanently delete them from the project. A background-mix track remains audible and configurable but is excluded from the player’s selected-part menu, so it can never receive the selected stem’s `featured` or `muted` state.
 
 Mixer videos are uploaded as MP4 files through the same mixer upload drop zone, but do not load into the audio engine. In the stem manager's Videos tab, an admin can link each uploaded video to a song part. When a member selects that linked part in the mixer, its video link appears beneath Play and opens the video in a dialog.
+
+Mixer downloads are MIDI or ZIP files uploaded through the mixer drop zone. They never enter a player mix or load into the audio engine. They appear alongside the available MP3 stems in the song's Download stems dialog, where members download files individually. Administrators can permanently remove them from the Downloads tab in the stem manager.
 
 ### `songs/global-mixer-defaults/mixerSettings/main`
 
@@ -373,10 +428,32 @@ The public member document contains only the fields required for navigation and 
   title: string;
   code: string; // unique five-character Nano ID
   memberIds: string[];
+  vocalPartByMemberId: Record<string, "voc_1" | "voc_2" | "voc_3" | "voc_4" | "voc_5">;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
 ```
+
+The band editor enforces unique default vocal parts. These defaults determine which members appear on `/assignments` and their left-to-right order.
+
+### `bandSongArrangements/{bandId_songId}`
+
+```ts
+{
+  bandId: string;
+  songId: string;
+  instrumentAssignments?: SongInstrumentAssignments;
+  showVocals: boolean;
+  vocalAssignments?: Array<{
+    memberId: string;
+    partSlug: "voc_1" | "voc_2" | "voc_3" | "voc_4" | "voc_5";
+    lead: boolean;
+  }>;
+  updatedAt: Timestamp;
+}
+```
+
+An absent `vocalAssignments` field means the song has not been customized and receives the band’s default vocal parts. Once customized, the stored array contains only active assignments, so an explicit empty array represents a song with no assigned vocals.
 
 ### `memberSongDefaults/{memberId_songId}`
 
@@ -412,12 +489,14 @@ This nested structure keeps song pages simple and makes all assets song-scoped. 
 ```text
 songs/{songSlug}/{assetId}-{sanitizedFilename}
 songs/{songSlug}/mixer/{trackId}-{sanitizedFilename}
+lyric-alignments/{songSlug}/source/{uploadId}-{sanitizedFilename}
 ```
 
 New mixer MP3 uploads set a one-year immutable browser cache policy because each upload receives a unique track-prefixed storage path. Repeat visits may reuse the cached audio bytes instead of downloading the same stems again.
 
 Files are uploaded directly from the browser to Firebase Storage. The Firestore asset document stores the resulting storage path and metadata.
 Deleting an asset removes its primary file and generated video thumbnail from Storage, removes its ID from every part in the song, and deletes its asset document.
+Lyric-alignment MP3s are uploaded directly from the browser. The server-only alignment route verifies a signed-in admin, downloads that Storage object, and sends it with the stored plain-text lyrics to ElevenLabs. Replacement MP3s use unique Storage paths so browsers cannot reuse stale audio; after a successful realignment and Firestore update, the prior MP3 is removed.
 
 ## 11. Assignment Rules
 
@@ -459,7 +538,7 @@ v1 decision:
 - Admin mutation UI is protected by Firebase Auth using email/password accounts.
 - There will be two admin users.
 - Admin emails are listed in `NEXT_PUBLIC_ADMIN_EMAILS` so the UI can show admin controls.
-- Firestore and Storage writes require an `admins/{uid}` document for the signed-in Firebase Auth user.
+- Firestore and Storage admin access accepts either an `admins/{uid}` document for the signed-in Firebase Auth user or a matching email in the rules-level admin allowlist. The rules allowlist stays synchronized with `NEXT_PUBLIC_ADMIN_EMAILS` while UID documents are provisioned.
 - Admins can create songs, upload assets, and assign assets to parts.
 - Admins can create/edit members and bands and write member defaults or band-specific overrides.
 - Member pages are read-only and accessible to anyone with the URL under the current v1 access model.
@@ -536,14 +615,14 @@ v1 decision:
 - Visiting `/` shows a list of songs.
 - Visiting `/songs/i-get-around` shows the song title, default parts, and assigned files.
 - Visiting `/songs/i-get-around/player` shows only that song's active player-mix stems and plays them in sync.
-- Visiting `/songs/inst` shows one row for every song, including songs created after the assignment page was introduced.
+- Visiting `/assignments` shows one row for every song, including songs created after the assignment page was introduced; `/songs/inst` redirects there.
 - Visiting `/songs/timing` shows one accordion row for every song, with collapsed per-attribute summaries and full-width percentage timelines when expanded.
 - An administrator can create, rename, hide, show, and delete arbitrary timing attributes without deleting assignments when an attribute is merely hidden.
 - Capturing Off completes the pending section with an end handle; changing either handle immediately updates the song summary and cumulative totals in seconds.
 - Capturing On at the MP3 playhead creates one pending handle that contributes no time until Off is captured later in the song.
 - The MP3 seek track and every attribute slider occupy the same horizontal span, and a paused playhead provides a three-percentage-point snap target for timing handles.
 - Clicking or dragging the MP3 seek track moves the playhead, and Space toggles play or pause for the most recently interacted-with song without replacing spaces typed into a field.
-- An administrator can upload or replace each song's original MP3 from `/songs/timing`; the change immediately updates the shared original recording shown by `/songs/inst`.
+- An administrator can upload or replace each song's original MP3 from `/songs/timing`; the change immediately updates the shared original recording shown by `/assignments`.
 - Cumulative timing totals include every visible attribute across every song and count overlapping assignments independently.
 - An administrator can drag instrument icons into five single-value performer slots or a multi-value Trax area, move assignments between songs, and remove assignments through a persistent trash target.
 - Holding Alt/Option while dragging an assigned instrument copies it to the destination without clearing its source assignment.
@@ -551,12 +630,16 @@ v1 decision:
 - Every completed instrument move updates Firestore without a separate save action.
 - An administrator can drag the handle at the left of a song row to reorder the instrument table, and the new order persists without a separate save action.
 - An administrator can upload one original-recording MP3 per song and play it in a dialog; uploading a replacement removes the prior storage object after the new recording is saved.
+- An administrator can replace a lyric-alignment MP3 and request a fresh ElevenLabs timing map without changing the active audio or saved timing edits when the replacement upload or alignment fails.
+- Moving a lyric word's start earlier into the previous word shortens the previous word to the shared boundary, and moving its end later into the next word pushes that next word's start forward. Moving either boundary away from its neighbor preserves the existing gap.
+- The lyric waveform centers a newly selected word and retains that center when zoom changes, but its horizontal scroll position remains fixed while either timing handle is being moved.
 - An administrator can open a song-notes dialog from each instrument row, save or cancel edits, and see the empty pencil control become a labeled Notes button after content is saved.
 - The instrument collection includes a draggable Notes tile that can occupy a performer slot or the Ableton tracks area; every assigned tile owns a unique ID, title, and note body, displays its title, and opens its own editor when clicked without changing the song’s general notes.
 - Every song without saved player mixes receives editable `Vocals Mix` and `Instrument Mix` defaults inferred from its uploaded stem filenames.
 - An administrator can change the stems in either default player mix and create, rename, reorder, or remove additional mixes.
 - Changing player mixes downloads and decodes only the new mix's stems, and the selected-part menu contains only selectable stems in that mix.
 - An admin can hide a mixer stem without deleting it, reorder mixer stems, or permanently remove a stem without changing rehearsal assets.
+- An admin can upload MIDI and ZIP files as download-only mixer files. They never enter player mixes, but members can download them individually from the Download stems dialog.
 - An admin can mark a stem as `BG mix`; it remains in playback and override editing but cannot appear in the selected-part menu or become the selected Learn/Practice stem.
 - An admin can create, update, resize, and delete non-overlapping song annotations, while a viewer can use annotation buttons to seek without editing them.
 - A viewer or administrator can choose NORMAL, LOOP, or STOP for selected-annotation playback. NORMAL plays through, LOOP returns to the annotation start, and STOP pauses at its end without blocking playback that starts or seeks beyond it.
@@ -582,7 +665,10 @@ v1 decision:
 - Moving a part saves a band-only change immediately. Per-member and whole-band default actions promote those changes when the admin is ready.
 - A new band inherits existing member-song defaults with no copied assignment rows.
 - `/members/[memberSlug]` shows effective parts for the selected band.
-- `/assignments/[songSlug]` clearly shows default, override, and uncovered parts.
+- Visiting a legacy `/assignments/[songSlug]` URL redirects to the canonical all-song assignment board.
+- Hovering an assigned instrument or vocal while holding Control or Command reveals a “Go to part” link; selecting it opens the song player in a new tab with the correct mix, part stem, and member selected.
+- An assignment without a playable matching stem displays a `?` badge, and adding or removing a playable stem updates that badge without refreshing the board.
+- A playable `guit_a`, `guit_b`, `bass`, `keys`, or `drums` stem without a matching band-member assignment appears as a faded, non-draggable icon in the Unassigned column and disappears as soon as that instrument is assigned to a member.
 
 ## 16. Clarifying Questions
 
@@ -1223,7 +1309,7 @@ type InventoryAsset = {
 
 `assetTag` is the permanent human-facing inventory ID. New assets use an uppercase three-letter prefix and a sequence of at least two digits, such as `HXS-01`. The creation form derives the prefix from the item, scans every existing asset with that prefix including retired assets, and suggests one greater than the highest middle sequence. Cable tags may add a second dash and a two-digit length in feet: `XLR-04-25` means XLR cable 04, 25 ft. The optional length does not participate in sequence allocation. Tags are unique and compared case-insensitively; saved values are canonical uppercase. Search ignores case, spaces, and punctuation, so `trs31`, `TRS-31`, and `tRs31` all find `TRS-31-15`.
 
-Machine-readable labels preserve the same identity. A Code 128 cable barcode encodes the bare tag, while a QR label points to `https://theswell.live/g/{lowercase-asset-tag}`. The short route canonicalizes the tag and opens `/gear` filtered to that asset.
+Machine-readable labels preserve the same identity. A Code 128 cable barcode encodes the bare tag, while a QR label points to `https://theswell.live/g/{lowercase-asset-tag}`. The short route canonicalizes the tag and opens a phone-first landing page. Signed-out visitors can see only the public asset name and tag, send a note to the gear contact, or sign in. An approved administrator can choose from the four most recently used locations, search the full location directory, create a location inline, and append a QR check-in. Private inventory details and all location-changing actions remain admin-only.
 
 Owners and setup providers use one open-ended `Party` registry rather than hardcoded enums. A party can be a band member, hired musician, venue, backline company, or other person or organization. The same party can own physical assets and be responsible for supplying them to a setup.
 
@@ -1433,4 +1519,4 @@ Asset creation suggests the next short human-readable ID from the definition nam
 
 Within one setup, an `inventoryAsset` may fulfill only one equipment node. The invariant applies to every individually reserved lifecycle state, including planned, cart, ordered, in transit, awaiting check-in, and active. The node editor disables assets already assigned elsewhere in the setup and identifies the conflicting node; graph persistence rejects duplicate asset IDs as a final integrity check. Two required units therefore require two distinct asset records, even before purchase.
 
-Current receiving supports manual check-in with a named `gearLocation` and optional browser geolocation. Camera QR scanning, bulk check-in, printable QR sheets, container inheritance, and correction workflows remain later slices built on the same append-only event model.
+Current receiving supports manual single-item check-in, individual QR landing-page check-in, and an authenticated multi-item camera session. A camera session locks one named `gearLocation`, decodes Swell QR URLs plus bare Code 128 or Code 39 asset tags on the device, suppresses repeat reads, and appends one immutable `qr_camera` event per recognized asset. All events in the session share an `operationId`; the session ends with a checked-in item summary. Manual asset-tag entry remains available when camera permission is denied or no camera is present. Printable label sheets, manual bulk selection, container inheritance, and correction workflows remain later slices built on the same append-only event model.

@@ -46,6 +46,11 @@ service cloud.firestore {
         allow create, update, delete: if isAdmin();
       }
 
+      match /mixerDownloads/{downloadId} {
+        allow read: if true;
+        allow create, update, delete: if isAdmin();
+      }
+
       match /annotations/{annotationId} {
         allow read: if true;
         allow create, update, delete: if isAdmin();
@@ -89,6 +94,16 @@ service cloud.firestore {
     match /collaboration/{collaborationId} {
       allow read: if true;
       allow create, update, delete: if isAdmin();
+    }
+
+    match /lyricAlignments/{songSlug} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+
+      match /versions/{versionId} {
+        allow read: if true;
+        allow create, update, delete: if isAdmin();
+      }
     }
 
     match /setups/{setupId} {

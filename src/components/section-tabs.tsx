@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 const baseTabs = [
   { href: "/songs", label: "Songs" },
   { href: "/members", label: "Members" },
+  { href: "/assignments", label: "Assignments" },
 ] as const;
 
 function tabClassName(active: boolean) {
@@ -27,7 +28,6 @@ export function SectionTabs() {
   const tabs = admin.isAdmin
     ? [
         ...baseTabs,
-        { href: "/assignments", label: "Assignments" },
         { href: "/setups", label: "Setups" },
         { href: "/gear", label: "Gear" },
         { href: "/docs", label: "Docs" },

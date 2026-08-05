@@ -1,7 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeftIcon, FileAudioIcon, FileVideoIcon, UploadIcon, XIcon } from "lucide-react";
+import {
+  DownloadIcon,
+  FileArchiveIcon,
+  FileAudioIcon,
+  FileMusicIcon,
+  FileVideoIcon,
+  LoaderCircleIcon,
+  UploadIcon,
+  XIcon,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
@@ -12,6 +21,14 @@ import { StemManagerDialog } from "@/components/stem-manager-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,6 +38,7 @@ import type {
   SongAnnotation,
   SongMixerBundle,
   SongMixerConfiguration,
+  SongMixerDownload,
   SongMixerSettings,
   SongMixerStateOverrides,
   SongMixerTrack,
@@ -28,6 +46,7 @@ import type {
 } from "@/lib/domain";
 import {
   createSongAnnotation,
+  deleteSongMixerDownload,
   deleteSongAnnotation,
   deleteSongMixerTrack,
   deleteSongMixerVideo,
@@ -37,14 +56,18 @@ import {
   saveSongMixerTrackOverrides,
   saveSongMixerTrackOverridesBatch,
   updateSongAnnotation,
+  uploadSongMixerDownload,
   uploadSongMixerTrack,
   uploadSongMixerVideo,
   type SongAssetUploadProgress,
 } from "@/lib/firestore";
 
+type MixerUploadKind = "track" | "video" | "download";
+
 type UploadItem = {
   id: string;
   filename: string;
+  kind: MixerUploadKind;
   bytesTransferred: number;
   totalBytes: number;
   status: "uploading" | "error";
@@ -71,6 +94,7 @@ export function SongPlayerPageClient({
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
   const [deletingTrackId, setDeletingTrackId] = useState<string | null>(null);
   const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
+  const [deletingDownloadId, setDeletingDownloadId] = useState<string | null>(null);
   const [playerView, setPlayerView] = useState<PlayerView>("user");
   const [autoSaveOverrides, setAutoSaveOverrides] = useState(false);
   const [overrideSaveStatus, setOverrideSaveStatus] = useState<OverrideSaveStatus>("idle");
@@ -137,6 +161,7 @@ export function SongPlayerPageClient({
         const item: UploadItem = {
           id: crypto.randomUUID(),
           filename: file.name,
+          kind: mixerUploadKind(file),
           bytesTransferred: 0,
           totalBytes: file.size,
           status: "uploading",
@@ -159,16 +184,36 @@ export function SongPlayerPageClient({
       await Promise.all(
         queuedUploads.map(async ({ controller, file, item }, uploadIndex) => {
           try {
-            const isVideo = isMp4(file);
-            await (isVideo ? uploadSongMixerVideo : uploadSongMixerTrack)(bundle, file, {
+            const uploadOptions = {
               signal: controller.signal,
-              ...(isVideo ? {} : { orderIndex: bundle.tracks.length + uploadIndex }),
               onProgress: (progress: SongAssetUploadProgress) => updateUpload(item.id, progress),
-            });
+            };
+
+            if (item.kind === "video") {
+              await uploadSongMixerVideo(bundle, file, uploadOptions);
+            } else if (item.kind === "download") {
+              await uploadSongMixerDownload(bundle, file, uploadOptions);
+            } else {
+              const precedingTrackUploads = queuedUploads
+                .slice(0, uploadIndex)
+                .filter((queued) => queued.item.kind === "track").length;
+              await uploadSongMixerTrack(bundle, file, {
+                ...uploadOptions,
+                orderIndex: bundle.tracks.length + precedingTrackUploads,
+              });
+            }
 
             if (controller.signal.aborted) return;
             setUploadItems((current) => current.filter((currentItem) => currentItem.id !== item.id));
-            toast.success(`${file.name} added to ${isVideo ? "videos" : "the mixer"}`);
+            toast.success(
+              `${file.name} added to ${
+                item.kind === "video"
+                  ? "videos"
+                  : item.kind === "download"
+                    ? "stem downloads"
+                    : "the mixer"
+              }`,
+            );
           } catch (caught) {
             if (controller.signal.aborted) {
               setUploadItems((current) => current.filter((currentItem) => currentItem.id !== item.id));
@@ -228,6 +273,28 @@ export function SongPlayerPageClient({
         return false;
       } finally {
         setDeletingVideoId(null);
+      }
+    },
+    [bundle, refresh],
+  );
+
+  const deleteDownload = useCallback(
+    async (download: SongMixerDownload) => {
+      if (!bundle) return false;
+
+      setDeletingDownloadId(download.id);
+      try {
+        await deleteSongMixerDownload(bundle, download);
+        toast.success(`${download.displayName} deleted from the project`);
+        await refresh();
+        return true;
+      } catch (caught) {
+        toast.error("Download could not be deleted", {
+          description: caught instanceof Error ? caught.message : "Please try again.",
+        });
+        return false;
+      } finally {
+        setDeletingDownloadId(null);
       }
     },
     [bundle, refresh],
@@ -546,20 +613,27 @@ export function SongPlayerPageClient({
     );
   }
 
-  const activeUploadCount = uploadItems.filter((item) => item.status === "uploading").length;
+  const activeUploadCount = uploadItems.filter(
+    (item) => item.status === "uploading" && item.kind === "track",
+  ).length;
   const trackCount = bundle.tracks.length + activeUploadCount;
   const visibleTracks = bundle.tracks.filter((track) => track.shown);
   const showAdminControls = admin.isAdmin && playerView === "admin";
-  const manageStemsAction = showAdminControls && (bundle.tracks.length || bundle.videos.length) ? (
+  const manageStemsAction = showAdminControls && (
+    bundle.tracks.length || bundle.videos.length || bundle.downloads.length
+  ) ? (
     <StemManagerDialog
       tracks={bundle.tracks}
       videos={bundle.videos}
+      downloads={bundle.downloads}
       configurations={bundle.configurations}
       settings={bundle.settings}
       deletingTrackId={deletingTrackId}
       deletingVideoId={deletingVideoId}
+      deletingDownloadId={deletingDownloadId}
       onDeleteTrack={deleteTrack}
       onDeleteVideo={deleteVideo}
+      onDeleteDownload={deleteDownload}
       onSave={saveMixerConfiguration}
     />
   ) : null;
@@ -575,8 +649,7 @@ export function SongPlayerPageClient({
             nativeButton={false}
             className="w-fit"
           >
-            <ArrowLeftIcon data-icon="inline-start" />
-            {requestedMember ? "My parts" : "Song files"}
+            {requestedMember ? "My parts" : "Song downloads"}
           </Button>
           <div>
             <p className="swell-page-kicker">Test mixer</p>
@@ -669,7 +742,142 @@ export function SongPlayerPageClient({
           {manageStemsAction ? <EmptyContent>{manageStemsAction}</EmptyContent> : null}
         </Empty>
       )}
+
+      <div className="flex justify-center py-2 sm:justify-end">
+        <StemDownloadsDialog
+          songTitle={bundle.song.title}
+          files={[...visibleTracks, ...bundle.downloads]}
+        />
+      </div>
     </AppShell>
+  );
+}
+
+function StemDownloadsDialog({
+  songTitle,
+  files,
+}: {
+  songTitle: string;
+  files: Array<SongMixerTrack | SongMixerDownload>;
+}) {
+  const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
+  const downloadableCount = files.filter(
+    (file) => file.downloadUrl && file.downloadUrl !== "#",
+  ).length;
+
+  const downloadFile = async (file: SongMixerTrack | SongMixerDownload) => {
+    if (!file.downloadUrl || file.downloadUrl === "#") return;
+
+    setDownloadingFileId(file.id);
+
+    try {
+      const response = await fetch(file.downloadUrl);
+      if (!response.ok) throw new Error(`Download failed with status ${response.status}.`);
+
+      const blobUrl = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = file.filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1_000);
+    } catch (caught) {
+      toast.error(`${file.displayName} could not be downloaded`, {
+        description: caught instanceof Error ? caught.message : "Please try again.",
+      });
+    } finally {
+      setDownloadingFileId(null);
+    }
+  };
+
+  return (
+    <Dialog>
+      <DialogTrigger
+        render={
+          <Button type="button" variant="outline">
+            <DownloadIcon data-icon="inline-start" />
+            Download stems
+          </Button>
+        }
+      />
+      <DialogContent className="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:max-w-xl">
+        <DialogHeader className="border-b p-4 pr-12">
+          <DialogTitle>Download song stems</DialogTitle>
+          <DialogDescription>
+            {downloadableCount
+              ? `${downloadableCount} ${downloadableCount === 1 ? "file is" : "files are"} available for ${songTitle}. Choose the files you want.`
+              : `There are no downloadable files available for ${songTitle}.`}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="min-h-0 overflow-y-auto p-4">
+          {files.length ? (
+            <ul className="grid gap-2" aria-label={`Download files for ${songTitle}`}>
+              {files.map((file) => {
+                const downloadable = Boolean(file.downloadUrl && file.downloadUrl !== "#");
+                const downloading = downloadingFileId === file.id;
+
+                return (
+                  <li
+                    key={file.id}
+                    className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border bg-card p-3"
+                  >
+                    <span className="grid size-9 place-items-center rounded-md bg-secondary text-primary">
+                      {isMixerDownload(file) ? (
+                        file.fileType === "zip" ? (
+                          <FileArchiveIcon aria-hidden />
+                        ) : (
+                          <FileMusicIcon aria-hidden />
+                        )
+                      ) : (
+                        <FileAudioIcon aria-hidden />
+                      )}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{file.displayName}</p>
+                      <p className="truncate text-xs text-muted-foreground" title={file.filename}>
+                        {file.filename} · {formatBytes(file.size)}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={!downloadable || downloadingFileId !== null}
+                      onClick={() => void downloadFile(file)}
+                      aria-label={
+                        downloadable
+                          ? `Download ${file.displayName}`
+                          : `${file.displayName} is unavailable`
+                      }
+                    >
+                      {downloading ? (
+                        <LoaderCircleIcon className="animate-spin" aria-hidden />
+                      ) : (
+                        <DownloadIcon aria-hidden />
+                      )}
+                      <span className="hidden sm:inline">
+                        {downloading ? "Downloading" : downloadable ? "Download" : "Unavailable"}
+                      </span>
+                    </Button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <Empty className="min-h-48 border">
+              <EmptyHeader>
+                <EmptyTitle>No downloads available</EmptyTitle>
+                <EmptyDescription>
+                  An administrator has not made any stems or download files available for this song.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -707,6 +915,10 @@ function MixerUploadPanel({
       "audio/mpeg": [".mp3"],
       "audio/mp3": [".mp3"],
       "video/mp4": [".mp4"],
+      "audio/midi": [".mid", ".midi"],
+      "audio/x-midi": [".mid", ".midi"],
+      "application/zip": [".zip"],
+      "application/x-zip-compressed": [".zip"],
     },
     multiple: true,
     onDropAccepted: (files) => void onDrop(files),
@@ -714,15 +926,21 @@ function MixerUploadPanel({
       const hasInvalidType = rejections.some((rejection) =>
         rejection.errors.some((error) => error.code === "file-invalid-type"),
       );
-      toast.error(hasInvalidType ? "Choose MP3 or MP4 files only" : "Those files could not be added.");
+      toast.error(
+        hasInvalidType
+          ? "Choose MP3, MP4, MIDI, or ZIP files only"
+          : "Those files could not be added.",
+      );
     },
   });
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Add mixer stems or videos</CardTitle>
-        <CardDescription>MP3 stems must begin at the same song start. MP4s can be linked to a player part in Manage stems.</CardDescription>
+        <CardTitle>Add mixer files</CardTitle>
+        <CardDescription>
+          MP3 stems must begin at the same song start. MIDI and ZIP files are download-only.
+        </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         <div
@@ -739,10 +957,12 @@ function MixerUploadPanel({
           </span>
           <div className="grid gap-0.5">
             <p className="font-medium">
-              {isDragActive ? "Drop MP3 stems or MP4 videos here" : "Drop MP3 stems or MP4 videos, or click to choose"}
+              {isDragActive
+                ? "Drop MP3, MP4, MIDI, or ZIP files here"
+                : "Drop MP3, MP4, MIDI, or ZIP files, or click to choose"}
             </p>
             <p className="text-sm text-muted-foreground">
-              MP3s become mixer stems. MP4s appear in the Videos tab, ready to link to a part.
+              MP3s enter the player. MP4s can be linked to a part. MIDI and ZIP files appear only in downloads.
             </p>
           </div>
         </div>
@@ -758,8 +978,14 @@ function MixerUploadPanel({
                   key={item.id}
                   className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border bg-card p-3"
                 >
-                  {isMp4Name(item.filename) ? (
+                  {item.kind === "video" ? (
                     <FileVideoIcon className="size-4 text-primary" aria-hidden />
+                  ) : item.kind === "download" ? (
+                    isZipName(item.filename) ? (
+                      <FileArchiveIcon className="size-4 text-primary" aria-hidden />
+                    ) : (
+                      <FileMusicIcon className="size-4 text-primary" aria-hidden />
+                    )
                   ) : (
                     <FileAudioIcon className="size-4 text-primary" aria-hidden />
                   )}
@@ -790,4 +1016,33 @@ function isMp4(file: Pick<File, "name" | "type">) {
 
 function isMp4Name(filename: string) {
   return filename.toLowerCase().endsWith(".mp4");
+}
+
+function mixerUploadKind(file: Pick<File, "name" | "type">): MixerUploadKind {
+  if (isMp4(file)) return "video";
+  if (isMidiName(file.name) || isZipName(file.name)) return "download";
+  return "track";
+}
+
+function isMidiName(filename: string) {
+  const lowerName = filename.toLowerCase();
+  return lowerName.endsWith(".mid") || lowerName.endsWith(".midi");
+}
+
+function isZipName(filename: string) {
+  return filename.toLowerCase().endsWith(".zip");
+}
+
+function isMixerDownload(
+  file: SongMixerTrack | SongMixerDownload,
+): file is SongMixerDownload {
+  return "fileType" in file;
+}
+
+function formatBytes(bytes: number) {
+  if (!bytes) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  const unitIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / 1024 ** unitIndex;
+  return `${value.toFixed(unitIndex === 0 || value >= 10 ? 0 : 1)} ${units[unitIndex]}`;
 }

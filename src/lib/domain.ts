@@ -209,6 +209,17 @@ export interface SongMixerVideo {
   downloadUrl?: string;
 }
 
+export interface SongMixerDownload {
+  id: string;
+  filename: string;
+  displayName: string;
+  contentType: string;
+  fileType: "midi" | "zip";
+  size: number;
+  storagePath: string;
+  downloadUrl?: string;
+}
+
 export function stemDisplayNameFromFilename(filename: string) {
   const name = filename.replace(/\.[^./\\]+$/, "");
   return name || filename;
@@ -237,6 +248,7 @@ export interface SongMixerBundle {
   song: Song;
   tracks: SongMixerTrack[];
   videos: SongMixerVideo[];
+  downloads: SongMixerDownload[];
   configurations: SongMixerConfiguration[];
   settings: SongMixerSettings;
   annotations: SongAnnotation[];

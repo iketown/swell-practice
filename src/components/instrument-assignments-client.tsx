@@ -68,7 +68,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAdmin } from "@/hooks/use-admin";
 import { listBands, listMembers } from "@/lib/assignments";
 import {
@@ -133,14 +132,6 @@ const INSTRUMENTS: Record<
 };
 
 const SELECTED_BAND_STORAGE_KEY = "swell-parts:instrument-assignment-band";
-const ASSIGNMENT_BOARD_WIDTH_STORAGE_KEY = "swell-parts:assignment-board-width";
-const ASSIGNMENT_BOARD_WIDTHS = ["l", "xl", "xxl"] as const;
-type AssignmentBoardWidth = (typeof ASSIGNMENT_BOARD_WIDTHS)[number];
-const ASSIGNMENT_BOARD_WIDTH_CLASSES: Record<AssignmentBoardWidth, string> = {
-  l: "max-w-6xl",
-  xl: "max-w-[88rem]",
-  xxl: "max-w-[104rem]",
-};
 const STARTUP_MEMBER_ORDER = ["ike", "jackson", "joe", "sam", "cron"] as const;
 const PLAYER_STEM_BY_INSTRUMENT_ID: Partial<
   Record<InstrumentId, { mix: "inst"; part: string }>
@@ -255,10 +246,6 @@ function sortSongsByInstrumentOrder(songs: Song[]) {
     if (rightOrder !== undefined) return 1;
     return left.sortTitle.localeCompare(right.sortTitle);
   });
-}
-
-function isAssignmentBoardWidth(value: string): value is AssignmentBoardWidth {
-  return ASSIGNMENT_BOARD_WIDTHS.includes(value as AssignmentBoardWidth);
 }
 
 function columnsForBand(band: Band | null, members: BandMember[]): BandColumn[] {
@@ -1168,6 +1155,7 @@ function InstrumentAssignmentRow({
   song,
   columns,
   vocalState,
+  canEdit,
   disabled,
   uploading,
   uploadProgress,
@@ -1186,6 +1174,7 @@ function InstrumentAssignmentRow({
   song: Song;
   columns: BandColumn[];
   vocalState: VocalArrangementState;
+  canEdit: boolean;
   disabled: boolean;
   uploading: boolean;
   uploadProgress: number;
@@ -1236,19 +1225,21 @@ function InstrumentAssignmentRow({
     >
       <TableCell className="sticky left-0 z-10 bg-card px-2 py-3">
         <div className="flex min-w-0 items-center gap-2">
-          <Button
-            ref={handleRef}
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            disabled={disabled}
-            data-testid={`song-handle-${song.id}`}
-            aria-label={`Reorder ${song.title}`}
-            title="Drag to reorder"
-            className="shrink-0 touch-none cursor-grab text-muted-foreground active:cursor-grabbing"
-          >
-            <GripVerticalIcon aria-hidden />
-          </Button>
+          {canEdit ? (
+            <Button
+              ref={handleRef}
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              disabled={disabled}
+              data-testid={`song-handle-${song.id}`}
+              aria-label={`Reorder ${song.title}`}
+              title="Drag to reorder"
+              className="shrink-0 touch-none cursor-grab text-muted-foreground active:cursor-grabbing"
+            >
+              <GripVerticalIcon aria-hidden />
+            </Button>
+          ) : null}
           <div className="flex min-w-0 flex-col items-start gap-2">
             <span className="max-w-48 truncate font-semibold" title={song.title}>
               {song.title}
@@ -1280,7 +1271,7 @@ function InstrumentAssignmentRow({
               ) : (
                 <span className="text-xs text-muted-foreground">No recording</span>
               )}
-              {song.notes?.trim() ? (
+              {canEdit && song.notes?.trim() ? (
                 <Button
                   type="button"
                   size="xs"
@@ -1291,7 +1282,7 @@ function InstrumentAssignmentRow({
                 >
                   Notes
                 </Button>
-              ) : (
+              ) : canEdit ? (
                 <Button
                   type="button"
                   size="icon-xs"
@@ -1304,21 +1295,23 @@ function InstrumentAssignmentRow({
                 >
                   <PencilIcon aria-hidden />
                 </Button>
-              )}
+              ) : null}
             </div>
-            <label
-              htmlFor={`edit-vocals-${song.id}`}
-              className="flex cursor-pointer items-center gap-2 text-xs font-medium text-muted-foreground"
-            >
-              <Switch
-                id={`edit-vocals-${song.id}`}
-                size="sm"
-                checked={vocalState.showVocals}
-                disabled={disabled}
-                onCheckedChange={onShowVocalsChange}
-              />
-              Edit vocals
-            </label>
+            {canEdit ? (
+              <label
+                htmlFor={`edit-vocals-${song.id}`}
+                className="flex cursor-pointer items-center gap-2 text-xs font-medium text-muted-foreground"
+              >
+                <Switch
+                  id={`edit-vocals-${song.id}`}
+                  size="sm"
+                  checked={vocalState.showVocals}
+                  disabled={disabled}
+                  onCheckedChange={onShowVocalsChange}
+                />
+                Edit vocals
+              </label>
+            ) : null}
           </div>
         </div>
       </TableCell>
@@ -1344,7 +1337,7 @@ function InstrumentAssignmentRow({
             stemParts={stemParts}
             stemPartsReady={stemPartsReady}
             assignment={vocalState.vocalAssignments[slotIndex] ?? null}
-            editable={vocalState.showVocals}
+            editable={canEdit && vocalState.showVocals}
             disabled={disabled}
             recentMove={recentMove}
             onToggleLead={() => onToggleLead(slotIndex)}
@@ -1428,8 +1421,6 @@ export function InstrumentAssignmentsClient() {
   const [bands, setBands] = useState<Band[]>([]);
   const [members, setMembers] = useState<BandMember[]>([]);
   const [selectedBandId, setSelectedBandId] = useState("");
-  const [assignmentBoardWidth, setAssignmentBoardWidth] =
-    useState<AssignmentBoardWidth>("xl");
   const [arrangementsBySongId, setArrangementsBySongId] =
     useState<Map<string, BandSongArrangement>>(new Map());
   const [arrangementsReady, setArrangementsReady] = useState(false);
@@ -1504,18 +1495,6 @@ export function InstrumentAssignmentsClient() {
   }
 
   useEffect(() => {
-    const rememberedWidth = window.localStorage.getItem(
-      ASSIGNMENT_BOARD_WIDTH_STORAGE_KEY,
-    );
-    if (!rememberedWidth || !isAssignmentBoardWidth(rememberedWidth)) return;
-
-    const frameId = window.requestAnimationFrame(() => {
-      setAssignmentBoardWidth(rememberedWidth);
-    });
-    return () => window.cancelAnimationFrame(frameId);
-  }, []);
-
-  useEffect(() => {
     let active = true;
     Promise.all([listBands(), listMembers()])
       .then(([nextBands, nextMembers]) => {
@@ -1539,11 +1518,6 @@ export function InstrumentAssignmentsClient() {
       active = false;
     };
   }, []);
-
-  function changeAssignmentBoardWidth(width: AssignmentBoardWidth) {
-    setAssignmentBoardWidth(width);
-    window.localStorage.setItem(ASSIGNMENT_BOARD_WIDTH_STORAGE_KEY, width);
-  }
 
   useEffect(() => {
     return subscribeSongs(
@@ -2441,7 +2415,7 @@ export function InstrumentAssignmentsClient() {
   }
 
   return (
-    <AppShell contentClassName={ASSIGNMENT_BOARD_WIDTH_CLASSES[assignmentBoardWidth]}>
+    <AppShell contentClassName="max-w-[88rem]">
       <p className="sr-only" aria-live="polite" aria-atomic="true">
         {recentMoveAnnouncement}
       </p>
@@ -2478,29 +2452,6 @@ export function InstrumentAssignmentsClient() {
                   </Select>
                 </div>
               ) : null}
-              <div className="flex items-center gap-2">
-                <span id="assignment-width-label" className="text-xs font-semibold text-muted-foreground">
-                  Width
-                </span>
-                <ToggleGroup
-                  aria-labelledby="assignment-width-label"
-                  variant="outline"
-                  size="sm"
-                  spacing={0}
-                  value={[assignmentBoardWidth]}
-                  disabled={assignmentInProgress}
-                  onValueChange={(value) => {
-                    const nextWidth = value[0];
-                    if (nextWidth && isAssignmentBoardWidth(nextWidth)) {
-                      changeAssignmentBoardWidth(nextWidth);
-                    }
-                  }}
-                >
-                  <ToggleGroupItem value="l">L</ToggleGroupItem>
-                  <ToggleGroupItem value="xl">XL</ToggleGroupItem>
-                  <ToggleGroupItem value="xxl">XXL</ToggleGroupItem>
-                </ToggleGroup>
-              </div>
               {!collaborationReady ? (
                 <Badge variant="outline">
                   <LoaderCircleIcon aria-hidden className="animate-spin" />
@@ -2519,9 +2470,6 @@ export function InstrumentAssignmentsClient() {
                 <Badge variant="destructive" title={stemPartsError}>
                   Stem links unavailable
                 </Badge>
-              ) : null}
-              {!admin.loading && !admin.isAdmin ? (
-                <Badge variant="secondary">Sign in to edit</Badge>
               ) : null}
               <Badge variant={saveFailed ? "destructive" : "secondary"}>
                 {!admin.loading && !admin.isAdmin ? (
@@ -2549,12 +2497,16 @@ export function InstrumentAssignmentsClient() {
               <li>
                 If <Kbd>?</Kbd> is shown there is no associated stem / link
               </li>
-              <li>
-                <Kbd>alt</Kbd> + drag to copy instrument
-              </li>
-              <li>
-                <Kbd>alt</Kbd> + click on vocal part to assign lead
-              </li>
+              {admin.isAdmin ? (
+                <>
+                  <li>
+                    <Kbd>alt</Kbd> + drag to copy instrument
+                  </li>
+                  <li>
+                    <Kbd>alt</Kbd> + click on vocal part to assign lead
+                  </li>
+                </>
+              ) : null}
             </ul>
           </div>
 
@@ -2651,6 +2603,7 @@ export function InstrumentAssignmentsClient() {
                       song={song}
                       columns={columns}
                       vocalState={vocalStateForSong(song.id)}
+                      canEdit={admin.isAdmin}
                       disabled={editingDisabled}
                       uploading={uploadingSongId === song.id}
                       uploadProgress={uploadProgress}
@@ -2683,29 +2636,31 @@ export function InstrumentAssignmentsClient() {
             </div>
           </div>
 
-          <div data-testid="instrument-dock" className="shrink-0 border-t bg-card p-3 sm:p-4">
-            <div className="flex items-end gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold">Instrument collection</p>
-                  <p className="hidden text-xs text-muted-foreground sm:block">
-                    Drag copies into the table
-                  </p>
+          {admin.isAdmin ? (
+            <div data-testid="instrument-dock" className="shrink-0 border-t bg-card p-3 sm:p-4">
+              <div className="flex items-end gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold">Instrument collection</p>
+                    <p className="hidden text-xs text-muted-foreground sm:block">
+                      Drag copies into the table
+                    </p>
+                  </div>
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {INSTRUMENT_IDS.map((instrumentId) => (
+                      <DraggableInstrument
+                        key={instrumentId}
+                        assignment={instrumentId}
+                        source={{ zone: "collection" }}
+                        disabled={editingDisabled}
+                      />
+                    ))}
+                  </div>
                 </div>
-                <div className="flex gap-2 overflow-x-auto pb-1">
-                  {INSTRUMENT_IDS.map((instrumentId) => (
-                    <DraggableInstrument
-                      key={instrumentId}
-                      assignment={instrumentId}
-                      source={{ zone: "collection" }}
-                      disabled={editingDisabled}
-                    />
-                  ))}
-                </div>
+                <TrashDropZone disabled={editingDisabled} />
               </div>
-              <TrashDropZone disabled={editingDisabled} />
             </div>
-          </div>
+          ) : null}
         </section>
       </DragDropProvider>
 
