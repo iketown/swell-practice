@@ -141,6 +141,9 @@ const PLAYER_STEM_BY_INSTRUMENT_ID: Partial<
   bass: { mix: "inst", part: "bass" },
   keys: { mix: "inst", part: "keys" },
   drums: { mix: "inst", part: "drums" },
+  acoustic: { mix: "inst", part: "guit_acoustic" },
+  alto_sax: { mix: "inst", part: "sax" },
+  accordion: { mix: "inst", part: "accordion" },
 };
 const EMPTY_STEM_PARTS: ReadonlySet<string> = new Set();
 
@@ -594,11 +597,14 @@ function unassignedStemInstrumentIds(
   song: Song,
   stemParts: ReadonlySet<string>,
 ) {
-  const assignedPlayerInstrumentIds = new Set<InstrumentId>();
+  const coveredInstrumentIds = new Set<InstrumentId>();
   song.instrumentAssignments.players.forEach((assignment) => {
     if (assignment) {
-      assignedPlayerInstrumentIds.add(assignmentInstrumentId(assignment));
+      coveredInstrumentIds.add(assignmentInstrumentId(assignment));
     }
+  });
+  song.instrumentAssignments.tracks.forEach((assignment) => {
+    coveredInstrumentIds.add(assignmentInstrumentId(assignment));
   });
 
   return INSTRUMENT_IDS.filter((instrumentId) => {
@@ -606,7 +612,7 @@ function unassignedStemInstrumentIds(
     return Boolean(
       playerStem
       && stemParts.has(playerStem.part)
-      && !assignedPlayerInstrumentIds.has(instrumentId),
+      && !coveredInstrumentIds.has(instrumentId),
     );
   });
 }

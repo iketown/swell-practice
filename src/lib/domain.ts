@@ -465,6 +465,9 @@ export const DEFAULT_PART_SLUGS = [
   "keys",
   "drums",
   "bass",
+  "guit_acoustic",
+  "sax",
+  "accordion",
 ] as const;
 
 export const DEFAULT_PARTS: SongPart[] = DEFAULT_PART_SLUGS.map((slug, index) => ({
@@ -620,14 +623,26 @@ export function inferPartSlugs(filename: string, availablePartSlugs = DEFAULT_PA
     }
   }
 
-  if (available.has("guit_a") && /(?:guit(?:ar)?|gtr)_?a/.test(normalized)) inferred.add("guit_a");
-  if (available.has("guit_b") && /(?:guit(?:ar)?|gtr)_?b/.test(normalized)) inferred.add("guit_b");
+  if (available.has("guit_a") && /(?:guit(?:ar)?|gtr)_?a(?:_|$)/.test(normalized)) inferred.add("guit_a");
+  if (available.has("guit_b") && /(?:guit(?:ar)?|gtr)_?b(?:_|$)/.test(normalized)) inferred.add("guit_b");
+  if (
+    available.has("guit_acoustic")
+    && (tokens.has("acoustic") || joined.includes("_guit_acoustic_"))
+  ) {
+    inferred.add("guit_acoustic");
+  }
   if (available.has("bass") && tokens.has("bass")) inferred.add("bass");
   if (available.has("keys") && (tokens.has("keys") || tokens.has("keyboards") || tokens.has("piano"))) {
     inferred.add("keys");
   }
   if (available.has("drums") && (tokens.has("drums") || tokens.has("drum") || tokens.has("kit"))) {
     inferred.add("drums");
+  }
+  if (available.has("sax") && (tokens.has("sax") || tokens.has("saxophone"))) {
+    inferred.add("sax");
+  }
+  if (available.has("accordion") && tokens.has("accordion")) {
+    inferred.add("accordion");
   }
 
   if (hasVocalGroupCue) {
