@@ -23,6 +23,19 @@ export const INSTRUMENT_IDS = [
 
 export type InstrumentId = (typeof INSTRUMENT_IDS)[number];
 
+export const ASSIGNMENT_STEM_PART_BY_INSTRUMENT_ID: Partial<
+  Record<InstrumentId, string>
+> = {
+  guit_a: "guit_a",
+  guit_b: "guit_b",
+  bass: "bass",
+  keys: "keys",
+  drums: "drums",
+  acoustic: "guit_acoustic",
+  alto_sax: "sax",
+  accordion: "accordion",
+};
+
 export interface SongInstrumentNote {
   kind: "notes";
   id: string;

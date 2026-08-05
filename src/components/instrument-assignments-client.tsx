@@ -57,7 +57,6 @@ import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -71,6 +70,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAdmin } from "@/hooks/use-admin";
 import { listBands, listMembers } from "@/lib/assignments";
 import {
+  ASSIGNMENT_STEM_PART_BY_INSTRUMENT_ID,
   INSTRUMENT_IDS,
   partLabel,
   VOCAL_PART_SLUGS,
@@ -133,18 +133,6 @@ const INSTRUMENTS: Record<
 
 const SELECTED_BAND_STORAGE_KEY = "swell-parts:instrument-assignment-band";
 const STARTUP_MEMBER_ORDER = ["ike", "jackson", "joe", "sam", "cron"] as const;
-const PLAYER_STEM_BY_INSTRUMENT_ID: Partial<
-  Record<InstrumentId, { mix: "inst"; part: string }>
-> = {
-  guit_a: { mix: "inst", part: "guit_a" },
-  guit_b: { mix: "inst", part: "guit_b" },
-  bass: { mix: "inst", part: "bass" },
-  keys: { mix: "inst", part: "keys" },
-  drums: { mix: "inst", part: "drums" },
-  acoustic: { mix: "inst", part: "guit_acoustic" },
-  alto_sax: { mix: "inst", part: "sax" },
-  accordion: { mix: "inst", part: "accordion" },
-};
 const EMPTY_STEM_PARTS: ReadonlySet<string> = new Set();
 
 type BandColumn = {
@@ -608,10 +596,10 @@ function unassignedStemInstrumentIds(
   });
 
   return INSTRUMENT_IDS.filter((instrumentId) => {
-    const playerStem = PLAYER_STEM_BY_INSTRUMENT_ID[instrumentId];
+    const stemPart = ASSIGNMENT_STEM_PART_BY_INSTRUMENT_ID[instrumentId];
     return Boolean(
-      playerStem
-      && stemParts.has(playerStem.part)
+      stemPart
+      && stemParts.has(stemPart)
       && !coveredInstrumentIds.has(instrumentId),
     );
   });
@@ -759,23 +747,23 @@ function PlayerSlot({
   const assignedInstrumentId = assignment
     ? assignmentInstrumentId(assignment)
     : null;
-  const playerStem = assignedInstrumentId
-    ? PLAYER_STEM_BY_INSTRUMENT_ID[assignedInstrumentId]
+  const stemPart = assignedInstrumentId
+    ? ASSIGNMENT_STEM_PART_BY_INSTRUMENT_ID[assignedInstrumentId]
     : undefined;
   const stemLink: AssignmentStemLink | undefined = assignment
     && assignedInstrumentId
     && assignedInstrumentId !== "notes"
-    ? playerStem
+    ? stemPart
       ? {
           href: assignmentPlayerHref({
             songSlug: song.slug,
-            mix: playerStem.mix,
-            part: playerStem.part,
+            mix: "inst",
+            part: stemPart,
             memberSlug,
           }),
           label: INSTRUMENTS[assignedInstrumentId].label,
           availability: stemPartsReady
-            ? stemParts.has(playerStem.part) ? "available" : "missing"
+            ? stemParts.has(stemPart) ? "available" : "missing"
             : "unknown",
         }
       : {
@@ -908,6 +896,8 @@ function VocalSlot({
   disabled,
   recentMove,
   onToggleLead,
+  defaultPart,
+  onRestoreDefault,
 }: {
   song: Song;
   slotIndex: number;
@@ -920,6 +910,8 @@ function VocalSlot({
   disabled: boolean;
   recentMove: InstrumentAssignmentLastMove | null;
   onToggleLead: () => void;
+  defaultPart: VocalPartSlug;
+  onRestoreDefault: () => void;
 }) {
   const { ref, isDropTarget } = useDroppable<VocalDropData>({
     id: `drop:vocal:${song.id}:${slotIndex}`,
@@ -949,19 +941,35 @@ function VocalSlot({
           : "unknown",
       }
     : undefined;
+  const canRestoreDefault = editable && !disabled && !assignment;
 
   return (
     <div
       ref={editable ? ref : undefined}
       data-testid={`vocal-slot-${song.id}-${slotIndex}`}
+      role={editable && !assignment ? "button" : undefined}
+      tabIndex={editable && !assignment && !disabled ? 0 : undefined}
+      aria-disabled={editable && !assignment ? disabled : undefined}
       aria-label={!assignment
         ? editable
-          ? `No vocal part for slot ${slotIndex + 1}. Drop a vocal part here.`
+          ? `No vocal part for slot ${slotIndex + 1}. Drop a vocal part here, or double-click to restore ${partLabel(defaultPart)}.`
           : `No vocal part for slot ${slotIndex + 1}.`
         : undefined}
+      title={editable && !assignment
+        ? `Double-click to restore ${partLabel(defaultPart)}`
+        : undefined}
+      onDoubleClick={() => {
+        if (canRestoreDefault) onRestoreDefault();
+      }}
+      onKeyDown={(event) => {
+        if (!canRestoreDefault || (event.key !== "Enter" && event.key !== " ")) return;
+        event.preventDefault();
+        onRestoreDefault();
+      }}
       className={cn(
-        "group/part-link relative mx-auto mt-0.5 flex h-6 w-16 items-center justify-center rounded-md border border-dashed border-transparent transition-[background-color,border-color,box-shadow,transform] duration-150",
+        "group/part-link relative mx-auto mt-0.5 flex h-6 w-16 items-center justify-center rounded-md border border-dashed border-transparent outline-none transition-[background-color,border-color,box-shadow,transform] duration-150 focus-visible:ring-3 focus-visible:ring-ring/40",
         editable && !assignment && "border-input bg-muted/35",
+        canRestoreDefault && "cursor-pointer hover:border-foreground/45 hover:bg-muted/60",
         isDropTarget && "scale-[1.04] border-primary bg-accent",
         recentlyCleared && "swell-recent-assignment",
       )}
@@ -993,7 +1001,11 @@ function VocalSlot({
             <span>{partLabel(assignment.partSlug)}</span>
           </div>
         )
-      ) : editable ? null : (
+      ) : editable ? (
+        <span aria-hidden className="text-xs font-semibold text-muted-foreground/55">
+          +
+        </span>
+      ) : (
         <span aria-hidden className="font-mono text-[10px] font-semibold text-muted-foreground">
           –
         </span>
@@ -1078,15 +1090,28 @@ function UnassignedStemSlot({
   song,
   stemParts,
   stemPartsReady,
+  vocalAssignments,
 }: {
   song: Song;
   stemParts: ReadonlySet<string>;
   stemPartsReady: boolean;
+  vocalAssignments: Array<SongVocalAssignment | null>;
 }) {
   const instrumentIds = stemPartsReady
     ? unassignedStemInstrumentIds(song, stemParts)
     : [];
-  const labels = instrumentIds.map((instrumentId) => INSTRUMENTS[instrumentId].label);
+  const assignedVocalParts = new Set(
+    vocalAssignments.flatMap((assignment) => assignment ? [assignment.partSlug] : []),
+  );
+  const vocalParts = stemPartsReady
+    ? VOCAL_PART_SLUGS.filter(
+        (partSlug) => stemParts.has(partSlug) && !assignedVocalParts.has(partSlug),
+      )
+    : [];
+  const labels = [
+    ...instrumentIds.map((instrumentId) => INSTRUMENTS[instrumentId].label),
+    ...vocalParts.map(partLabel),
+  ];
 
   return (
     <div
@@ -1101,29 +1126,41 @@ function UnassignedStemSlot({
     >
       {!stemPartsReady ? (
         <Skeleton className="size-9 rounded-md" />
-      ) : instrumentIds.length ? (
-        instrumentIds.map((instrumentId) => {
-          const instrument = INSTRUMENTS[instrumentId];
-          if (!instrument.imageSrc) return null;
+      ) : labels.length ? (
+        <>
+          {instrumentIds.map((instrumentId) => {
+            const instrument = INSTRUMENTS[instrumentId];
+            if (!instrument.imageSrc) return null;
 
-          return (
+            return (
+              <div
+                key={instrumentId}
+                data-testid={`unassigned-stem-${song.id}-${instrumentId}`}
+                title={`${instrument.label} stem is not assigned to a band member or Trax`}
+                className="size-9 shrink-0 rounded-md border bg-card p-0.5 opacity-70 shadow-sm"
+              >
+                <Image
+                  src={instrument.imageSrc}
+                  alt={`${instrument.label} stem is unassigned`}
+                  width={170}
+                  height={170}
+                  draggable={false}
+                  className="size-full rounded-[calc(var(--radius-md)-3px)] object-cover"
+                />
+              </div>
+            );
+          })}
+          {vocalParts.map((partSlug) => (
             <div
-              key={instrumentId}
-              data-testid={`unassigned-stem-${song.id}-${instrumentId}`}
-              title={`${instrument.label} stem is not assigned to a band member`}
-              className="size-9 shrink-0 rounded-md border bg-card p-0.5 opacity-70 shadow-sm"
+              key={partSlug}
+              data-testid={`unassigned-stem-${song.id}-${partSlug}`}
+              title={`${partLabel(partSlug)} stem is not assigned to a band member`}
+              className="swell-vocal-tile flex h-6 min-w-11 shrink-0 items-center justify-center rounded-sm border border-input bg-card px-1 font-mono text-[8px] font-bold leading-none uppercase text-foreground opacity-70 shadow-sm"
             >
-              <Image
-                src={instrument.imageSrc}
-                alt={`${instrument.label} stem is unassigned`}
-                width={170}
-                height={170}
-                draggable={false}
-                className="size-full rounded-[calc(var(--radius-md)-3px)] object-cover"
-              />
+              {partLabel(partSlug)}
             </div>
-          );
-        })
+          ))}
+        </>
       ) : (
         <span aria-hidden className="font-mono text-xs font-semibold text-muted-foreground/55">
           –
@@ -1174,8 +1211,8 @@ function InstrumentAssignmentRow({
   onUpload,
   onOpenSongNotes,
   onOpenInstrumentNote,
-  onShowVocalsChange,
   onToggleLead,
+  onRestoreDefaultVocal,
 }: {
   song: Song;
   columns: BandColumn[];
@@ -1193,8 +1230,8 @@ function InstrumentAssignmentRow({
   onUpload: () => void;
   onOpenSongNotes: () => void;
   onOpenInstrumentNote: (note: SongInstrumentNote) => void;
-  onShowVocalsChange: (checked: boolean) => void;
   onToggleLead: (slotIndex: number) => void;
+  onRestoreDefaultVocal: (slotIndex: number) => void;
 }) {
   const {
     ref: draggableRef,
@@ -1303,21 +1340,6 @@ function InstrumentAssignmentRow({
                 </Button>
               ) : null}
             </div>
-            {canEdit ? (
-              <label
-                htmlFor={`edit-vocals-${song.id}`}
-                className="flex cursor-pointer items-center gap-2 text-xs font-medium text-muted-foreground"
-              >
-                <Switch
-                  id={`edit-vocals-${song.id}`}
-                  size="sm"
-                  checked={vocalState.showVocals}
-                  disabled={disabled}
-                  onCheckedChange={onShowVocalsChange}
-                />
-                Edit vocals
-              </label>
-            ) : null}
           </div>
         </div>
       </TableCell>
@@ -1343,10 +1365,12 @@ function InstrumentAssignmentRow({
             stemParts={stemParts}
             stemPartsReady={stemPartsReady}
             assignment={vocalState.vocalAssignments[slotIndex] ?? null}
-            editable={canEdit && vocalState.showVocals}
+            editable={canEdit}
             disabled={disabled}
             recentMove={recentMove}
             onToggleLead={() => onToggleLead(slotIndex)}
+            defaultPart={column.defaultVocalPart}
+            onRestoreDefault={() => onRestoreDefaultVocal(slotIndex)}
           />
         </TableCell>
       ))}
@@ -1363,6 +1387,7 @@ function InstrumentAssignmentRow({
           song={song}
           stemParts={stemParts}
           stemPartsReady={stemPartsReady}
+          vocalAssignments={vocalState.vocalAssignments}
         />
       </TableCell>
     </TableRow>
@@ -1725,7 +1750,7 @@ export function InstrumentAssignmentsClient() {
         bandId: selectedBandId,
         songId,
         instrumentAssignments: assignments,
-        showVocals: existing?.showVocals ?? false,
+        showVocals: true,
         vocalAssignments: existing?.vocalAssignments,
       });
     });
@@ -1761,7 +1786,7 @@ export function InstrumentAssignmentsClient() {
   function vocalStateForSong(songId: string): VocalArrangementState {
     const arrangement = arrangementsBySongId.get(songId);
     return {
-      showVocals: arrangement?.showVocals ?? false,
+      showVocals: true,
       vocalAssignments: normalizeVocalAssignments(
         arrangement?.vocalAssignments,
         columns,
@@ -1780,7 +1805,7 @@ export function InstrumentAssignmentsClient() {
       bandId: selectedBandId,
       songId,
       instrumentAssignments: existing?.instrumentAssignments,
-      showVocals: nextState.showVocals,
+      showVocals: true,
       vocalAssignments: persistedVocalAssignments(nextState),
     });
     arrangementsRef.current = nextArrangements;
@@ -1807,7 +1832,7 @@ export function InstrumentAssignmentsClient() {
       () => saveBandSongVocalAssignments(
         selectedBandId,
         songId,
-        nextState.showVocals,
+        true,
         persistedVocalAssignments(nextState),
         assignmentSessionId,
         lastMove,
@@ -1826,6 +1851,7 @@ export function InstrumentAssignmentsClient() {
   async function saveVocalSetting(
     songId: string,
     nextState: VocalArrangementState,
+    lastMove: InstrumentAssignmentLastMove | null = null,
   ) {
     if (!selectedBandId || editingDisabled) return;
     const previousArrangements = arrangementsRef.current;
@@ -1840,9 +1866,10 @@ export function InstrumentAssignmentsClient() {
         () => saveBandSongVocalAssignments(
           selectedBandId,
           songId,
-          nextState.showVocals,
+          true,
           persistedVocalAssignments(nextState),
           assignmentSessionId,
+          lastMove,
         ),
         "Vocal setting was not saved",
       );
@@ -2015,7 +2042,7 @@ export function InstrumentAssignmentsClient() {
       }
 
       const currentState = {
-        showVocals: arrangementsRef.current.get(sourceData.songId)?.showVocals ?? true,
+        showVocals: true,
         vocalAssignments: normalizeVocalAssignments(
           arrangementsRef.current.get(sourceData.songId)?.vocalAssignments,
           columns,
@@ -2032,7 +2059,7 @@ export function InstrumentAssignmentsClient() {
         nextAssignments[sourceData.slotIndex] = null;
         await commitVocalDrop(
           sourceData.songId,
-          { showVocals: currentState.showVocals, vocalAssignments: nextAssignments },
+          { showVocals: true, vocalAssignments: nextAssignments },
           {
             kind: "vocal",
             bandId: selectedBandId,
@@ -2080,7 +2107,7 @@ export function InstrumentAssignmentsClient() {
       };
       await commitVocalDrop(
         sourceData.songId,
-        { showVocals: currentState.showVocals, vocalAssignments: nextAssignments },
+        { showVocals: true, vocalAssignments: nextAssignments },
         {
           kind: "vocal",
           bandId: selectedBandId,
@@ -2237,7 +2264,7 @@ export function InstrumentAssignmentsClient() {
           bandId: selectedBandId,
           songId: song.id,
           instrumentAssignments: assignments,
-          showVocals: existing?.showVocals ?? false,
+          showVocals: true,
           vocalAssignments: existing?.vocalAssignments,
         });
         arrangementsRef.current = nextArrangements;
@@ -2393,11 +2420,6 @@ export function InstrumentAssignmentsClient() {
       : `${recentMoveLabel} moved to ${recentMoveDestination} for ${recentMoveSong.title}.`
     : "";
 
-  function handleShowVocalsChange(songId: string, checked: boolean) {
-    const current = vocalStateForSong(songId);
-    void saveVocalSetting(songId, { ...current, showVocals: checked });
-  }
-
   function handleToggleLead(songId: string, slotIndex: number) {
     const current = vocalStateForSong(songId);
     const nextAssignments = current.vocalAssignments.map((assignment, index) =>
@@ -2409,6 +2431,42 @@ export function InstrumentAssignmentsClient() {
       ...current,
       vocalAssignments: nextAssignments,
     });
+  }
+
+  function handleRestoreDefaultVocal(songId: string, slotIndex: number) {
+    if (!selectedBandId) return;
+    const column = columns[slotIndex];
+    if (!column) return;
+
+    const current = vocalStateForSong(songId);
+    if (current.vocalAssignments[slotIndex]) return;
+
+    const displacedAssignment = current.vocalAssignments.find(
+      (assignment) => assignment?.partSlug === column.defaultVocalPart,
+    );
+    const nextAssignments = current.vocalAssignments.map((assignment) =>
+      assignment?.partSlug === column.defaultVocalPart ? null : assignment,
+    );
+    nextAssignments[slotIndex] = {
+      memberId: column.member.id,
+      partSlug: column.defaultVocalPart,
+      lead: displacedAssignment?.lead ?? false,
+    };
+
+    void saveVocalSetting(
+      songId,
+      { showVocals: true, vocalAssignments: nextAssignments },
+      {
+        kind: "vocal",
+        bandId: selectedBandId,
+        songId,
+        assignmentKey: column.defaultVocalPart,
+        partSlug: column.defaultVocalPart,
+        zone: "vocal",
+        slotIndex,
+        changeId: crypto.randomUUID(),
+      },
+    );
   }
 
   function cancelPendingDuplicateDrop() {
@@ -2624,8 +2682,10 @@ export function InstrumentAssignmentsClient() {
                       onOpenInstrumentNote={(note) =>
                         openInstrumentNote(song, note)
                       }
-                      onShowVocalsChange={(checked) => handleShowVocalsChange(song.id, checked)}
                       onToggleLead={(slotIndex) => handleToggleLead(song.id, slotIndex)}
+                      onRestoreDefaultVocal={(slotIndex) =>
+                        handleRestoreDefaultVocal(song.id, slotIndex)
+                      }
                     />
                   ))}
                 </TableBody>

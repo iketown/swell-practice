@@ -22,19 +22,20 @@ import type {
   BandSongOverride,
   MemberSongDefault,
   Song,
-  SongAsset,
   SongAssignmentBundle,
   VocalPartSlug,
 } from "@/lib/domain";
 import {
+  ASSIGNMENT_STEM_PART_BY_INSTRUMENT_ID,
   createBandCode,
+  DEFAULT_PARTS,
   samePartSlugs,
   slugify,
   sortPartSlugs,
   VOCAL_PART_SLUGS,
 } from "@/lib/domain";
 import { db, hasFirebaseConfig, storage } from "@/lib/firebase";
-import { getSongBundle, listSongs } from "@/lib/firestore";
+import { getSongBundle, listBandSongArrangements, listSongs } from "@/lib/firestore";
 import {
   sampleBands,
   sampleBandSongOverrides,
@@ -58,10 +59,7 @@ interface DemoAssignmentStore {
 
 export interface MemberSongAssignmentRow {
   song: Song;
-  defaultPartSlugs: string[];
-  effectivePartSlugs: string[];
-  hasOverride: boolean;
-  assets: SongAsset[];
+  partSlugs: string[];
 }
 
 export interface MemberAssignmentPageData {
@@ -628,71 +626,105 @@ export async function saveAssignmentChanges(
   await batch.commit();
 }
 
+const STARTUP_MEMBER_ORDER = ["ike", "jackson", "joe", "sam", "cron"] as const;
+
+function assignmentMemberIdsForBand(band: Band, members: BandMember[]) {
+  const memberMap = new Map(members.map((member) => [member.id, member]));
+  const usedParts = new Set<VocalPartSlug>();
+  const orderedMemberIds = band.memberIds.flatMap((memberId) => {
+    const vocalPart = band.vocalPartByMemberId[memberId];
+    if (!memberMap.has(memberId) || !vocalPart || usedParts.has(vocalPart)) return [];
+    usedParts.add(vocalPart);
+    return [{ memberId, vocalPart }];
+  });
+
+  if (Object.keys(band.vocalPartByMemberId).length) {
+    return orderedMemberIds
+      .sort(
+        (left, right) =>
+          VOCAL_PART_SLUGS.indexOf(left.vocalPart)
+          - VOCAL_PART_SLUGS.indexOf(right.vocalPart),
+      )
+      .map(({ memberId }) => memberId);
+  }
+
+  const fallbackMemberIds = band.title.trim().toLowerCase().includes("startup")
+    ? [...band.memberIds].sort((leftId, rightId) => {
+        const leftName = memberMap.get(leftId)?.displayName.trim().toLowerCase() ?? "";
+        const rightName = memberMap.get(rightId)?.displayName.trim().toLowerCase() ?? "";
+        const leftOrder = STARTUP_MEMBER_ORDER.indexOf(
+          leftName as (typeof STARTUP_MEMBER_ORDER)[number],
+        );
+        const rightOrder = STARTUP_MEMBER_ORDER.indexOf(
+          rightName as (typeof STARTUP_MEMBER_ORDER)[number],
+        );
+        return (leftOrder < 0 ? 99 : leftOrder) - (rightOrder < 0 ? 99 : rightOrder);
+      })
+    : band.memberIds;
+
+  return fallbackMemberIds
+    .filter((memberId) => memberMap.has(memberId))
+    .slice(0, VOCAL_PART_SLUGS.length);
+}
+
 export async function getMemberAssignmentPage(memberSlug: string, bandId?: string): Promise<MemberAssignmentPageData | null> {
-  const [member, bands, songs] = await Promise.all([
+  const [member, bands, members, songs] = await Promise.all([
     getMemberBySlug(memberSlug),
     listBands(),
+    listMembers(),
     isDemoAssignments() ? Promise.resolve(sampleSongList()) : listSongs(),
   ]);
   if (!member) return null;
   const memberBands = bands.filter((band) => band.memberIds.includes(member.id));
   if (!memberBands.length) return null;
   const selectedBand = memberBands.find((band) => band.id === bandId) ?? memberBands[0];
+  const arrangements = isDemoAssignments()
+    ? []
+    : await listBandSongArrangements(selectedBand.id);
+  const arrangementBySongId = new Map(
+    arrangements.map((arrangement) => [arrangement.songId, arrangement]),
+  );
+  const assignmentMemberIds = assignmentMemberIdsForBand(selectedBand, members);
+  const memberSlotIndex = assignmentMemberIds.indexOf(member.id);
+  const usesConfiguredVocalParts = Boolean(
+    Object.keys(selectedBand.vocalPartByMemberId).length,
+  );
 
-  let defaults: MemberSongDefault[];
-  let overrides: BandSongOverride[];
-  if (isDemoAssignments() || !db) {
-    const store = readDemoStore();
-    defaults = store.defaults.filter((item) => item.memberId === member.id);
-    overrides = store.overrides.filter((item) => item.memberId === member.id && item.bandId === selectedBand.id);
-  } else {
-    const [defaultSnaps, overrideSnaps] = await Promise.all([
-      getDocs(query(collection(db, "memberSongDefaults"), where("memberId", "==", member.id))),
-      getDocs(query(collection(db, "bandSongOverrides"), where("memberId", "==", member.id))),
-    ]);
-    defaults = defaultSnaps.docs.map((snap) => defaultFromDoc(snap.data()));
-    overrides = overrideSnaps.docs
-      .map((snap) => overrideFromDoc(snap.data()))
-      .filter((item) => item.bandId === selectedBand.id);
-  }
-
-  const defaultMap = new Map(defaults.map((item) => [item.songId, item]));
-  const overrideMap = new Map(overrides.map((item) => [item.songId, item]));
   const rows = songs.map((song) => {
-    const defaultPartSlugs = defaultMap.get(song.id)?.partSlugs ?? [];
-    const override = overrideMap.get(song.id);
+    const arrangement = arrangementBySongId.get(song.id);
+    const instrumentAssignments =
+      arrangement?.instrumentAssignments ?? song.instrumentAssignments;
+    const instrumentAssignment = memberSlotIndex >= 0
+      ? instrumentAssignments.players[memberSlotIndex]
+      : null;
+    const instrumentPartSlug = typeof instrumentAssignment === "string"
+      ? ASSIGNMENT_STEM_PART_BY_INSTRUMENT_ID[instrumentAssignment]
+      : undefined;
+    const vocalPartSlug = arrangement?.vocalAssignments === undefined
+      ? selectedBand.vocalPartByMemberId[member.id]
+        ?? (!usesConfiguredVocalParts && memberSlotIndex >= 0
+          ? VOCAL_PART_SLUGS[memberSlotIndex]
+          : undefined)
+      : arrangement.vocalAssignments.find(
+          (assignment) => assignment.memberId === member.id,
+        )?.partSlug;
+
     return {
       song,
-      defaultPartSlugs,
-      effectivePartSlugs: override?.partSlugs ?? defaultPartSlugs,
-      hasOverride: Boolean(override),
+      partSlugs: sortPartSlugs(
+        [instrumentPartSlug, vocalPartSlug].filter(
+          (partSlug): partSlug is string => Boolean(partSlug),
+        ),
+        DEFAULT_PARTS,
+      ),
     };
   });
-
-  const rowsWithAssets = await Promise.all(rows.map(async (row) => {
-    if (!row.effectivePartSlugs.length) return { ...row, assets: [] };
-
-    const bundle = isDemoAssignments() ? sampleSongBundle(row.song.slug) : await getSongBundle(row.song.slug);
-    if (!bundle) return { ...row, assets: [] };
-
-    const effectiveParts = new Set(row.effectivePartSlugs);
-    const assetIds = new Set(
-      bundle.parts
-        .filter((part) => effectiveParts.has(part.slug))
-        .flatMap((part) => part.assetIds),
-    );
-
-    return {
-      ...row,
-      assets: bundle.assets.filter((asset) => assetIds.has(asset.id)),
-    };
-  }));
 
   return {
     member,
     bands: memberBands,
     selectedBand,
-    rows: rowsWithAssets,
+    rows,
   };
 }
 

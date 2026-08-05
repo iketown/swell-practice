@@ -53,14 +53,13 @@ That means Vercel/UI and Firebase rules both know who can administer the library
 - `/admin/bands` create bands and manage their rosters
 - `/assignments` manage live instrument and vocal assignments for the selected band
 - `/songs/inst` and `/assignments/[songSlug]` redirect to `/assignments`
-- `/members/[memberSlug]` show one member's effective parts for a selected band
+- `/members/[memberSlug]` shows one member's current matrix assignments for a selected band, with direct song-player links
 
 ## Assignment Model
 
 - `members` stores the public name, display name, slug, and optional square headshot for each person. Headshots are cropped in the admin editor and stored at `members/{memberId}/headshot.jpg`.
 - `memberPrivate` stores admin-only email, phone, and notes under the same document ID.
-- `bands` stores a five-character code and an array of member IDs.
-- `memberSongDefaults` stores one default part array per member and song.
-- `bandSongOverrides` stores only the member/song assignments that differ in a particular band.
+- `bands` stores a five-character code, member IDs, and each member's default vocal part.
+- `bandSongArrangements` stores the selected band's instrument matrix and per-song vocal assignments.
 
-Effective parts are `band override ?? member-song default`. Creating a new band does not copy assignments, so swapping one person into a lineup requires only a roster change and any true exceptions.
+The `/assignments` matrix is the source of truth for member pages. A member's instrument and vocal come from that person's matrix column. Vocal assignments are always editable for administrators; double-clicking an empty vocal box restores the member's band-default part, and uploaded vocal stems without an assignment appear in the Unassigned column. Legacy `memberSongDefaults` and `bandSongOverrides` documents are no longer read by member pages.

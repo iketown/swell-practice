@@ -1,14 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpenCheckIcon, Layers3Icon } from "lucide-react";
+import { BookOpenCheckIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
-import { AssetLinks } from "@/components/asset-links";
 import { MemberAvatar } from "@/components/member-avatar";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -54,7 +51,10 @@ export function MemberPartsClient({ memberSlug }: { memberSlug: string }) {
     };
   }, [memberSlug]);
 
-  const assignedSongCount = useMemo(() => data?.rows.filter((row) => row.effectivePartSlugs.length).length ?? 0, [data]);
+  const assignedSongCount = useMemo(
+    () => data?.rows.filter((row) => row.partSlugs.length).length ?? 0,
+    [data],
+  );
 
   if (loading && !data) {
     return <AppShell><Skeleton className="h-40 w-full" /><Skeleton className="h-72 w-full" /></AppShell>;
@@ -96,40 +96,37 @@ export function MemberPartsClient({ memberSlug }: { memberSlug: string }) {
             <span className="font-mono text-xs tracking-[0.12em] text-muted-foreground">{data.selectedBand.code}</span>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <Badge variant="secondary">Usual</Badge><span className="text-muted-foreground">Your saved default</span>
-          <Badge>Changed</Badge><span className="text-muted-foreground">Only for this band</span>
-        </div>
       </section>
 
       <section className="flex flex-col gap-4" aria-labelledby="member-set-list-title">
         <header className="flex flex-col gap-1 px-1">
           <h2 id="member-set-list-title" className="text-xl font-semibold">Set list</h2>
-          <p className="text-sm text-muted-foreground">Choose a part to open its mixer, or expand a song for files.</p>
+          <p className="text-sm text-muted-foreground">Choose a part to open it in the song player.</p>
         </header>
-        <Accordion multiple>
-          {data.rows.map((row) => (
-            <AccordionItem key={row.song.id} value={row.song.id} disabled={!row.effectivePartSlugs.length}>
-              <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <AccordionTrigger className="min-w-0 p-0 hover:bg-transparent data-[open]:bg-transparent">
-                  <span className="flex min-w-0 flex-1 flex-col gap-2">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold">{row.song.title}</span>
-                    {row.hasOverride ? <Badge variant="outline">Band change</Badge> : null}
-                  </span>
-                  {!row.effectivePartSlugs.length ? <span className="text-sm font-normal text-muted-foreground">No assignment for this song</span> : null}
-                  </span>
-                </AccordionTrigger>
-                {row.effectivePartSlugs.length ? (
+        <div className="swell-panel overflow-hidden">
+          <ul className="divide-y">
+            {data.rows.map((row) => (
+              <li
+                key={row.song.id}
+                className="flex min-h-16 flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-semibold" title={row.song.title}>
+                    {row.song.title}
+                  </p>
+                  {!row.partSlugs.length ? (
+                    <p className="text-sm text-muted-foreground">No assignment for this song</p>
+                  ) : null}
+                </div>
+                {row.partSlugs.length ? (
                   <div className="flex flex-wrap gap-2 sm:justify-end">
-                    {row.effectivePartSlugs.map((partSlug) => {
-                      const changed = !row.defaultPartSlugs.includes(partSlug);
+                    {row.partSlugs.map((partSlug) => {
                       const mix = partSlug.startsWith("voc_") ? "voc" : "inst";
                       return (
                         <Button
                           key={partSlug}
                           render={<Link href={`/songs/${row.song.slug}?mix=${mix}&part=${partSlug}&member=${data.member.slug}`} />}
-                          variant={changed ? "default" : "secondary"}
+                          variant="secondary"
                           size="sm"
                           nativeButton={false}
                         >
@@ -139,19 +136,10 @@ export function MemberPartsClient({ memberSlug }: { memberSlug: string }) {
                     })}
                   </div>
                 ) : null}
-              </div>
-              <AccordionContent className="border-t">
-                <div className="flex flex-col gap-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="font-medium text-foreground">Learning materials</h3>
-                    <Badge variant="outline">{row.assets.length} {row.assets.length === 1 ? "file" : "files"}</Badge>
-                  </div>
-                  <AssetLinks assets={row.assets} />
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
+              </li>
+            ))}
+          </ul>
+        </div>
       </section>
 
       {!assignedSongCount ? (
@@ -159,12 +147,10 @@ export function MemberPartsClient({ memberSlug }: { memberSlug: string }) {
           <EmptyHeader>
             <EmptyMedia variant="icon"><BookOpenCheckIcon aria-hidden /></EmptyMedia>
             <EmptyTitle>No parts assigned in this band</EmptyTitle>
-            <EmptyDescription>An admin can add defaults or a band-only assignment from a song board.</EmptyDescription>
+            <EmptyDescription>An admin can add parts from the Band Assignments page.</EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : null}
-
-      <p className="flex items-center gap-2 text-sm text-muted-foreground"><Layers3Icon aria-hidden /> Defaults follow you into every band. Blue changes apply only to the selected lineup.</p>
     </AppShell>
   );
 }

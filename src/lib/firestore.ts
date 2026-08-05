@@ -597,6 +597,19 @@ export function subscribeBandSongArrangements(
   );
 }
 
+export async function listBandSongArrangements(
+  bandId: string,
+): Promise<BandSongArrangement[]> {
+  if (!hasFirebaseConfig || !db) return [];
+
+  const snapshot = await getDocs(
+    query(collection(db, "bandSongArrangements"), where("bandId", "==", bandId)),
+  );
+  return snapshot.docs.map((arrangementSnapshot) =>
+    bandSongArrangementFromDoc(arrangementSnapshot.data()),
+  );
+}
+
 export async function getSongBundle(slug: string): Promise<SongBundle | null> {
   if (!hasFirebaseConfig || !db) return sampleSongBundle(slug);
 
