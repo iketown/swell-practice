@@ -61,5 +61,6 @@ That means Vercel/UI and Firebase rules both know who can administer the library
 - `memberPrivate` stores admin-only email, phone, and notes under the same document ID.
 - `bands` stores a five-character code, member IDs, and each member's default vocal part.
 - `bandSongArrangements` stores the selected band's instrument matrix and per-song vocal assignments.
+- `songs.published` controls public visibility. New songs and legacy documents without the field are published by default; unpublishing preserves every stem, asset, assignment, and timing record.
 
 The `/assignments` matrix is the source of truth for member pages. A member's instrument and vocal come from that person's matrix column. Vocal assignments are always editable for administrators; double-clicking an empty vocal box restores the member's band-default part, and uploaded vocal stems without an assignment appear in the Unassigned column. Legacy `memberSongDefaults` and `bandSongOverrides` documents are no longer read by member pages.

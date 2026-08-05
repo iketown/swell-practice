@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AudioLinesIcon, CheckIcon, ClipboardListIcon, FileIcon, ImageIcon, Trash2Icon, UploadIcon } from "lucide-react";
+import { AudioLinesIcon, CheckIcon, ClipboardListIcon, EyeOffIcon, FileIcon, ImageIcon, Trash2Icon, UploadIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
@@ -37,7 +37,7 @@ import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from "@
 import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAdmin } from "@/hooks/use-admin";
-import { DEFAULT_PARTS, type SongAsset, type SongBundle } from "@/lib/domain";
+import { DEFAULT_PARTS, isSongPublished, type SongAsset, type SongBundle } from "@/lib/domain";
 import {
   deleteSongAsset,
   getSongBundle,
@@ -158,7 +158,7 @@ export function SongPageClient({ slug }: { slug: string }) {
     [bundle, slug],
   );
 
-  if (loading) {
+  if (loading || admin.loading) {
     return (
       <AppShell>
         <Skeleton className="h-10 w-72" />
@@ -180,11 +180,32 @@ export function SongPageClient({ slug }: { slug: string }) {
     );
   }
 
+  if (!isSongPublished(bundle.song) && !admin.isAdmin) {
+    return (
+      <AppShell>
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>Song unavailable</EmptyTitle>
+            <EmptyDescription>This song is not currently published.</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      </AppShell>
+    );
+  }
+
   const assetMap = new Map(bundle.assets.map((asset) => [asset.id, asset]));
   return (
     <AppShell>
       <header className="flex flex-col gap-3 py-1 sm:flex-row sm:items-end sm:justify-between sm:py-2">
-        <h1 className="swell-song-title">{bundle.song.title}</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="swell-song-title">{bundle.song.title}</h1>
+          {admin.isAdmin && !isSongPublished(bundle.song) ? (
+            <Badge variant="outline">
+              <EyeOffIcon aria-hidden />
+              Unpublished
+            </Badge>
+          ) : null}
+        </div>
         <div className="flex flex-wrap gap-2">
           <Button render={<Link href={`/songs/${bundle.song.slug}`} />} variant="secondary" nativeButton={false}>
             <AudioLinesIcon data-icon="inline-start" />

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Music2Icon } from "lucide-react";
+import { EyeOffIcon, Music2Icon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
@@ -12,17 +12,22 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
-import { partLabel, rankSongsForQuery, type PartSongRow } from "@/lib/domain";
+import { useAdmin } from "@/hooks/use-admin";
+import { isSongPublished, partLabel, rankSongsForQuery, type PartSongRow } from "@/lib/domain";
 import { getPartRows } from "@/lib/firestore";
 import { cn } from "@/lib/utils";
 
 export function PartPageClient({ partSlug }: { partSlug: string }) {
+  const admin = useAdmin();
   const [rows, setRows] = useState<PartSongRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [songQuery, setSongQuery] = useState("");
-  const rowsBySongId = new Map(rows.map((row) => [row.song.id, row]));
+  const visibleRows = admin.isAdmin
+    ? rows
+    : rows.filter((row) => isSongPublished(row.song));
+  const rowsBySongId = new Map(visibleRows.map((row) => [row.song.id, row]));
   const rankedRows = rankSongsForQuery(
-    rows.map((row) => row.song),
+    visibleRows.map((row) => row.song),
     songQuery,
   ).flatMap(({ song, matchesQuery }) => {
     const row = rowsBySongId.get(song.id);
@@ -55,7 +60,7 @@ export function PartPageClient({ partSlug }: { partSlug: string }) {
         <div className="swell-panel w-full bg-card/50 p-4 shadow-none sm:justify-self-end sm:p-5">
           <SongFilterInput
             id={`part-${partSlug}-song-search`}
-            songs={rows.map((row) => row.song)}
+            songs={visibleRows.map((row) => row.song)}
             value={songQuery}
             onChange={setSongQuery}
             matchCount={matchingSongCount}
@@ -69,7 +74,7 @@ export function PartPageClient({ partSlug }: { partSlug: string }) {
           <Skeleton className="h-28 w-full" />
           <Skeleton className="h-28 w-full" />
         </div>
-      ) : rows.length ? (
+      ) : visibleRows.length ? (
         <section className="grid gap-2.5">
           {rankedRows.map(({ row, matchesQuery }) => (
             <div
@@ -85,7 +90,15 @@ export function PartPageClient({ partSlug }: { partSlug: string }) {
                     <Link href={`/songs/${row.song.slug}`} className="hover:underline">
                       {row.song.title.toUpperCase()}
                     </Link>
-                    <Badge variant="secondary">{row.assets.length} files</Badge>
+                    <span className="flex items-center gap-2">
+                      {admin.isAdmin && !isSongPublished(row.song) ? (
+                        <Badge variant="outline">
+                          <EyeOffIcon aria-hidden />
+                          Unpublished
+                        </Badge>
+                      ) : null}
+                      <Badge variant="secondary">{row.assets.length} files</Badge>
+                    </span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-3">

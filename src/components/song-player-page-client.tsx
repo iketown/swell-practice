@@ -3,6 +3,8 @@
 import Link from "next/link";
 import {
   DownloadIcon,
+  EyeIcon,
+  EyeOffIcon,
   FileArchiveIcon,
   FileAudioIcon,
   FileMusicIcon,
@@ -32,6 +34,7 @@ import {
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAdmin } from "@/hooks/use-admin";
 import type {
@@ -44,6 +47,7 @@ import type {
   SongMixerTrack,
   SongMixerVideo,
 } from "@/lib/domain";
+import { isSongPublished } from "@/lib/domain";
 import {
   createSongAnnotation,
   deleteSongMixerDownload,
@@ -55,6 +59,7 @@ import {
   saveSongMixerConfiguration,
   saveSongMixerTrackOverrides,
   saveSongMixerTrackOverridesBatch,
+  updateSongPublished,
   updateSongAnnotation,
   uploadSongMixerDownload,
   uploadSongMixerTrack,
@@ -98,6 +103,7 @@ export function SongPlayerPageClient({
   const [playerView, setPlayerView] = useState<PlayerView>("user");
   const [autoSaveOverrides, setAutoSaveOverrides] = useState(false);
   const [overrideSaveStatus, setOverrideSaveStatus] = useState<OverrideSaveStatus>("idle");
+  const [savingPublication, setSavingPublication] = useState(false);
   const [savedTrackOverrides, setSavedTrackOverrides] = useState<SavedTrackOverrides>({});
   const uploadControllers = useRef(new Map<string, AbortController>());
   const annotationSaveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
@@ -590,7 +596,35 @@ export function SongPlayerPageClient({
     [hasUnsavedOverrideChanges, saveDraftOverrides],
   );
 
-  if (loading) {
+  const changePublished = useCallback(async (published: boolean) => {
+    if (!bundle || !admin.isAdmin || savingPublication) return;
+
+    const previousPublished = isSongPublished(bundle.song);
+    setSavingPublication(true);
+    setBundle((current) => current
+      ? { ...current, song: { ...current.song, published } }
+      : current);
+
+    try {
+      await updateSongPublished(bundle.song.id, published);
+      toast.success(published ? "Song published" : "Song unpublished", {
+        description: published
+          ? "This song is visible to everyone."
+          : "Only administrators can see this song.",
+      });
+    } catch (caught) {
+      setBundle((current) => current
+        ? { ...current, song: { ...current.song, published: previousPublished } }
+        : current);
+      toast.error("Song visibility was not saved", {
+        description: caught instanceof Error ? caught.message : "Please try again.",
+      });
+    } finally {
+      setSavingPublication(false);
+    }
+  }, [admin.isAdmin, bundle, savingPublication]);
+
+  if (loading || admin.loading) {
     return (
       <AppShell>
         <Skeleton className="h-10 w-72" />
@@ -607,6 +641,19 @@ export function SongPlayerPageClient({
           <EmptyHeader>
             <EmptyTitle>Song not found</EmptyTitle>
             <EmptyDescription>No song exists at `/songs/{slug}` yet.</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      </AppShell>
+    );
+  }
+
+  if (!isSongPublished(bundle.song) && !admin.isAdmin) {
+    return (
+      <AppShell>
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>Song unavailable</EmptyTitle>
+            <EmptyDescription>This song is not currently published.</EmptyDescription>
           </EmptyHeader>
         </Empty>
       </AppShell>
@@ -657,6 +704,26 @@ export function SongPlayerPageClient({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          {admin.isAdmin ? (
+            <label
+              htmlFor="song-published"
+              className="flex min-h-8 items-center gap-2 rounded-md border bg-card px-2.5 text-xs font-semibold"
+            >
+              {isSongPublished(bundle.song) ? (
+                <EyeIcon aria-hidden className="size-3.5 text-muted-foreground" />
+              ) : (
+                <EyeOffIcon aria-hidden className="size-3.5 text-muted-foreground" />
+              )}
+              <Switch
+                id="song-published"
+                size="sm"
+                checked={isSongPublished(bundle.song)}
+                disabled={savingPublication}
+                onCheckedChange={(checked) => void changePublished(checked)}
+              />
+              <span>{isSongPublished(bundle.song) ? "Published" : "Unpublished"}</span>
+            </label>
+          ) : null}
           {admin.isAdmin ? (
             <ToggleGroup
               aria-label="Player view"

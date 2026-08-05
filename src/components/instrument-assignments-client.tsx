@@ -10,6 +10,7 @@ import {
 } from "@dnd-kit/react";
 import {
   CheckIcon,
+  EyeOffIcon,
   GripVerticalIcon,
   LoaderCircleIcon,
   Mic2Icon,
@@ -72,6 +73,7 @@ import { listBands, listMembers } from "@/lib/assignments";
 import {
   ASSIGNMENT_STEM_PART_BY_INSTRUMENT_ID,
   INSTRUMENT_IDS,
+  isSongPublished,
   partLabel,
   VOCAL_PART_SLUGS,
   type Band,
@@ -1284,9 +1286,17 @@ function InstrumentAssignmentRow({
             </Button>
           ) : null}
           <div className="flex min-w-0 flex-col items-start gap-2">
-            <span className="max-w-48 truncate font-semibold" title={song.title}>
-              {song.title}
-            </span>
+            <div className="flex max-w-52 flex-wrap items-center gap-1.5">
+              <span className="max-w-48 truncate font-semibold" title={song.title}>
+                {song.title}
+              </span>
+              {canEdit && !isSongPublished(song) ? (
+                <Badge variant="outline" className="px-1.5 text-[9px]">
+                  <EyeOffIcon aria-hidden />
+                  Unpublished
+                </Badge>
+              ) : null}
+            </div>
             <div className="flex items-center gap-1.5">
               {song.originalRecording ? (
                 <Button type="button" size="xs" variant="secondary" onClick={onPlay}>
@@ -1505,6 +1515,10 @@ export function InstrumentAssignmentsClient() {
   const columns = useMemo(
     () => columnsForBand(selectedBand, members),
     [members, selectedBand],
+  );
+  const visibleSongs = useMemo(
+    () => admin.isAdmin ? songs : songs.filter(isSongPublished),
+    [admin.isAdmin, songs],
   );
   const songIdsKey = useMemo(
     () => songs.map((song) => song.id).sort().join(","),
@@ -2400,7 +2414,7 @@ export function InstrumentAssignmentsClient() {
     ? recentMove
     : null;
   const recentMoveSong = visibleRecentMove
-    ? songs.find((song) => song.id === visibleRecentMove.songId)
+    ? visibleSongs.find((song) => song.id === visibleRecentMove.songId)
     : null;
   const recentMoveDestination = visibleRecentMove?.zone === "player"
     ? columns[visibleRecentMove.slotIndex]?.member.displayName ?? `person ${visibleRecentMove.slotIndex + 1}`
@@ -2622,7 +2636,7 @@ export function InstrumentAssignmentsClient() {
                   Edit the band and assign at least one member a default vocal part.
                 </p>
               </div>
-            ) : songs.length ? (
+            ) : visibleSongs.length ? (
               <Table
                 containerClassName="overflow-visible"
                 className="min-w-[74rem] table-fixed"
@@ -2661,7 +2675,7 @@ export function InstrumentAssignmentsClient() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {songs.map((song) => (
+                  {visibleSongs.map((song) => (
                     <InstrumentAssignmentRow
                       key={song.id}
                       song={song}

@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ExternalLinkIcon, LogOutIcon, PencilIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
+import { EyeOffIcon, ExternalLinkIcon, LogOutIcon, PencilIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { AdminSectionNav } from "@/components/admin-section-nav";
 import { SongFilterInput } from "@/components/song-filter-input";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -24,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAdmin } from "@/hooks/use-admin";
 import type { Song } from "@/lib/domain";
-import { rankSongsForQuery } from "@/lib/domain";
+import { isSongPublished, rankSongsForQuery } from "@/lib/domain";
 import { createSong, deleteSong, listSongs, updateSong } from "@/lib/firestore";
 import { cn } from "@/lib/utils";
 
@@ -260,7 +261,15 @@ export function AdminPageClient() {
                     className="absolute inset-0 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
                   />
                   <div className="pointer-events-none min-w-0">
-                    <p className="font-medium group-hover/admin-song:underline">{song.title}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium group-hover/admin-song:underline">{song.title}</p>
+                      {!isSongPublished(song) ? (
+                        <Badge variant="outline">
+                          <EyeOffIcon aria-hidden />
+                          Unpublished
+                        </Badge>
+                      ) : null}
+                    </div>
                     <p className="truncate text-sm text-muted-foreground">/songs/{song.slug}</p>
                   </div>
                   <div className="relative flex flex-wrap gap-2">

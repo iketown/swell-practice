@@ -135,6 +135,7 @@ Part pages group by song and show only assets assigned to that part for that son
   title: string;
   slug: string;
   sortTitle: string;
+  published: boolean; // absent on legacy documents means true
   notes?: string;
   instrumentOrder?: number;
   instrumentAssignments: {
@@ -161,6 +162,8 @@ Part pages group by song and show only assets assigned to that part for that son
 ```
 
 `timingDurationSeconds` is the whole-song length used by `/songs/timing`. The timing workspace can populate it from the original recording metadata or accept a manually entered `m:ss` value.
+
+Songs are published by default. An administrator can change the status from the song player without deleting the song document, stems, downloads, rehearsal assets, timing data, or band assignments. Unpublished songs remain visible to administrators but are omitted from public song and part lists, member set lists, and the read-only assignment board. A non-admin opening an unpublished song URL directly receives an unavailable state.
 
 ### `timingAttributes/{attributeId}`
 
@@ -611,7 +614,7 @@ v1 decision:
 - Visiting `/` shows a list of songs.
 - Visiting `/songs/i-get-around` shows the song title, default parts, and assigned files.
 - Visiting `/songs/i-get-around/player` shows only that song's active player-mix stems and plays them in sync.
-- Visiting `/assignments` shows one row for every song, including songs created after the assignment page was introduced; `/songs/inst` redirects there.
+- Visiting `/assignments` shows administrators one row for every song and non-admins one row for every published song, including songs created after the assignment page was introduced; `/songs/inst` redirects there.
 - Visiting `/songs/timing` shows one accordion row for every song, with collapsed per-attribute summaries and full-width percentage timelines when expanded.
 - An administrator can create, rename, hide, show, and delete arbitrary timing attributes without deleting assignments when an attribute is merely hidden.
 - Capturing Off completes the pending section with an end handle; changing either handle immediately updates the song summary and cumulative totals in seconds.
@@ -648,6 +651,7 @@ v1 decision:
 - An admin changing a live stem’s volume, pan, or mute stores that field under the stem’s currently effective state, while moving it back to the inherited value clears that field. Reloading the song restores the saved effective levels for every viewer.
 - The song overrides inspector displays the same sparse override object that the player is currently using.
 - Visiting `/parts/voc_1` shows all songs with files assigned to `voc_1`.
+- New and legacy songs default to published. An administrator can unpublish a song without deleting any assets or stems, after which non-admins cannot see it in song, part, member, or assignment lists and receive an unavailable state at its direct URL.
 - Creating a song creates all default parts.
 - Uploading `IGA_voc1.mp3` suggests assignment to `voc_1`.
 - Uploading `i_get_around_vox.pdf` suggests assignment to all vocal parts.

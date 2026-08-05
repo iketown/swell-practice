@@ -1,19 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpenCheckIcon } from "lucide-react";
+import { BookOpenCheckIcon, EyeOffIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { MemberAvatar } from "@/components/member-avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAdmin } from "@/hooks/use-admin";
 import { getMemberAssignmentPage, type MemberAssignmentPageData } from "@/lib/assignments";
-import { partLabel } from "@/lib/domain";
+import { isSongPublished, partLabel } from "@/lib/domain";
 
 export function MemberPartsClient({ memberSlug }: { memberSlug: string }) {
+  const admin = useAdmin();
   const [data, setData] = useState<MemberAssignmentPageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,9 +54,13 @@ export function MemberPartsClient({ memberSlug }: { memberSlug: string }) {
     };
   }, [memberSlug]);
 
+  const visibleRows = useMemo(
+    () => data?.rows.filter((row) => admin.isAdmin || isSongPublished(row.song)) ?? [],
+    [admin.isAdmin, data],
+  );
   const assignedSongCount = useMemo(
-    () => data?.rows.filter((row) => row.partSlugs.length).length ?? 0,
-    [data],
+    () => visibleRows.filter((row) => row.partSlugs.length).length,
+    [visibleRows],
   );
 
   if (loading && !data) {
@@ -105,15 +112,23 @@ export function MemberPartsClient({ memberSlug }: { memberSlug: string }) {
         </header>
         <div className="swell-panel overflow-hidden">
           <ul className="divide-y">
-            {data.rows.map((row) => (
+            {visibleRows.map((row) => (
               <li
                 key={row.song.id}
                 className="flex min-h-16 flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="min-w-0">
-                  <p className="truncate font-semibold" title={row.song.title}>
-                    {row.song.title}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="truncate font-semibold" title={row.song.title}>
+                      {row.song.title}
+                    </p>
+                    {admin.isAdmin && !isSongPublished(row.song) ? (
+                      <Badge variant="outline">
+                        <EyeOffIcon aria-hidden />
+                        Unpublished
+                      </Badge>
+                    ) : null}
+                  </div>
                   {!row.partSlugs.length ? (
                     <p className="text-sm text-muted-foreground">No assignment for this song</p>
                   ) : null}

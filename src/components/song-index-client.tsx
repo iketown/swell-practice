@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Clock3Icon, MusicIcon } from "lucide-react";
+import { Clock3Icon, EyeOffIcon, MusicIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
@@ -13,7 +13,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAdmin } from "@/hooks/use-admin";
 import type { Song } from "@/lib/domain";
-import { rankSongsForQuery } from "@/lib/domain";
+import { isSongPublished, rankSongsForQuery } from "@/lib/domain";
 import { listSongs } from "@/lib/firestore";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +22,10 @@ export function SongIndexClient() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [songQuery, setSongQuery] = useState("");
-  const rankedSongs = rankSongsForQuery(songs, songQuery);
+  const visibleSongs = admin.isAdmin
+    ? songs
+    : songs.filter(isSongPublished);
+  const rankedSongs = rankSongsForQuery(visibleSongs, songQuery);
   const matchingSongCount = rankedSongs.filter((item) => item.matchesQuery).length;
 
   useEffect(() => {
@@ -61,11 +64,11 @@ export function SongIndexClient() {
               </Link>
             ) : null}
             <Badge variant="secondary" className="mt-1">
-              {loading ? "Loading" : `${songs.length} songs`}
+              {loading ? "Loading" : `${visibleSongs.length} songs`}
             </Badge>
           </div>
         </div>
-        <SongFilterInput id="public-song-search" songs={songs} value={songQuery} onChange={setSongQuery} matchCount={matchingSongCount} />
+        <SongFilterInput id="public-song-search" songs={visibleSongs} value={songQuery} onChange={setSongQuery} matchCount={matchingSongCount} />
       </section>
 
       {loading ? (
@@ -73,7 +76,7 @@ export function SongIndexClient() {
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-24 w-full" />
         </div>
-      ) : songs.length ? (
+      ) : visibleSongs.length ? (
         <section className="grid gap-2.5">
           {rankedSongs.map(({ song, matchesQuery }) => (
             <Link
@@ -88,7 +91,15 @@ export function SongIndexClient() {
               <Card size="sm" className="cursor-pointer transition-colors hover:bg-muted/70">
                 <CardHeader>
                   <CardTitle className="text-base">
-                    <span className="group-hover/song-card:underline">{song.title}</span>
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="group-hover/song-card:underline">{song.title}</span>
+                      {!isSongPublished(song) ? (
+                        <Badge variant="outline">
+                          <EyeOffIcon aria-hidden />
+                          Unpublished
+                        </Badge>
+                      ) : null}
+                    </span>
                   </CardTitle>
                   <CardAction>
                     <span className={buttonVariants({ variant: "secondary", size: "sm", className: "pointer-events-none" })}>Open</span>

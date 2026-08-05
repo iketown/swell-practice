@@ -71,11 +71,16 @@ export interface Song {
   title: string;
   slug: string;
   sortTitle: string;
+  published?: boolean;
   notes?: string;
   instrumentOrder?: number;
   timingDurationSeconds?: number;
   instrumentAssignments: SongInstrumentAssignments;
   originalRecording?: SongOriginalRecording;
+}
+
+export function isSongPublished(song: Pick<Song, "published">) {
+  return song.published !== false;
 }
 
 export interface TimingSegment {

@@ -89,6 +89,7 @@ function songFromDoc(id: string, data: Record<string, unknown>): Song {
     title: String(data.title ?? ""),
     slug: String(data.slug ?? ""),
     sortTitle: String(data.sortTitle ?? data.title ?? ""),
+    published: data.published !== false,
     notes: typeof data.notes === "string" ? data.notes : undefined,
     instrumentOrder:
       typeof data.instrumentOrder === "number" && Number.isFinite(data.instrumentOrder)
@@ -762,6 +763,7 @@ export async function createSong(title: string) {
     title: trimmedTitle,
     slug,
     sortTitle: sortTitle(trimmedTitle),
+    published: true,
     instrumentAssignments: createEmptyInstrumentAssignments(),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -795,6 +797,15 @@ export async function updateSong(song: Song, title: string) {
   });
 
   return slug;
+}
+
+export async function updateSongPublished(songId: string, published: boolean) {
+  const { db } = requireFirebase();
+
+  await updateDoc(doc(db, "songs", songId), {
+    published,
+    updatedAt: serverTimestamp(),
+  });
 }
 
 export async function deleteSong(song: Song) {
