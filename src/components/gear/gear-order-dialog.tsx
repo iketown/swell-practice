@@ -90,11 +90,15 @@ export function GearOrderDialog({
     const groups = new Map<string, InventoryAsset[]>();
     for (const asset of assets) {
       if (!selectedAssetIds.has(asset.id)) continue;
-      groups.set(asset.definitionId, [...(groups.get(asset.definitionId) ?? []), asset]);
+      const groupKey = asset.definitionId ? `definition:${asset.definitionId}` : `asset:${asset.id}`;
+      groups.set(groupKey, [...(groups.get(groupKey) ?? []), asset]);
     }
-    return Array.from(groups.entries()).map(([definitionId, groupedAssets]) => {
+    return Array.from(groups.values()).map((groupedAssets) => {
+      const definitionId = groupedAssets[0]?.definitionId ?? "";
       const definition = definitions.find((item) => item.id === definitionId);
-      const existingLine = order?.lines.find((line) => line.definitionId === definitionId);
+      const existingLine = definitionId
+        ? order?.lines.find((line) => line.definitionId === definitionId)
+        : order?.lines.find((line) => line.assetIds.includes(groupedAssets[0]?.id ?? ""));
       return {
         id: existingLine?.id ?? createGearId("line"),
         definitionId,
@@ -248,7 +252,9 @@ export function GearOrderDialog({
                       <Checkbox id={id} checked={selectedAssetIds.has(asset.id)} onCheckedChange={(checked) => toggleAsset(asset.id, checked === true)} disabled={saving} />
                       <FieldLabel htmlFor={id} className="min-w-0 flex-1">
                         <span className="block truncate">{asset.label}</span>
-                        <span className="block truncate text-xs font-normal text-muted-foreground">{definition?.manufacturer} {definition?.model} · {lifecycleLabel(asset.lifecycleStatus)}</span>
+                        <span className="block truncate text-xs font-normal text-muted-foreground">{definition
+                          ? `${[definition.manufacturer, definition.model || definition.name].filter(Boolean).join(" ")} · ${lifecycleLabel(asset.lifecycleStatus)}`
+                          : `No reusable definition · ${lifecycleLabel(asset.lifecycleStatus)}`}</span>
                         {definition?.purchaseSource ? (
                           <a href={definition.purchaseSource.url} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-xs font-normal underline underline-offset-4" onClick={(event) => event.stopPropagation()}>
                             Product source <ExternalLinkIcon aria-hidden />

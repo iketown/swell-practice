@@ -6,6 +6,10 @@ import Image from "next/image";
 import { Dispatch, SetStateAction, useEffect, useState } from "react";
 import { useDropzone } from "react-dropzone";
 
+import {
+  EquipmentImageSourcePicker,
+  type EquipmentImageSource,
+} from "@/components/setup-designer/equipment-image-source-picker";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Slider } from "@/components/ui/slider";
@@ -33,6 +37,8 @@ interface EquipmentIconEditorProps {
   nodeName: string;
   currentImageUrl?: string;
   currentFilename?: string;
+  sourceImages?: EquipmentImageSource[];
+  pendingDetailFiles?: File[];
   pendingIcon: PendingEquipmentIcon | null;
   onPendingIconChange: Dispatch<SetStateAction<PendingEquipmentIcon | null>>;
   disabled?: boolean;
@@ -42,6 +48,8 @@ export function EquipmentIconEditor({
   nodeName,
   currentImageUrl,
   currentFilename,
+  sourceImages,
+  pendingDetailFiles,
   pendingIcon,
   onPendingIconChange,
   disabled,
@@ -90,7 +98,7 @@ export function EquipmentIconEditor({
     <FieldGroup className="gap-3">
       {pendingIcon && cropping ? (
         <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-3">
-          <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-muted">
+          <div className="relative mx-auto aspect-square w-full max-w-[220px] overflow-hidden rounded-lg bg-muted">
             <Cropper
               image={pendingIcon.sourceUrl}
               crop={pendingIcon.crop}
@@ -148,7 +156,7 @@ export function EquipmentIconEditor({
       ) : visibleImage ? (
         <button
           type="button"
-          className="group relative aspect-square w-full overflow-hidden rounded-lg border bg-muted/30 outline-none transition-[border-color,box-shadow] hover:border-primary/60 focus-visible:ring-2 focus-visible:ring-ring"
+          className="group relative mx-auto aspect-square w-full max-w-[220px] overflow-hidden rounded-lg border bg-muted/30 outline-none transition-[border-color,box-shadow] hover:border-primary/60 focus-visible:ring-2 focus-visible:ring-ring"
           onClick={() => {
             if (pendingIcon) setCropping(true);
             else if (currentImageUrl) beginCrop(currentImageUrl, currentFilename || `${nodeName}-icon`);
@@ -162,6 +170,17 @@ export function EquipmentIconEditor({
             Adjust crop
           </span>
         </button>
+      ) : null}
+
+      {!(pendingIcon && cropping) ? (
+        <EquipmentImageSourcePicker
+          sourceImages={sourceImages}
+          pendingFiles={pendingDetailFiles}
+          excludeUrl={currentImageUrl}
+          purpose="SIGNAL icon"
+          onSelect={beginCrop}
+          disabled={disabled}
+        />
       ) : null}
 
       {!(pendingIcon && cropping) ? (

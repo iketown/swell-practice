@@ -4,6 +4,7 @@ import { ArchiveIcon, BotIcon, ExternalLinkIcon, ImagePlusIcon, LoaderCircleIcon
 import Image from "next/image";
 import { FormEvent, useEffect, useRef, useState } from "react";
 
+import { CableEndEditor } from "@/components/setup-designer/cable-end-editor";
 import { EquipmentPortEditor } from "@/components/setup-designer/equipment-port-editor";
 import {
   AlertDialog,
@@ -32,10 +33,11 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { auth } from "@/lib/firebase";
-import type { EquipmentKind, EquipmentPort, EquipmentTemplate, EquipmentTransportTopology, ImportedEquipmentDraft } from "@/lib/setup-designer/domain";
+import { createDefaultCableDefinitionEnds, formatCableDefinitionName } from "@/lib/setup-designer/cable-definitions";
+import type { CableDefinitionEnds, EquipmentKind, EquipmentPort, EquipmentTemplate, EquipmentTransportTopology, GearDefinitionKind, ImportedEquipmentDraft } from "@/lib/setup-designer/domain";
+import { downloadEquipmentReferenceImages, researchEquipmentUrl } from "@/lib/setup-designer/equipment-research-client";
 import { createPort } from "@/lib/setup-designer/ports";
-import { archiveEquipmentTemplate, createEquipmentTemplate, updateEquipmentTemplate } from "@/lib/setup-designer/repository";
+import { archiveEquipmentTemplate, createEquipmentTemplate, updateEquipmentTemplate, updateEquipmentTemplateImages } from "@/lib/setup-designer/repository";
 import { defaultTransportTopology } from "@/lib/setup-designer/snake-topology";
 import { cn } from "@/lib/utils";
 
@@ -56,10 +58,12 @@ interface EquipmentTemplateDialogProps {
   onCreated?: (template: EquipmentTemplate) => void;
   onSaved?: (template: EquipmentTemplate) => void;
   onArchived?: (template: EquipmentTemplate) => void;
+  showArchiveAction?: boolean;
 }
 
-export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreated, onSaved, onArchived }: EquipmentTemplateDialogProps) {
+export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreated, onSaved, onArchived, showArchiveAction = true }: EquipmentTemplateDialogProps) {
   const [name, setName] = useState(template?.name ?? "");
+  const [definitionKind, setDefinitionKind] = useState<GearDefinitionKind>(template?.definitionKind ?? "equipment");
   const [manufacturer, setManufacturer] = useState(template?.manufacturer ?? "");
   const [model, setModel] = useState(template?.model ?? "");
   const [category, setCategory] = useState(template?.category ?? "Other");
@@ -67,12 +71,19 @@ export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreate
   const [transport, setTransport] = useState<EquipmentTransportTopology | undefined>(() => template?.transport ? structuredClone(template.transport) : undefined);
   const [description, setDescription] = useState(template?.description ?? "");
   const [notes, setNotes] = useState(template?.notes ?? "");
+  const [widthInches, setWidthInches] = useState(template?.physicalDimensions?.widthInches?.toString() ?? "");
+  const [depthInches, setDepthInches] = useState(template?.physicalDimensions?.depthInches?.toString() ?? "");
+  const [heightInches, setHeightInches] = useState(template?.physicalDimensions?.heightInches?.toString() ?? "");
+  const [weightPounds, setWeightPounds] = useState(template?.physicalDimensions?.weightPounds?.toString() ?? "");
+  const [dimensionSourceText, setDimensionSourceText] = useState(template?.physicalDimensions?.sourceText ?? "");
   const [productUrl, setProductUrl] = useState(template?.purchaseSource?.url ?? "");
   const [priceAmount, setPriceAmount] = useState(template?.purchaseSource?.priceAmount?.toString() ?? "");
   const [priceCurrency, setPriceCurrency] = useState(template?.purchaseSource?.priceCurrency ?? "");
   const [priceDisplay, setPriceDisplay] = useState(template?.purchaseSource?.priceDisplay ?? "");
   const [priceVendor, setPriceVendor] = useState(template?.purchaseSource?.vendor ?? "");
   const [ports, setPorts] = useState<EquipmentPort[]>(() => template ? structuredClone(template.ports) : initialPorts());
+  const [cableEnds, setCableEnds] = useState<CableDefinitionEnds>(() => template?.cableEnds ? structuredClone(template.cableEnds) : createDefaultCableDefinitionEnds());
+  const [showInSignalView, setShowInSignalView] = useState(template?.showInSignalView ?? true);
   const [imageFile, setImageFile] = useState<File | undefined>();
   const [researchResult, setResearchResult] = useState<ImportedEquipmentDraft | null>(null);
   const [selectedReferenceUrls, setSelectedReferenceUrls] = useState<Set<string>>(() => new Set(template?.referenceImages.map((image) => image.url) ?? []));
@@ -90,6 +101,7 @@ export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreate
 
   function resetForm() {
     setName(template?.name ?? "");
+    setDefinitionKind(template?.definitionKind ?? "equipment");
     setManufacturer(template?.manufacturer ?? "");
     setModel(template?.model ?? "");
     setCategory(template?.category ?? "Other");
@@ -97,12 +109,19 @@ export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreate
     setTransport(template?.transport ? structuredClone(template.transport) : undefined);
     setDescription(template?.description ?? "");
     setNotes(template?.notes ?? "");
+    setWidthInches(template?.physicalDimensions?.widthInches?.toString() ?? "");
+    setDepthInches(template?.physicalDimensions?.depthInches?.toString() ?? "");
+    setHeightInches(template?.physicalDimensions?.heightInches?.toString() ?? "");
+    setWeightPounds(template?.physicalDimensions?.weightPounds?.toString() ?? "");
+    setDimensionSourceText(template?.physicalDimensions?.sourceText ?? "");
     setProductUrl(template?.purchaseSource?.url ?? "");
     setPriceAmount(template?.purchaseSource?.priceAmount?.toString() ?? "");
     setPriceCurrency(template?.purchaseSource?.priceCurrency ?? "");
     setPriceDisplay(template?.purchaseSource?.priceDisplay ?? "");
     setPriceVendor(template?.purchaseSource?.vendor ?? "");
     setPorts(template ? structuredClone(template.ports) : initialPorts());
+    setCableEnds(template?.cableEnds ? structuredClone(template.cableEnds) : createDefaultCableDefinitionEnds());
+    setShowInSignalView(template?.showInSignalView ?? true);
     setImageFile(undefined);
     setResearchResult(null);
     setSelectedReferenceUrls(new Set(template?.referenceImages.map((image) => image.url) ?? []));
@@ -148,30 +167,9 @@ export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreate
     setResearching(true);
     setResearchError(null);
     try {
-      const token = auth?.currentUser ? await auth.currentUser.getIdToken() : "";
-      const demoMode = new URLSearchParams(window.location.search).get("demo") === "1";
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (token) headers.Authorization = `Bearer ${token}`;
-      else if (demoMode) headers["X-Swell-Demo"] = "1";
-
-      const response = await fetch("/api/equipment/research", {
-        body: JSON.stringify({ url: productUrl.trim() }),
-        headers,
-        method: "POST",
-      });
-      const payload: unknown = await response.json().catch(() => null);
-      if (!response.ok) {
-        const message = payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
-          ? payload.error
-          : "The product page could not be researched.";
-        throw new Error(message);
-      }
-      if (!payload || typeof payload !== "object" || !("ports" in payload) || !Array.isArray(payload.ports)) {
-        throw new Error("The product research response was not usable.");
-      }
-
-      const result = payload as ImportedEquipmentDraft;
+      const result = await researchEquipmentUrl(productUrl.trim());
       setResearchResult(result);
+      setDefinitionKind("equipment");
       setName(result.name);
       setManufacturer(result.manufacturer ?? "");
       setModel(result.model ?? "");
@@ -179,13 +177,18 @@ export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreate
       setEquipmentKind(result.equipmentKind ?? "device");
       setTransport(result.transport ? structuredClone(result.transport) : undefined);
       setDescription(result.description ?? "");
+      setWidthInches(result.physicalDimensions?.widthInches?.toString() ?? "");
+      setDepthInches(result.physicalDimensions?.depthInches?.toString() ?? "");
+      setHeightInches(result.physicalDimensions?.heightInches?.toString() ?? "");
+      setWeightPounds(result.physicalDimensions?.weightPounds?.toString() ?? "");
+      setDimensionSourceText(result.physicalDimensions?.sourceText ?? "");
       setProductUrl(result.purchaseSource.url);
       setPriceAmount(result.purchaseSource.priceAmount?.toString() ?? "");
       setPriceCurrency(result.purchaseSource.priceCurrency ?? "");
       setPriceDisplay(result.purchaseSource.priceDisplay ?? "");
       setPriceVendor(result.purchaseSource.vendor ?? "");
       setPorts(structuredClone(result.ports));
-      setSelectedReferenceUrls(new Set(result.referenceImages.map((image) => image.url)));
+      setSelectedReferenceUrls(new Set(result.referenceImages.slice(0, 3).map((image) => image.url)));
     } catch (caught) {
       setResearchError(caught instanceof Error ? caught.message : "The product page could not be researched.");
     } finally {
@@ -195,22 +198,31 @@ export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreate
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!name.trim()) return;
+    const definitionName = definitionKind === "cable" ? formatCableDefinitionName(cableEnds) : name.trim();
+    if (!definitionName) return;
     setSaving(true);
     setError(null);
     setProgress(0);
     try {
-      const savedTransport = equipmentKind === "device" ? undefined : transport ?? defaultTransportTopology(equipmentKind);
+      const savedTransport = definitionKind === "equipment" && equipmentKind !== "device" ? transport ?? defaultTransportTopology(equipmentKind) : undefined;
       const definition = {
-        name: name.trim(),
-        manufacturer: manufacturer.trim() || undefined,
-        model: model.trim() || undefined,
-        category: category.trim() || "Other",
-        equipmentKind,
-        ...(savedTransport ? { transport: structuredClone(savedTransport) } : {}),
-        description: description.trim() || undefined,
-        notes: notes.trim() || undefined,
-        purchaseSource: productUrl.trim() ? {
+        name: definitionName,
+        definitionKind,
+        manufacturer: definitionKind === "equipment" ? manufacturer.trim() || undefined : undefined,
+        model: definitionKind === "equipment" ? model.trim() || undefined : undefined,
+        category: definitionKind === "equipment" ? category.trim() || "Other" : "Cable",
+        equipmentKind: definitionKind === "cable" ? "device" as const : equipmentKind,
+        transport: savedTransport ? structuredClone(savedTransport) : undefined,
+        description: definitionKind === "equipment" ? description.trim() || undefined : undefined,
+        notes: definitionKind === "equipment" ? notes.trim() || undefined : undefined,
+        physicalDimensions: definitionKind === "equipment" && (widthInches || depthInches || heightInches || weightPounds || dimensionSourceText.trim()) ? {
+          widthInches: positiveNumberOrUndefined(widthInches),
+          depthInches: positiveNumberOrUndefined(depthInches),
+          heightInches: positiveNumberOrUndefined(heightInches),
+          weightPounds: positiveNumberOrUndefined(weightPounds),
+          sourceText: dimensionSourceText.trim() || undefined,
+        } : undefined,
+        purchaseSource: definitionKind === "equipment" && productUrl.trim() ? {
           url: productUrl.trim(),
           vendor: priceVendor.trim() || undefined,
           priceAmount: priceAmount.trim() && Number.isFinite(Number(priceAmount)) && Number(priceAmount) >= 0 ? Number(priceAmount) : undefined,
@@ -218,20 +230,31 @@ export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreate
           priceDisplay: priceDisplay.trim() || undefined,
           observedAt: researchResult?.purchaseSource.observedAt ?? Date.now(),
         } : undefined,
-        referenceImages: referenceImages.filter((image) => selectedReferenceUrls.has(image.url)),
-        aiImport: researchResult?.aiImport ?? template?.aiImport,
-        ports: structuredClone(ports),
+        referenceImages: definitionKind === "equipment" ? referenceImages.filter((image) => selectedReferenceUrls.has(image.url)) : [],
+        aiImport: definitionKind === "equipment" ? researchResult?.aiImport ?? template?.aiImport : undefined,
+        cableEnds: definitionKind === "cable" ? structuredClone(cableEnds) : undefined,
+        ports: definitionKind === "cable" ? [] : structuredClone(ports),
+        showInSignalView: definitionKind === "cable" ? false : showInSignalView,
         showPortNumbers: template?.showPortNumbers ?? true,
         showPortLabels: template?.showPortLabels ?? true,
-        ownedUnits: template?.ownedUnits ?? [],
       };
-      const saved = template
+      const selectedImageUrls = definitionKind === "equipment" ? referenceImages.filter((image) => selectedReferenceUrls.has(image.url)).map((image) => image.url) : [];
+      const downloadedImages = definitionKind === "equipment" && researchResult ? await downloadEquipmentReferenceImages(selectedImageUrls) : { files: [], failedCount: 0 };
+      if (downloadedImages.failedCount) {
+        console.warn(`${downloadedImages.failedCount} selected merchant image${downloadedImages.failedCount === 1 ? "" : "s"} could not be copied to Storage.`);
+      }
+      const savedDefinition = template
         ? await updateEquipmentTemplate({
             ...structuredClone(template),
             ...definition,
-            detailImages: template.detailImages ?? [],
-          }, imageFile, setProgress)
-        : await createEquipmentTemplate(definition, imageFile, setProgress);
+            image: definitionKind === "cable" ? undefined : template.image,
+            stageImage: definitionKind === "cable" ? undefined : template.stageImage,
+            detailImages: definitionKind === "cable" ? [] : template.detailImages ?? [],
+          }, definitionKind === "equipment" ? imageFile : undefined, setProgress)
+        : await createEquipmentTemplate(definition, definitionKind === "equipment" ? imageFile : undefined, setProgress);
+      const saved = downloadedImages.files.length
+        ? await updateEquipmentTemplateImages(savedDefinition, { detailFiles: downloadedImages.files }, setProgress)
+        : savedDefinition;
       if (template) onSaved?.(saved);
       else onCreated?.(saved);
       changeOpen(false);
@@ -251,7 +274,7 @@ export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreate
       onArchived?.(archived);
       changeOpen(false);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not remove this definition from the equipment rack.");
+      setError(caught instanceof Error ? caught.message : "Could not archive this definition.");
     } finally {
       setSaving(false);
     }
@@ -261,11 +284,11 @@ export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreate
     <Dialog open={open} onOpenChange={changeOpen}>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>{template ? `Edit ${template.name}` : "New equipment"}</DialogTitle>
-          <DialogDescription>{template ? "Update this reusable definition manually or paste a product URL and let AI replace its product data and physical port map." : "Create a reusable gear definition with product data, exact ports, reference photos, and a diagram icon. Physical and planned assets are created separately."}</DialogDescription>
+          <DialogTitle>{template ? `Edit ${template.name}` : "New gear definition"}</DialogTitle>
+          <DialogDescription>{template ? "Update this reusable definition. Equipment uses directional ports; cables use two interchangeable connector ends." : "Create reusable equipment with directional ports or a cable type with two interchangeable ends. Physical and planned assets are created separately."}</DialogDescription>
         </DialogHeader>
         <form id="equipment-template-form" onSubmit={submit} className="flex flex-col gap-5" aria-busy={researching}>
-          <FieldGroup className="rounded-lg border bg-muted/30 p-3">
+          {definitionKind === "equipment" ? <FieldGroup className="rounded-lg border bg-muted/30 p-3">
             <Field data-invalid={Boolean(researchError)}>
               <FieldLabel htmlFor="equipment-product-url">Research a product page</FieldLabel>
               <div className="flex flex-col gap-2 sm:flex-row">
@@ -311,7 +334,7 @@ export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreate
                 ) : <FieldDescription>No research warnings. Review port counts and the live price before saving.</FieldDescription>}
               </Field>
             ) : null}
-          </FieldGroup>
+          </FieldGroup> : null}
 
           <div className="relative">
             <fieldset
@@ -323,44 +346,112 @@ export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreate
                 researching && "pointer-events-none select-none blur-[2px] opacity-35",
               )}
             >
-          <FieldGroup className="grid gap-4 sm:grid-cols-2">
-            <Field data-invalid={Boolean(error && !name.trim())}>
-              <FieldLabel htmlFor="equipment-name">Name</FieldLabel>
-              <Input id="equipment-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Guitar D.I." required aria-invalid={Boolean(error && !name.trim())} />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="equipment-category">Category</FieldLabel>
-              <Input id="equipment-category" value={category} onChange={(event) => setCategory(event.target.value)} placeholder="Direct box" />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="equipment-kind">Equipment behavior</FieldLabel>
-              <Select value={equipmentKind} onValueChange={(value) => {
+          <FieldGroup className="gap-4">
+            <Field className="sm:max-w-sm">
+              <FieldLabel htmlFor="equipment-definition-kind">Definition type</FieldLabel>
+              <Select value={definitionKind} onValueChange={(value) => {
                 if (!value) return;
-                const nextKind = value as EquipmentKind;
-                setEquipmentKind(nextKind);
-                setTransport(nextKind === "device" ? undefined : defaultTransportTopology(nextKind));
-                if (nextKind === "device") {
-                  setPorts((current) => current.map((port) => ({ ...port, endpointId: undefined, channelKey: undefined })));
+                const nextKind = value as GearDefinitionKind;
+                setDefinitionKind(nextKind);
+                if (nextKind === "cable") {
+                  setEquipmentKind("device");
+                  setTransport(undefined);
+                  setShowInSignalView(false);
+                  setImageFile(undefined);
+                } else {
+                  setShowInSignalView(template?.showInSignalView ?? ports.length > 0);
                 }
               }}>
-                <SelectTrigger id="equipment-kind" className="w-full"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="equipment-definition-kind" className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectGroup>
-                  <SelectItem value="device">Standard device</SelectItem>
-                  <SelectItem value="snake">Snake · two linked sides</SelectItem>
-                  <SelectItem value="split-snake">Split snake · three linked sides</SelectItem>
+                  <SelectItem value="equipment">Equipment</SelectItem>
+                  <SelectItem value="cable">Cable</SelectItem>
                 </SelectGroup></SelectContent>
               </Select>
-              <FieldDescription>Snakes expand into movable endpoints joined by their fixed multicore trunk.</FieldDescription>
+              <FieldDescription>Cables are bidirectional and use End 1 and End 2 instead of inputs and outputs.</FieldDescription>
             </Field>
-            <Field>
-              <FieldLabel htmlFor="equipment-manufacturer">Manufacturer</FieldLabel>
-              <Input id="equipment-manufacturer" value={manufacturer} onChange={(event) => setManufacturer(event.target.value)} placeholder="Radial" />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="equipment-model">Model</FieldLabel>
-              <Input id="equipment-model" value={model} onChange={(event) => setModel(event.target.value)} placeholder="JDI" />
-            </Field>
+            {definitionKind === "equipment" ? (
+              <FieldGroup className="grid gap-4 sm:grid-cols-2">
+                <Field data-invalid={Boolean(error && !name.trim())}>
+                  <FieldLabel htmlFor="equipment-name">Name</FieldLabel>
+                  <Input id="equipment-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Guitar D.I." required aria-invalid={Boolean(error && !name.trim())} />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="equipment-category">Category</FieldLabel>
+                  <Input id="equipment-category" value={category} onChange={(event) => setCategory(event.target.value)} placeholder="Direct box" />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="equipment-kind">Equipment behavior</FieldLabel>
+                  <Select value={equipmentKind} onValueChange={(value) => {
+                    if (!value) return;
+                    const nextKind = value as EquipmentKind;
+                    setEquipmentKind(nextKind);
+                    setTransport(nextKind === "device" ? undefined : defaultTransportTopology(nextKind));
+                    if (nextKind === "device") {
+                      setPorts((current) => current.map((port) => ({ ...port, endpointId: undefined, channelKey: undefined })));
+                    }
+                  }}>
+                    <SelectTrigger id="equipment-kind" className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectGroup>
+                      <SelectItem value="device">Standard device</SelectItem>
+                      <SelectItem value="snake">Snake · two linked sides</SelectItem>
+                      <SelectItem value="split-snake">Split snake · three linked sides</SelectItem>
+                    </SelectGroup></SelectContent>
+                  </Select>
+                  <FieldDescription>Snakes expand into movable endpoints joined by their fixed multicore trunk.</FieldDescription>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="equipment-manufacturer">Manufacturer</FieldLabel>
+                  <Input id="equipment-manufacturer" value={manufacturer} onChange={(event) => setManufacturer(event.target.value)} placeholder="Radial" />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="equipment-model">Model</FieldLabel>
+                  <Input id="equipment-model" value={model} onChange={(event) => setModel(event.target.value)} placeholder="JDI" />
+                </Field>
+              </FieldGroup>
+            ) : null}
           </FieldGroup>
+
+          {definitionKind === "equipment" ? <FieldGroup className="grid gap-4 rounded-lg border bg-muted/30 p-3 sm:grid-cols-4">
+            <Field className="sm:col-span-4">
+              <FieldLabel>Physical dimensions</FieldLabel>
+              <FieldDescription>Reusable product measurements. Width and depth become the default STAGE footprint for newly placed equipment.</FieldDescription>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="equipment-width">Width (in)</FieldLabel>
+              <Input id="equipment-width" type="number" min="0" step="0.01" inputMode="decimal" value={widthInches} onChange={(event) => setWidthInches(event.target.value)} placeholder="19" />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="equipment-depth">Depth (in)</FieldLabel>
+              <Input id="equipment-depth" type="number" min="0" step="0.01" inputMode="decimal" value={depthInches} onChange={(event) => setDepthInches(event.target.value)} placeholder="8.5" />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="equipment-height">Height (in)</FieldLabel>
+              <Input id="equipment-height" type="number" min="0" step="0.01" inputMode="decimal" value={heightInches} onChange={(event) => setHeightInches(event.target.value)} placeholder="3.5" />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="equipment-weight">Weight (lb)</FieldLabel>
+              <Input id="equipment-weight" type="number" min="0" step="0.01" inputMode="decimal" value={weightPounds} onChange={(event) => setWeightPounds(event.target.value)} placeholder="8.4" />
+            </Field>
+            {dimensionSourceText ? (
+              <Field className="sm:col-span-4">
+                <FieldLabel htmlFor="equipment-dimension-source">Source text</FieldLabel>
+                <Input id="equipment-dimension-source" value={dimensionSourceText} onChange={(event) => setDimensionSourceText(event.target.value)} />
+              </Field>
+            ) : null}
+          </FieldGroup> : null}
+
+          {definitionKind === "equipment" ? <Field orientation="horizontal" className="rounded-lg border bg-muted/30 p-3">
+            <Checkbox
+              id="equipment-show-in-signal"
+              checked={showInSignalView}
+              onCheckedChange={(checked) => setShowInSignalView(checked === true)}
+            />
+            <div className="flex flex-col gap-1">
+              <FieldLabel htmlFor="equipment-show-in-signal">Show this equipment in SIGNAL</FieldLabel>
+              <FieldDescription>Turn this off for stands, furniture, and other stage-only gear. It remains catalogued and always appears in STAGE.</FieldDescription>
+            </div>
+          </Field> : null}
 
           {transport ? (
             <FieldGroup className="rounded-lg border bg-muted/30 p-3">
@@ -414,13 +505,13 @@ export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreate
             </FieldGroup>
           ) : null}
 
-          <Field>
-            <FieldLabel htmlFor="equipment-description">Gear description</FieldLabel>
+          {definitionKind === "equipment" ? <Field>
+            <FieldLabel htmlFor="equipment-description">Definition description</FieldLabel>
             <Textarea id="equipment-description" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="A concise description of what this equipment does and where it fits in a setup." rows={4} />
             <FieldDescription>Reusable catalog information. Setup-specific instructions belong in notes.</FieldDescription>
-          </Field>
+          </Field> : null}
 
-          {productUrl.trim() ? (
+          {definitionKind === "equipment" && productUrl.trim() ? (
             <FieldGroup className="grid gap-4 rounded-lg border p-3 sm:grid-cols-4">
               <Field className="sm:col-span-2">
                 <FieldLabel htmlFor="equipment-price-vendor">Seller / source</FieldLabel>
@@ -442,7 +533,19 @@ export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreate
             </FieldGroup>
           ) : null}
 
-          <FieldGroup className="rounded-lg border bg-muted/30 p-3">
+          {definitionKind === "cable" ? (
+            <FieldGroup className="rounded-lg border bg-muted/30 p-3">
+              <Field>
+                <div className="flex flex-wrap items-center gap-2">
+                  <FieldLabel>Cable ends</FieldLabel>
+                  <Badge variant="secondary">{formatCableDefinitionName(cableEnds)}</Badge>
+                </div>
+                <FieldDescription>The definition name is created from these two ends. Length, manufacturer, notes, and photos belong to each individual cable.</FieldDescription>
+              </Field>
+              <CableEndEditor value={cableEnds} onChange={setCableEnds} idPrefix="equipment-template-cable" />
+            </FieldGroup>
+          ) : (
+            <FieldGroup className="rounded-lg border bg-muted/30 p-3">
             <Field>
               <div className="flex flex-wrap items-center gap-2">
                 <FieldLabel>Physical port map</FieldLabel>
@@ -451,13 +554,14 @@ export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreate
               <FieldDescription>Each row is one physical connector with its own stable ID, direction, label, connector type, gender, and signal. Group totals are derived from these rows.</FieldDescription>
             </Field>
             <EquipmentPortEditor ports={ports} onChange={setPorts} idPrefix="equipment-template" transport={transport} />
-          </FieldGroup>
+            </FieldGroup>
+          )}
 
-          {referenceImages.length ? (
+          {definitionKind === "equipment" && referenceImages.length ? (
             <FieldGroup className="rounded-lg border p-3">
               <Field>
                 <FieldLabel>Reference product photos</FieldLabel>
-                <FieldDescription>These are source-page references for the gear description. They are not the transparent stage-plot icon and they are not photos of a specific physical asset.</FieldDescription>
+                <FieldDescription>Selected source-page images are copied into The Swell&apos;s own Storage as reusable product detail photos. They remain separate from the diagram icon and photos of a specific physical asset.</FieldDescription>
               </Field>
               <FieldGroup className="grid gap-2 sm:grid-cols-2">
                 {referenceImages.map((image, index) => {
@@ -478,9 +582,9 @@ export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreate
             </FieldGroup>
           ) : null}
 
-          <FieldGroup>
+          {definitionKind === "equipment" ? <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="equipment-image">Stage-plot icon</FieldLabel>
+              <FieldLabel htmlFor="equipment-image">Catalog image</FieldLabel>
               <label htmlFor="equipment-image" className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-background px-3 py-4 text-center text-sm font-medium hover:bg-muted/50">
                 <ImagePlusIcon aria-hidden className="size-5" />
                 {imageFile ? imageFile.name : "Choose JPEG, PNG, or WebP"}
@@ -488,14 +592,14 @@ export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreate
               </label>
               <FieldDescription>One clean visual representation for diagrams, ideally a transparent PNG or WebP. Optional, up to 10 MB.</FieldDescription>
             </Field>
-          </FieldGroup>
+          </FieldGroup> : null}
 
-          <Field>
+          {definitionKind === "equipment" ? <Field>
             <FieldLabel htmlFor="equipment-notes">Notes</FieldLabel>
             <Textarea id="equipment-notes" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Active D.I.; phantom power supported." rows={3} />
-          </Field>
+          </Field> : null}
 
-          {saving && imageFile ? <Progress value={progress} aria-label={`Upload ${progress}% complete`} /> : null}
+          {saving && (imageFile || (researchResult && selectedReferenceUrls.size)) ? <Progress value={progress} aria-label={`Upload ${progress}% complete`} /> : null}
           {error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}
             </fieldset>
 
@@ -535,33 +639,38 @@ export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreate
           </div>
         </form>
         <DialogFooter className="sm:justify-between">
-          {template ? (
+          {template && showArchiveAction ? (
             <AlertDialog>
               <AlertDialogTrigger render={<Button type="button" variant="ghost" disabled={saving || researching} />}>
                 <ArchiveIcon data-icon="inline-start" />
-                Remove from rack
+                Archive definition
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Remove {template.name} from the equipment rack?</AlertDialogTitle>
-                  <AlertDialogDescription>Existing setup nodes and gear assets keep their saved data. This definition will no longer appear as something you can drag onto a setup.</AlertDialogDescription>
+                  <AlertDialogTitle>Archive {template.name}?</AlertDialogTitle>
+                  <AlertDialogDescription>Existing setup nodes and gear assets keep their saved data. This definition will no longer appear in the active catalog.</AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Keep definition</AlertDialogCancel>
-                  <AlertDialogAction variant="destructive" onClick={() => void archiveDefinition()}>Remove from rack</AlertDialogAction>
+                  <AlertDialogAction variant="destructive" onClick={() => void archiveDefinition()}>Archive definition</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
           ) : <span />}
           <div className="flex flex-col-reverse gap-2 sm:flex-row">
             <Button type="button" variant="outline" onClick={() => changeOpen(false)} disabled={saving}>Cancel</Button>
-            <Button type="submit" form="equipment-template-form" disabled={researching || saving || !name.trim()}>
+            <Button type="submit" form="equipment-template-form" disabled={researching || saving || (definitionKind === "equipment" && !name.trim())}>
               {template ? <SaveIcon data-icon="inline-start" /> : <PlusIcon data-icon="inline-start" />}
-              {saving ? "Saving..." : template ? "Save definition" : "Create equipment"}
+              {saving ? "Saving..." : template ? "Save definition" : "Create definition"}
             </Button>
           </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
+}
+
+function positiveNumberOrUndefined(value: string) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : undefined;
 }

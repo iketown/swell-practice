@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Londrina_Shadow, Londrina_Solid } from "next/font/google";
 
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 import "./globals.css";
 
@@ -50,8 +51,10 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${londrinaSolid.variable} ${londrinaShadow.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
-        {children}
-        <Toaster position="bottom-right" richColors closeButton />
+        <TooltipProvider delay={180}>
+          {children}
+          <Toaster position="bottom-right" richColors closeButton />
+        </TooltipProvider>
       </body>
     </html>
   );

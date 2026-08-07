@@ -3,7 +3,7 @@
 import { Trash2Icon, UnplugIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +12,7 @@ import type { CableEdge, ConnectorSnapshot, FulfillmentStatus } from "@/lib/setu
 
 export function CableInspector({ edge, onChange, onDelete }: { edge: CableEdge; onChange: (edge: CableEdge) => void; onDelete: (edgeId: string) => void }) {
   const data = edge.data;
+  const measuredOnStage = Boolean(data.stageRoute);
   const updateData = (patch: Partial<CableEdge["data"]>) => onChange({ ...edge, data: { ...data, ...patch } });
 
   return (
@@ -38,8 +39,9 @@ export function CableInspector({ edge, onChange, onDelete }: { edge: CableEdge; 
         </div>
         <div className="grid grid-cols-[1fr_5.5rem] gap-2">
           <Field>
-            <FieldLabel htmlFor="cable-length">Estimated length</FieldLabel>
-            <Input id="cable-length" type="number" min={0} value={data.estimatedLength ?? ""} onChange={(event) => updateData({ estimatedLength: event.target.value ? Number(event.target.value) : undefined })} placeholder="25" />
+            <FieldLabel htmlFor="cable-length">{measuredOnStage ? "Required length" : "Estimated length"}</FieldLabel>
+            <Input id="cable-length" type="number" min={0} value={data.estimatedLength ?? ""} onChange={(event) => updateData({ estimatedLength: event.target.value ? Number(event.target.value) : undefined })} placeholder="25" readOnly={measuredOnStage} />
+            {measuredOnStage ? <p className="text-xs text-muted-foreground">Calculated from the STAGE route.</p> : null}
           </Field>
           <Field>
             <FieldLabel htmlFor="cable-unit">Unit</FieldLabel>
@@ -62,8 +64,9 @@ export function CableInspector({ edge, onChange, onDelete }: { edge: CableEdge; 
           </Select>
         </Field>
         <Field>
-          <FieldLabel htmlFor="cable-inventory">Owned cable / inventory label</FieldLabel>
-          <Input id="cable-inventory" value={data.assignedInventoryLabel ?? ""} onChange={(event) => updateData({ assignedInventoryLabel: event.target.value })} placeholder="25 ft XLR #3" />
+          <FieldLabel htmlFor="cable-inventory">Inventory cable</FieldLabel>
+          <Input id="cable-inventory" value={data.assignedInventoryLabel ?? ""} placeholder="Not assigned" readOnly />
+          <FieldDescription>Use the Match tab to assign a tagged cable from inventory.</FieldDescription>
         </Field>
         <Field>
           <FieldLabel htmlFor="cable-color">Cable color</FieldLabel>

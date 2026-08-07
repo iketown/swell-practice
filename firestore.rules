@@ -123,7 +123,10 @@ service cloud.firestore {
 
       match /checkIns/{checkInId} {
         allow read, create: if isAdmin();
-        allow update, delete: if false;
+        // Check-ins remain immutable audit records, but an admin may remove them
+        // when permanently deleting their parent inventory item.
+        allow update: if false;
+        allow delete: if isAdmin();
       }
     }
 

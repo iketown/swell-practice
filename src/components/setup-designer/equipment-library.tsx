@@ -34,7 +34,7 @@ export function EquipmentLibrary({
   const suppressClickRef = useRef<string | null>(null);
   const matching = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    return templates.filter((template) => !normalized || [template.name, template.category, template.manufacturer, template.model].some((value) => value?.toLowerCase().includes(normalized)));
+    return templates.filter((template) => template.definitionKind !== "cable" && (!normalized || [template.name, template.category, template.manufacturer, template.model].some((value) => value?.toLowerCase().includes(normalized))));
   }, [query, templates]);
 
   return (

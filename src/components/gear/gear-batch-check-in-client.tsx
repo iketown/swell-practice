@@ -4,17 +4,22 @@ import type { IScannerControls } from "@zxing/browser";
 import {
   AlertTriangleIcon,
   CameraIcon,
+  CheckIcon,
   CheckCircle2Icon,
   KeyboardIcon,
+  LoaderCircleIcon,
   LogInIcon,
   MapPinCheckIcon,
   MapPinIcon,
+  MicIcon,
   PlusIcon,
   ScanLineIcon,
   SquareIcon,
+  StopCircleIcon,
+  XIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 
 import { AdminSignInDialog } from "@/components/admin-sign-in-dialog";
@@ -36,11 +41,14 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAdmin } from "@/hooks/use-admin";
 import {
   canonicalizeAssetTag,
   createGearId,
+  normalizeInventoryAssetCode,
   type GearLocation,
   type GearLocationKind,
   type InventoryAsset,
@@ -52,6 +60,7 @@ import {
   listInventoryAssets,
 } from "@/lib/gear/repository";
 import { assetTagFromScannedValue, cameraAccessErrorMessage } from "@/lib/gear/scanner";
+import { spokenGearAssetCodes } from "@/lib/gear/voice-entry";
 
 const LOCATION_KINDS: Array<{ value: GearLocationKind; label: string }> = [
   { value: "house", label: "House" },
@@ -65,11 +74,56 @@ const LOCATION_KINDS: Array<{ value: GearLocationKind; label: string }> = [
 
 type SessionPhase = "setup" | "scanning" | "summary";
 type CameraStatus = "idle" | "starting" | "scanning" | "error";
-type ScanSource = "camera" | "manual";
+type ScanSource = "camera" | "manual" | "voice";
+type ScanEntryMode = "voice" | "number" | "camera";
+type VoiceStatus = "idle" | "listening" | "processing" | "error";
+type VoiceQueueStatus = "pending" | "checking" | "checked" | "error";
 type CameraDetectionStatus = "checking" | "recorded";
 
 const CAMERA_DETECTION_LIFETIME_MS = 2200;
 const MAX_VISIBLE_CAMERA_DETECTIONS = 8;
+
+interface BrowserSpeechRecognitionResult {
+  isFinal: boolean;
+  0: { transcript: string };
+}
+
+interface BrowserSpeechRecognitionEvent extends Event {
+  results: ArrayLike<BrowserSpeechRecognitionResult>;
+}
+
+interface BrowserSpeechRecognitionErrorEvent extends Event {
+  error: string;
+  message?: string;
+}
+
+interface BrowserSpeechRecognition {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  maxAlternatives: number;
+  onend: (() => void) | null;
+  onerror: ((event: BrowserSpeechRecognitionErrorEvent) => void) | null;
+  onresult: ((event: BrowserSpeechRecognitionEvent) => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+}
+
+type BrowserSpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
+
+function subscribeToVoiceSupport() {
+  return () => undefined;
+}
+
+function browserSupportsDirectVoice() {
+  if (typeof window === "undefined") return false;
+  const speechWindow = window as Window & {
+    SpeechRecognition?: BrowserSpeechRecognitionConstructor;
+    webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor;
+  };
+  return Boolean(speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition);
+}
 
 interface CameraFrameSize {
   width: number;
@@ -99,6 +153,15 @@ interface ScannedSessionItem {
   checkInId: string;
   checkedInAt: number;
   previousLocationName?: string;
+}
+
+interface VoiceQueueItem {
+  code: string;
+  assetId?: string;
+  assetTag: string;
+  label: string;
+  status: VoiceQueueStatus;
+  error?: string;
 }
 
 function clamp(value: number, minimum: number, maximum: number) {
@@ -259,14 +322,18 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
   const [loginOpen, setLoginOpen] = useState(false);
   const [selectedLocationId, setSelectedLocationId] = useState("");
   const [phase, setPhase] = useState<SessionPhase>("setup");
+  const [entryMode, setEntryMode] = useState<ScanEntryMode>("voice");
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>("idle");
   const [cameraRequested, setCameraRequested] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [cameraFrame, setCameraFrame] = useState<CameraFrameSize>({ width: 1280, height: 720 });
   const [cameraDetections, setCameraDetections] = useState<CameraDetectionBox[]>([]);
-  const [manualEntryOpen, setManualEntryOpen] = useState(false);
   const [manualAssetTag, setManualAssetTag] = useState("");
-  const [manualSubmitting, setManualSubmitting] = useState(false);
+  const [manualPendingCount, setManualPendingCount] = useState(0);
+  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>("idle");
+  const [voiceTranscript, setVoiceTranscript] = useState("");
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [voiceQueue, setVoiceQueue] = useState<VoiceQueueItem[]>([]);
   const [scannedItems, setScannedItems] = useState<ScannedSessionItem[]>([]);
   const [lastScan, setLastScan] = useState<ScannedSessionItem | null>(null);
   const [creatingLocation, setCreatingLocation] = useState(false);
@@ -275,6 +342,10 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
   const [savingLocation, setSavingLocation] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const manualInputRef = useRef<HTMLInputElement | null>(null);
+  const voiceInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const voiceListEndRef = useRef<HTMLDivElement | null>(null);
+  const manualSubmissionQueueRef = useRef<Promise<unknown>>(Promise.resolve());
   const controlsRef = useRef<IScannerControls | null>(null);
   const cameraAttemptRef = useRef(0);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -285,6 +356,13 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
   const recentDetectionRef = useRef(new Map<string, number>());
   const cameraDetectionsRef = useRef(new Map<string, CameraDetectionBox>());
   const initialLocationAppliedRef = useRef(false);
+  const voiceRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
+  const voiceTranscriptRef = useRef("");
+  const directVoiceAvailable = useSyncExternalStore(
+    subscribeToVoiceSupport,
+    browserSupportsDirectVoice,
+    () => false,
+  );
 
   const loadGear = useCallback(async () => {
     if (!admin.isAdmin) return;
@@ -329,6 +407,8 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
   const assetByTag = useMemo(() => new Map(
     assets.map((asset) => [canonicalizeAssetTag(asset.assetTag), asset]),
   ), [assets]);
+  const normalizedManualAssetTag = normalizeInventoryAssetCode(manualAssetTag);
+  const manualSubmitting = manualPendingCount > 0;
 
   const publishCameraDetections = useCallback(() => {
     const visible = [...cameraDetectionsRef.current.values()]
@@ -530,12 +610,153 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
     selectedLocation,
   ]);
 
+  const appendVoiceCodes = useCallback((codes: string[]) => {
+    if (!codes.length) return;
+    setVoiceQueue((current) => {
+      const seen = new Set(current.map((item) => item.code));
+      const additions: VoiceQueueItem[] = [];
+      for (const code of codes) {
+        if (seen.has(code)) continue;
+        seen.add(code);
+        const asset = assetByTag.get(code);
+        additions.push(asset
+          ? {
+              code,
+              assetId: asset.id,
+              assetTag: asset.assetTag,
+              label: asset.label,
+              status: successfulAssetIdsRef.current.has(asset.id) ? "checked" : "pending",
+            }
+          : {
+              code,
+              assetTag: code,
+              label: "No matching inventory item",
+              status: "error",
+              error: "This number is not registered.",
+            });
+      }
+      return additions.length ? [...current, ...additions] : current;
+    });
+  }, [assetByTag]);
+
+  const parseVoiceTranscript = useCallback((transcript: string) => {
+    const codes = spokenGearAssetCodes(transcript);
+    appendVoiceCodes(codes);
+    return codes;
+  }, [appendVoiceCodes]);
+
+  const removeVoiceQueueItem = useCallback((code: string) => {
+    setVoiceQueue((current) => current.filter((item) => item.code !== code));
+  }, []);
+
+  const confirmVoiceQueueItem = useCallback(async (code: string) => {
+    const item = voiceQueue.find((candidate) => candidate.code === code);
+    if (!item?.assetId || item.status === "checking" || item.status === "checked") return;
+    setVoiceQueue((current) => current.map((candidate) => candidate.code === code
+      ? { ...candidate, status: "checking", error: undefined }
+      : candidate));
+    const added = await processScannedValue(code, "voice");
+    const checked = added || successfulAssetIdsRef.current.has(item.assetId);
+    setVoiceQueue((current) => current.map((candidate) => candidate.code === code
+      ? checked
+        ? { ...candidate, status: "checked", error: undefined }
+        : { ...candidate, status: "error", error: "Check-in failed. Tap the checkmark to try again." }
+      : candidate));
+  }, [processScannedValue, voiceQueue]);
+
+  const cancelVoiceCapture = useCallback((updateStatus = true) => {
+    const recognition = voiceRecognitionRef.current;
+    voiceRecognitionRef.current = null;
+    recognition?.abort();
+    if (updateStatus) setVoiceStatus("idle");
+  }, []);
+
+  const startVoiceRecognition = useCallback(() => {
+    if (voiceStatus === "listening" || voiceStatus === "processing") return;
+    if (!window.isSecureContext) {
+      setVoiceError("Microphone access requires HTTPS. Open the secure scanner link and try again.");
+      setVoiceStatus("error");
+      return;
+    }
+    const speechWindow = window as Window & {
+      SpeechRecognition?: BrowserSpeechRecognitionConstructor;
+      webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor;
+    };
+    const SpeechRecognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setVoiceError("Direct listening is not available in this browser. Tap the phrase field and use the microphone on the iPhone keyboard.");
+      setVoiceStatus("error");
+      return;
+    }
+
+    cancelVoiceCapture(false);
+    setVoiceError(null);
+    setVoiceTranscript("");
+    voiceTranscriptRef.current = "";
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+    recognition.maxAlternatives = 1;
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results, (result) => result[0]?.transcript ?? "")
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+      const finalTranscript = Array.from(event.results, (result) => (
+        result.isFinal ? result[0]?.transcript ?? "" : ""
+      ))
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+      voiceTranscriptRef.current = transcript;
+      setVoiceTranscript(transcript);
+      if (finalTranscript) parseVoiceTranscript(finalTranscript);
+    };
+    recognition.onerror = (event) => {
+      if (voiceRecognitionRef.current !== recognition) return;
+      voiceRecognitionRef.current = null;
+      const chromeHelp = event.error === "service-not-allowed"
+        ? " Open this page in Safari, or use the microphone on the iPhone keyboard in the phrase field."
+        : "";
+      setVoiceError(
+        event.error === "not-allowed"
+          ? "Speech recognition was blocked. Allow microphone and speech recognition access in the browser settings."
+          : event.error === "no-speech"
+            ? "I did not hear a number. Try speaking closer to the phone."
+            : `${event.message || "The phone could not start speech recognition."}${chromeHelp}`,
+      );
+      setVoiceStatus("error");
+    };
+    recognition.onend = () => {
+      if (voiceRecognitionRef.current !== recognition) return;
+      voiceRecognitionRef.current = null;
+      parseVoiceTranscript(voiceTranscriptRef.current);
+      setVoiceStatus("idle");
+    };
+    voiceRecognitionRef.current = recognition;
+    try {
+      recognition.start();
+      setVoiceStatus("listening");
+    } catch (caught) {
+      voiceRecognitionRef.current = null;
+      setVoiceError(caught instanceof Error ? caught.message : "The phone could not start speech recognition.");
+      setVoiceStatus("error");
+    }
+  }, [cancelVoiceCapture, parseVoiceTranscript, voiceStatus]);
+
+  const stopVoiceRecognition = useCallback(() => {
+    const recognition = voiceRecognitionRef.current;
+    if (!recognition) return;
+    setVoiceStatus("processing");
+    recognition.stop();
+  }, []);
+
   const startCamera = useCallback(async () => {
     if (!videoRef.current || cameraStatus === "starting" || cameraStatus === "scanning") return;
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraError("This browser cannot open a live camera. Enter asset tags manually instead.");
       setCameraStatus("error");
-      setManualEntryOpen(true);
       return;
     }
 
@@ -548,7 +769,6 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
       cameraAttemptRef.current += 1;
       setCameraError("Camera permission is still waiting. Approve it in the browser prompt, then try again, or enter asset tags manually.");
       setCameraStatus("error");
-      setManualEntryOpen(true);
     }, 15000);
     try {
       await primeFeedback();
@@ -559,6 +779,7 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
       const hints = new Map();
       hints.set(DecodeHintType.POSSIBLE_FORMATS, [
         BarcodeFormat.QR_CODE,
+        BarcodeFormat.DATA_MATRIX,
         BarcodeFormat.CODE_128,
         BarcodeFormat.CODE_39,
       ]);
@@ -593,7 +814,6 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
       if (attempt !== cameraAttemptRef.current) return;
       setCameraError(cameraAccessErrorMessage(caught));
       setCameraStatus("error");
-      setManualEntryOpen(true);
     } finally {
       window.clearTimeout(permissionTimeout);
     }
@@ -624,20 +844,27 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
   }, [phase, publishCameraDetections]);
 
   useEffect(() => {
-    function pauseHiddenCamera() {
-      if (document.visibilityState === "hidden" && controlsRef.current) {
-        stopCamera();
+    if (entryMode !== "voice" || !voiceQueue.length) return;
+    voiceListEndRef.current?.scrollIntoView({ block: "nearest" });
+  }, [entryMode, voiceQueue.length]);
+
+  useEffect(() => {
+    function pauseHiddenCapture() {
+      if (document.visibilityState === "hidden") {
+        if (controlsRef.current) stopCamera();
+        if (voiceRecognitionRef.current) cancelVoiceCapture();
       }
     }
-    document.addEventListener("visibilitychange", pauseHiddenCamera);
-    return () => document.removeEventListener("visibilitychange", pauseHiddenCamera);
-  }, [stopCamera]);
+    document.addEventListener("visibilitychange", pauseHiddenCapture);
+    return () => document.removeEventListener("visibilitychange", pauseHiddenCapture);
+  }, [cancelVoiceCapture, stopCamera]);
 
   useEffect(() => () => {
     sessionActiveRef.current = false;
     stopCamera(false);
+    cancelVoiceCapture(false);
     if (audioContextRef.current) void audioContextRef.current.close();
-  }, [stopCamera]);
+  }, [cancelVoiceCapture, stopCamera]);
 
   async function submitNewLocation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -662,6 +889,7 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
   async function beginSession() {
     if (!selectedLocation) return;
     stopCamera();
+    cancelVoiceCapture();
     await primeFeedback().catch(() => undefined);
     operationIdRef.current = createGearId("scan");
     successfulAssetIdsRef.current = new Set();
@@ -671,16 +899,21 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
     setScannedItems([]);
     setLastScan(null);
     setManualAssetTag("");
-    setManualEntryOpen(false);
+    setVoiceTranscript("");
+    voiceTranscriptRef.current = "";
+    setVoiceError(null);
+    setVoiceStatus("idle");
+    setVoiceQueue([]);
     setCameraError(null);
     setCameraStatus("idle");
     setPhase("scanning");
-    setCameraRequested(true);
+    setCameraRequested(entryMode === "camera");
   }
 
   function finishSession() {
     sessionActiveRef.current = false;
     stopCamera();
+    cancelVoiceCapture();
     setCameraRequested(false);
     setPhase(scannedItems.length ? "summary" : "setup");
   }
@@ -688,19 +921,46 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
   function changeLocation() {
     sessionActiveRef.current = false;
     stopCamera();
+    cancelVoiceCapture();
+    setCameraRequested(false);
     setSelectedLocationId("");
     setScannedItems([]);
     setLastScan(null);
     setPhase("setup");
   }
 
-  async function submitManualAsset(event: FormEvent<HTMLFormElement>) {
+  function changeEntryMode(value: string) {
+    if (value !== "voice" && value !== "number" && value !== "camera") return;
+    const nextMode = value as ScanEntryMode;
+    if (nextMode === entryMode) return;
+    if (nextMode === "camera") {
+      cancelVoiceCapture();
+      setCameraRequested(true);
+    } else {
+      stopCamera();
+      setCameraRequested(false);
+      if (nextMode === "number") cancelVoiceCapture();
+    }
+    setEntryMode(nextMode);
+    if (nextMode === "number") {
+      window.requestAnimationFrame(() => manualInputRef.current?.focus());
+    }
+  }
+
+  function submitManualAsset(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!manualAssetTag.trim() || manualSubmitting) return;
-    setManualSubmitting(true);
-    const added = await processScannedValue(manualAssetTag, "manual");
-    if (added) setManualAssetTag("");
-    setManualSubmitting(false);
+    if (!normalizedManualAssetTag) return;
+    const submittedCode = normalizedManualAssetTag;
+    setManualAssetTag("");
+    manualInputRef.current?.focus({ preventScroll: true });
+    setManualPendingCount((current) => current + 1);
+    const submission = manualSubmissionQueueRef.current
+      .catch(() => undefined)
+      .then(() => processScannedValue(submittedCode, "manual"));
+    manualSubmissionQueueRef.current = submission.finally(() => {
+      setManualPendingCount((current) => Math.max(0, current - 1));
+      window.requestAnimationFrame(() => manualInputRef.current?.focus({ preventScroll: true }));
+    });
   }
 
   if (admin.loading) {
@@ -820,128 +1080,361 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
           <header className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <p className="swell-page-kicker">Checking in to {selectedLocation.name}</p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Scan gear labels</h1>
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Check in gear</h1>
             </div>
-            <Badge variant="secondary">{scannedItems.length} scanned</Badge>
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              <Badge variant="secondary">{scannedItems.length} checked in</Badge>
+              {entryMode !== "voice" ? (
+                <Button size="sm" variant="ghost" onClick={finishSession}>
+                  {scannedItems.length ? "Done" : "Cancel"}
+                </Button>
+              ) : null}
+            </div>
           </header>
 
-          <div className="relative overflow-hidden rounded-xl border-2 border-foreground bg-foreground text-background">
-            <video
-              ref={videoRef}
-              aria-label="Live rear-camera preview"
-              autoPlay
-              muted
-              playsInline
-              onLoadedMetadata={(event) => updateCameraFrame(event.currentTarget)}
-              className="aspect-[3/4] w-full object-cover sm:aspect-video"
-            />
-            {cameraStatus === "scanning" ? (
-              <>
-                <CameraDetectionOverlay detections={cameraDetections} frame={cameraFrame} />
-                <div className="pointer-events-none absolute inset-[11%] rounded-xl border-2 border-background/80" aria-hidden />
-                <Badge className="absolute left-3 top-3" variant="secondary">
-                  <span className="size-2 rounded-full bg-primary" aria-hidden />
-                  Camera on
-                </Badge>
-              </>
-            ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-foreground/85 p-6 text-center">
-                <CameraIcon className="size-10" aria-hidden />
-                <div className="flex max-w-sm flex-col gap-1">
-                  <strong>{cameraStatus === "starting" ? "Starting camera..." : "Camera paused"}</strong>
-                  <span className="text-sm text-background/75">
-                    Point the rear camera at a Swell QR code or asset barcode.
-                  </span>
-                </div>
-                {cameraStatus !== "starting" ? (
-                  <Button variant="secondary" onClick={() => setCameraRequested(true)}>
-                    <CameraIcon data-icon="inline-start" />
-                    {cameraStatus === "error" ? "Try camera again" : "Start camera"}
-                  </Button>
-                ) : null}
-              </div>
-            )}
-          </div>
+          <Tabs value={entryMode} onValueChange={changeEntryMode} className="gap-4">
+            <TabsList
+              className={entryMode === "voice" && (voiceStatus === "listening" || voiceStatus === "processing")
+                ? "hidden"
+                : "grid h-auto w-full grid-cols-3"}
+              aria-label="Check-in method"
+            >
+              <TabsTrigger value="voice" className="min-h-11 px-2">
+                <MicIcon aria-hidden />
+                Voice
+              </TabsTrigger>
+              <TabsTrigger value="number" className="min-h-11 px-2">
+                <KeyboardIcon aria-hidden />
+                Number
+              </TabsTrigger>
+              <TabsTrigger value="camera" className="min-h-11 px-2">
+                <CameraIcon aria-hidden />
+                Camera
+              </TabsTrigger>
+            </TabsList>
 
-          {cameraError ? (
-            <Alert variant="destructive">
-              <AlertTriangleIcon aria-hidden />
-              <AlertTitle>Camera unavailable</AlertTitle>
-              <AlertDescription>{cameraError}</AlertDescription>
-            </Alert>
-          ) : null}
+            <TabsContent value="voice" className="flex flex-col gap-3">
+              <section className="swell-panel overflow-hidden" aria-labelledby="voice-check-in-heading">
+                <div className="flex items-center justify-between gap-3 bg-muted/35 px-4 py-3 sm:px-5">
+                  <div className="min-w-0">
+                    <h2 id="voice-check-in-heading" className="font-semibold">Voice check-in</h2>
+                    <p className="truncate text-sm text-muted-foreground">
+                      Say “gear” or “cable” before every number.
+                    </p>
+                  </div>
+                  <Badge variant={voiceStatus === "listening" ? "default" : "secondary"}>
+                    {voiceStatus === "listening" ? (
+                      <span className="size-2 rounded-full bg-current motion-safe:animate-pulse" aria-hidden />
+                    ) : null}
+                    {voiceStatus === "listening" ? "Listening" : `${voiceQueue.length} heard`}
+                  </Badge>
+                </div>
+                <Separator />
+
+                <div
+                  className="max-h-[56dvh] min-h-72 overflow-y-auto overscroll-contain"
+                  role="log"
+                  aria-live="polite"
+                  aria-label="Recognized gear awaiting confirmation"
+                >
+                  {voiceQueue.length ? (
+                    <ol className="divide-y">
+                      {voiceQueue.map((item) => (
+                        <li
+                          className={item.status === "checked"
+                            ? "grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 bg-[color-mix(in_oklch,var(--swell-success)_10%,transparent)] p-3 sm:p-4"
+                            : item.status === "error"
+                              ? "grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 bg-destructive/5 p-3 sm:p-4"
+                              : "grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 p-3 sm:p-4"}
+                          key={item.code}
+                        >
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon-lg"
+                            className="size-14 shrink-0"
+                            onClick={() => removeVoiceQueueItem(item.code)}
+                            disabled={item.status === "checking" || item.status === "checked"}
+                            aria-label={`Remove ${item.assetTag} from this list`}
+                          >
+                            <XIcon className="size-7" aria-hidden />
+                          </Button>
+
+                          <span className="min-w-0">
+                            <strong className="block font-mono text-xl tracking-[0.08em]">{item.assetTag}</strong>
+                            <span className="block truncate text-base font-medium">{item.label}</span>
+                            {item.status === "checked" ? (
+                              <span className="mt-0.5 block text-sm font-medium text-foreground">Checked in</span>
+                            ) : item.error ? (
+                              <span className="mt-0.5 block text-sm text-destructive">{item.error}</span>
+                            ) : (
+                              <span className="mt-0.5 block text-sm text-muted-foreground">Waiting for confirmation</span>
+                            )}
+                          </span>
+
+                          <Button
+                            type="button"
+                            variant="success"
+                            size="icon-lg"
+                            className="size-14 shrink-0"
+                            onClick={() => void confirmVoiceQueueItem(item.code)}
+                            disabled={!item.assetId || item.status === "checking" || item.status === "checked"}
+                            aria-label={item.status === "checked"
+                              ? `${item.assetTag} checked in`
+                              : `Confirm check-in for ${item.assetTag}`}
+                          >
+                            {item.status === "checking" ? (
+                              <LoaderCircleIcon className="size-7 motion-safe:animate-spin" aria-hidden />
+                            ) : (
+                              <CheckIcon className="size-8" aria-hidden />
+                            )}
+                          </Button>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <div className="flex min-h-72 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
+                      <span className="flex size-14 items-center justify-center rounded-full bg-muted">
+                        <MicIcon className="size-7" aria-hidden />
+                      </span>
+                      <div className="max-w-sm">
+                        <strong className="block text-lg">Ready for the first number</strong>
+                        <span className="mt-1 block text-sm leading-6 text-muted-foreground">
+                          Tap Start listening below, then say “gear 3, gear 4.”
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={voiceListEndRef} aria-hidden />
+                </div>
+
+                {!directVoiceAvailable ? (
+                  <>
+                    <Separator />
+                    <Field className="p-4 sm:p-5">
+                      <FieldLabel htmlFor="voice-gear-numbers">iPhone dictation field</FieldLabel>
+                      <Textarea
+                        ref={voiceInputRef}
+                        id="voice-gear-numbers"
+                        value={voiceTranscript}
+                        onChange={(event) => {
+                          const transcript = event.target.value;
+                          voiceTranscriptRef.current = transcript;
+                          setVoiceTranscript(transcript);
+                          parseVoiceTranscript(transcript);
+                          setVoiceError(null);
+                          if (voiceStatus === "error") setVoiceStatus("idle");
+                        }}
+                        placeholder="Tap here, then tap the microphone on the iPhone keyboard"
+                        rows={2}
+                        autoCapitalize="none"
+                        autoComplete="off"
+                        enterKeyHint="done"
+                      />
+                    </Field>
+                  </>
+                ) : null}
+              </section>
+
+              {voiceError ? (
+                <Alert variant="destructive">
+                  <AlertTriangleIcon aria-hidden />
+                  <AlertTitle>Could not listen</AlertTitle>
+                  <AlertDescription>{voiceError}</AlertDescription>
+                </Alert>
+              ) : null}
+            </TabsContent>
+
+            <TabsContent value="number">
+              <div className="flex flex-col gap-1 px-2 py-3 text-center">
+                <h2 className="text-lg font-semibold">Type the large number on the label</h2>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  Leading zeros are automatic. Type 23 and the system checks in 0023.
+                </p>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="camera" className="flex flex-col gap-3">
+              <div className="relative overflow-hidden rounded-xl border-2 border-foreground bg-foreground text-background">
+                <video
+                  ref={videoRef}
+                  aria-label="Live rear-camera preview"
+                  autoPlay
+                  muted
+                  playsInline
+                  onLoadedMetadata={(event) => updateCameraFrame(event.currentTarget)}
+                  className="aspect-[3/4] w-full object-cover sm:aspect-video"
+                />
+                {cameraStatus === "scanning" ? (
+                  <>
+                    <CameraDetectionOverlay detections={cameraDetections} frame={cameraFrame} />
+                    <div className="pointer-events-none absolute inset-[11%] rounded-xl border-2 border-background/80" aria-hidden />
+                    <Badge className="absolute left-3 top-3" variant="secondary">
+                      <span className="size-2 rounded-full bg-primary" aria-hidden />
+                      Camera on
+                    </Badge>
+                  </>
+                ) : (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-foreground/85 p-6 text-center">
+                    <CameraIcon className="size-10" aria-hidden />
+                    <div className="flex max-w-sm flex-col gap-1">
+                      <strong>{cameraStatus === "starting" ? "Starting camera..." : "Camera paused"}</strong>
+                      <span className="text-sm text-background/75">
+                        Point the rear camera at a QR code, Data Matrix code, or barcode.
+                      </span>
+                    </div>
+                    {cameraStatus !== "starting" ? (
+                      <Button variant="secondary" onClick={() => setCameraRequested(true)}>
+                        <CameraIcon data-icon="inline-start" />
+                        {cameraStatus === "error" ? "Try camera again" : "Start camera"}
+                      </Button>
+                    ) : null}
+                  </div>
+                )}
+              </div>
+
+              {cameraError ? (
+                <Alert variant="destructive">
+                  <AlertTriangleIcon aria-hidden />
+                  <AlertTitle>Camera unavailable</AlertTitle>
+                  <AlertDescription>{cameraError}</AlertDescription>
+                </Alert>
+              ) : null}
+            </TabsContent>
+          </Tabs>
 
           <p className="sr-only" aria-live="polite">
             {lastScan ? `${lastScan.assetTag} checked into ${selectedLocation.name}.` : "Scanner ready."}
           </p>
 
-          <div className="flex flex-col gap-2">
-            <Button variant="ghost" onClick={() => setManualEntryOpen((current) => !current)} aria-expanded={manualEntryOpen}>
-              <KeyboardIcon data-icon="inline-start" />
-              Enter an asset tag instead
-            </Button>
-            {manualEntryOpen ? (
-              <form className="swell-panel flex flex-col gap-3 p-4" onSubmit={submitManualAsset}>
+          {entryMode !== "voice" ? (
+            <section className="swell-panel overflow-hidden" aria-labelledby="session-scans-heading">
+              <div className="flex items-center justify-between gap-3 p-4 sm:px-5">
+                <h2 className="font-semibold" id="session-scans-heading">This session</h2>
+                <Badge variant="outline">{scannedItems.length}</Badge>
+              </div>
+              <Separator />
+              {scannedItems.length ? (
+                <ol className="divide-y">
+                  {[...scannedItems].reverse().slice(0, 6).map((item) => (
+                    <li className="flex items-start gap-3 p-4 sm:px-5" key={item.checkInId}>
+                      <CheckCircle2Icon className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
+                      <span className="min-w-0 flex-1">
+                        <strong className="block truncate font-semibold">{item.assetTag}</strong>
+                        <span className="block truncate text-sm text-muted-foreground">{item.label}</span>
+                      </span>
+                      <span className="text-xs text-muted-foreground">{formatScanTime(item.checkedInAt)}</span>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <Empty className="border-0 py-8">
+                  <EmptyHeader>
+                    <EmptyTitle>No gear checked in yet</EmptyTitle>
+                    <EmptyDescription>
+                      {entryMode === "number"
+                        ? "Type the first label number below."
+                        : "Hold one code inside the frame until you hear the confirmation tone."}
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              )}
+            </section>
+          ) : null}
+
+          {entryMode === "voice" ? (
+            <div className="sticky bottom-2 z-10 overflow-hidden rounded-xl border-2 border-foreground bg-card shadow-md">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 p-3">
+                {directVoiceAvailable ? (
+                  <Button
+                    type="button"
+                    size="lg"
+                    variant={voiceStatus === "listening" ? "secondary" : "default"}
+                    className="min-h-14"
+                    onClick={voiceStatus === "listening" ? stopVoiceRecognition : startVoiceRecognition}
+                    disabled={voiceStatus === "processing"}
+                  >
+                    {voiceStatus === "listening" ? (
+                      <StopCircleIcon data-icon="inline-start" className="size-6" />
+                    ) : (
+                      <MicIcon data-icon="inline-start" className="size-6" />
+                    )}
+                    {voiceStatus === "listening"
+                      ? "Stop listening"
+                      : voiceStatus === "processing"
+                        ? "Stopping..."
+                        : "Start listening"}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    size="lg"
+                    className="min-h-14"
+                    onClick={() => voiceInputRef.current?.focus()}
+                  >
+                    <MicIcon data-icon="inline-start" className="size-6" />
+                    Start dictation
+                  </Button>
+                )}
+                <Button type="button" size="lg" variant="outline" className="min-h-14 px-5" onClick={finishSession}>
+                  <SquareIcon data-icon="inline-start" />
+                  Exit
+                </Button>
+              </div>
+              <div className="flex items-center justify-between gap-3 bg-muted/35 px-3 py-2 text-sm">
+                <strong className="truncate">{selectedLocation.name}</strong>
+                <span className="shrink-0 text-muted-foreground">{scannedItems.length} checked in</span>
+              </div>
+            </div>
+          ) : (
+            <div className="sticky bottom-2 overflow-hidden rounded-xl border-2 border-foreground bg-card shadow-md">
+              <form className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 p-3" onSubmit={submitManualAsset}>
                 <Field>
-                  <FieldLabel htmlFor="manual-scanner-asset-tag">Asset tag</FieldLabel>
+                  <FieldLabel htmlFor="manual-scanner-asset-tag">Quick number entry</FieldLabel>
                   <Input
+                    ref={manualInputRef}
                     id="manual-scanner-asset-tag"
                     value={manualAssetTag}
-                    onChange={(event) => setManualAssetTag(event.target.value)}
-                    placeholder="XLR-04-10"
-                    autoCapitalize="characters"
+                    onChange={(event) => setManualAssetTag(event.target.value.replace(/\D/g, "").slice(0, 4))}
+                    placeholder="click here to enter number"
                     autoComplete="off"
-                    disabled={manualSubmitting}
+                    enterKeyHint="done"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={4}
+                    className="h-14 border-2 px-4 font-mono text-2xl tracking-[0.14em] md:text-2xl"
                   />
-                  <FieldDescription>Enter the code printed beneath the barcode.</FieldDescription>
+                  <FieldDescription>
+                    {normalizedManualAssetTag
+                      ? `Will check in ${normalizedManualAssetTag}`
+                      : manualSubmitting
+                        ? `${manualPendingCount} check-in${manualPendingCount === 1 ? "" : "s"} saving`
+                        : "Enter 1 to 4 digits"}
+                  </FieldDescription>
                 </Field>
-                <Button type="submit" disabled={manualSubmitting || !manualAssetTag.trim()}>
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="mt-6 min-h-14 min-w-28"
+                  disabled={!normalizedManualAssetTag}
+                >
                   <MapPinCheckIcon data-icon="inline-start" />
-                  {manualSubmitting ? "Checking in..." : "Check in tag"}
+                  Enter
                 </Button>
               </form>
-            ) : null}
-          </div>
-
-          <section className="swell-panel overflow-hidden" aria-labelledby="session-scans-heading">
-            <div className="flex items-center justify-between gap-3 p-4 sm:px-5">
-              <h2 className="font-semibold" id="session-scans-heading">This session</h2>
-              <Badge variant="outline">{scannedItems.length}</Badge>
+              <Separator />
+              <div className="flex items-center gap-3 bg-muted/35 px-3 py-2.5">
+                <span className="min-w-0 flex-1 text-sm">
+                  <strong className="block truncate">{selectedLocation.name}</strong>
+                  <span className="text-muted-foreground">{scannedItems.length} checked in</span>
+                </span>
+                <Button size="sm" variant="ghost" onClick={finishSession}>
+                  <SquareIcon data-icon="inline-start" />
+                  {scannedItems.length ? "Done" : "Cancel"}
+                </Button>
+              </div>
             </div>
-            <Separator />
-            {scannedItems.length ? (
-              <ol className="divide-y">
-                {[...scannedItems].reverse().slice(0, 6).map((item) => (
-                  <li className="flex items-start gap-3 p-4 sm:px-5" key={item.checkInId}>
-                    <CheckCircle2Icon className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
-                    <span className="min-w-0 flex-1">
-                      <strong className="block truncate font-semibold">{item.assetTag}</strong>
-                      <span className="block truncate text-sm text-muted-foreground">{item.label}</span>
-                    </span>
-                    <span className="text-xs text-muted-foreground">{formatScanTime(item.checkedInAt)}</span>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <Empty className="border-0 py-8">
-                <EmptyHeader>
-                  <EmptyTitle>No labels scanned yet</EmptyTitle>
-                  <EmptyDescription>Hold one label inside the frame until you hear the confirmation tone.</EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            )}
-          </section>
-
-          <div className="sticky bottom-2 flex items-center gap-3 rounded-xl border-2 border-foreground bg-card p-3 shadow-md">
-            <span className="min-w-0 flex-1 text-sm">
-              <strong className="block truncate">{selectedLocation.name}</strong>
-              <span className="text-muted-foreground">{scannedItems.length} checked in</span>
-            </span>
-            <Button onClick={finishSession}>
-              <SquareIcon data-icon="inline-start" />
-              {scannedItems.length ? "Done" : "Cancel"}
-            </Button>
-          </div>
+          )}
         </section>
       </GearShell>
     );
@@ -956,7 +1449,7 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
               <p className="swell-page-kicker">Multi-item check-in</p>
               <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Where is this gear going?</h1>
               <p className="max-w-lg text-sm leading-6 text-muted-foreground sm:text-base">
-                Choose one destination, then scan as many QR codes or barcodes as you need.
+                Choose one destination, then speak, type, or scan as many labels as you need.
               </p>
             </div>
             <ScanLineIcon className="mt-1 size-7 shrink-0 text-primary" aria-hidden />
@@ -1082,11 +1575,11 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
         <Separator />
         <div className="flex flex-col gap-2 bg-muted/35 p-4 sm:p-5">
           <Button size="lg" className="w-full" onClick={() => void beginSession()} disabled={!selectedLocation || Boolean(loadError)}>
-            <CameraIcon data-icon="inline-start" />
-            {selectedLocation ? `Start scanning into ${selectedLocation.name}` : "Choose a location"}
+            <ScanLineIcon data-icon="inline-start" />
+            {selectedLocation ? `Start check-in to ${selectedLocation.name}` : "Choose a location"}
           </Button>
           <p className="text-center text-xs text-muted-foreground">
-            Your browser will ask for camera permission. Video stays on this device.
+            Voice uses the microphone. Number entry works with no permissions.
           </p>
         </div>
       </section>

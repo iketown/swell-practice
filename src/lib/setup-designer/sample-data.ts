@@ -30,12 +30,13 @@ function samplePorts(
   }));
 }
 
-function template(input: Omit<EquipmentTemplate, "version" | "status" | "showPortNumbers" | "showPortLabels" | "ownedUnits" | "referenceImages" | "equipmentKind"> & Partial<Pick<EquipmentTemplate, "showPortNumbers" | "showPortLabels" | "ownedUnits" | "referenceImages" | "equipmentKind">>): EquipmentTemplate {
+function template(input: Omit<EquipmentTemplate, "version" | "status" | "showInSignalView" | "showPortNumbers" | "showPortLabels" | "referenceImages" | "equipmentKind" | "definitionKind"> & Partial<Pick<EquipmentTemplate, "showInSignalView" | "showPortNumbers" | "showPortLabels" | "referenceImages" | "equipmentKind" | "definitionKind">>): EquipmentTemplate {
   return {
     ...input,
+    definitionKind: input.definitionKind ?? "equipment",
+    showInSignalView: input.showInSignalView ?? input.ports.length > 0,
     showPortNumbers: input.showPortNumbers ?? true,
     showPortLabels: input.showPortLabels ?? true,
-    ownedUnits: input.ownedUnits ?? [],
     referenceImages: input.referenceImages ?? [],
     equipmentKind: input.equipmentKind ?? "device",
     version: 1,
@@ -51,11 +52,6 @@ export const SAMPLE_EQUIPMENT_TEMPLATES: EquipmentTemplate[] = [
     model: "SM58",
     category: "Microphone",
     ports: samplePorts("vocal-mic", "output", 1, "xlr", "male", "microphone", "Output"),
-    ownedUnits: [
-      { id: "sm58-1", label: "SM58 #1" },
-      { id: "sm58-2", label: "SM58 #2" },
-      { id: "sm58-3", label: "SM58 #3" },
-    ],
   }),
   template({
     id: "template-kick-mic",
@@ -97,7 +93,6 @@ export const SAMPLE_EQUIPMENT_TEMPLATES: EquipmentTemplate[] = [
       ...samplePorts("guitar-di", "input", 1, "quarter-ts", "female", "instrument", "Instrument in"),
       ...samplePorts("guitar-di", "output", 1, "xlr", "male", "microphone", "Balanced out"),
     ],
-    ownedUnits: [{ id: "jdi-1", label: "Radial JDI #1" }],
   }),
   template({
     id: "template-bass",
@@ -113,7 +108,6 @@ export const SAMPLE_EQUIPMENT_TEMPLATES: EquipmentTemplate[] = [
       ...samplePorts("bass-di", "input", 1, "quarter-ts", "female", "instrument", "Instrument in"),
       ...samplePorts("bass-di", "output", 1, "xlr", "male", "microphone", "Balanced out"),
     ],
-    ownedUnits: [{ id: "bass-di-1", label: "Bass D.I. #1" }],
   }),
   template({
     id: "template-stage-box",
@@ -145,7 +139,20 @@ export const SAMPLE_EQUIPMENT_TEMPLATES: EquipmentTemplate[] = [
       const directionIndex = directionPorts.findIndex((item) => item.id === port.id);
       return { ...port, number: directionIndex + 1 };
     }),
-    ownedUnits: [{ id: "x32-main", label: "The Swell X32" }],
+  }),
+  template({
+    id: "template-microphone-stand",
+    name: "Microphone stand",
+    category: "Stand",
+    ports: [],
+    showInSignalView: false,
+  }),
+  template({
+    id: "template-guitar-stand",
+    name: "Guitar stand",
+    category: "Stand",
+    ports: [],
+    showInSignalView: false,
   }),
 ];
 
@@ -161,9 +168,12 @@ export function nodeFromTemplate(templateValue: EquipmentTemplate, id: string, x
       category: templateValue.category,
       equipmentKind: templateValue.equipmentKind,
       transport: templateValue.transport ? structuredClone(templateValue.transport) : undefined,
+      physicalDimensions: templateValue.physicalDimensions ? structuredClone(templateValue.physicalDimensions) : undefined,
       notes: templateValue.notes,
       image: templateValue.image,
+      stageImage: templateValue.stageImage,
       ports: structuredClone(templateValue.ports),
+      showInSignalView: templateValue.showInSignalView,
       showPortNumbers: templateValue.showPortNumbers,
       showPortLabels: templateValue.showPortLabels,
       isExpanded: false,
@@ -229,7 +239,7 @@ const sampleMetadata: SetupMetadata = {
   name: "Live vocal patch",
   description: "A starting example for microphones, stage box, and the X32.",
   status: "active",
-  graphSchemaVersion: 1,
+  graphSchemaVersion: 2,
   revision: 1,
   nodeCount: sampleNodes.length,
   cableCount: sampleEdges.length,
@@ -239,11 +249,18 @@ const sampleMetadata: SetupMetadata = {
 export const SAMPLE_SETUP_WORKSPACE: SetupWorkspace = {
   metadata: sampleMetadata,
   graph: {
-    schemaVersion: 1,
+    schemaVersion: 2,
     revision: 1,
     nodes: sampleNodes,
     edges: sampleEdges,
     viewport: { x: 10, y: 10, zoom: 0.7 },
+    stage: {
+      widthFeet: 40,
+      depthFeet: 24,
+      viewport: { x: 56, y: 80, zoom: 0.72 },
+      areas: [],
+      waypoints: [],
+    },
   },
 };
 

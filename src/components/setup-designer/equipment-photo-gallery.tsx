@@ -168,7 +168,7 @@ export function EquipmentPhotoGallery({ template, pendingFiles, onPendingFilesCh
         <span className="text-xs text-muted-foreground">JPEG, PNG, or WebP, up to 10 MB each · {remainingSlots} slots available</span>
       </div>
 
-      <FieldDescription>These reusable reference photos do not replace the square stage icon. Future owned-asset photos will appear here as a separate source.</FieldDescription>
+      <FieldDescription>These reusable product and port photos stay separate from the final SIGNAL and STAGE crops, but either image editor can use them as a source.</FieldDescription>
       {error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}
     </FieldGroup>
   );

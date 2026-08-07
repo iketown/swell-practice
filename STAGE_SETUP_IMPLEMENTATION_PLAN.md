@@ -1,12 +1,14 @@
 # Stage / Setup Designer Implementation Plan
 
-Status: Ready to implement
+Status: Signal foundation shipped; linked STAGE first slice shipped 2026-08-06
 
 Date: 2026-08-02
 
 Source requirements: `PRD.md`, Section 17
 
 Scope update, 2026-08-03: PRD Section 18 extends this foundation into a scaled Stage Plot and individually tagged Gear Tracker. Section 18 supersedes this file where it previously assumed approximate-only placement, quantity-only cable inventory, or a single undifferentiated equipment image. The working signal-editor foundation remains valid.
+
+Implementation update, 2026-08-06: the setup workspace now switches between linked `SIGNAL` and `STAGE` views. Schema v2 persists separate signal and stage positions/viewports, exact physical footprints, arbitrary rotation, shared physical input/output anchors, stage-only visibility, separate cropped overhead images, shared cord waypoints, ordered orthogonal routes, vertical drops, service slack, and measured cable requirements. The resting plot is rider-clean: only scaled objects and cord paths remain visible until a node is rolled over, focused, or selected. PRD Section 18.2 and 18.3 track the remaining grouping, direct resizing, corridor offsets, PDF export, and shortage-matching work.
 
 ## 1. Outcome
 

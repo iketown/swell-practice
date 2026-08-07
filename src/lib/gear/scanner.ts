@@ -1,4 +1,4 @@
-import { canonicalizeAssetTag } from "@/lib/gear/domain";
+import { canonicalizeAssetTag, normalizeInventoryAssetCode } from "@/lib/gear/domain";
 
 const GEAR_PATH = /^\/g\/([^/?#]+)\/?$/i;
 
@@ -27,6 +27,10 @@ export function assetTagFromScannedValue(value: string) {
     } catch {
       return "";
     }
+  }
+
+  if (/^\d{1,4}$/.test(trimmed)) {
+    return normalizeInventoryAssetCode(trimmed);
   }
 
   return canonicalizeAssetTag(trimmed);

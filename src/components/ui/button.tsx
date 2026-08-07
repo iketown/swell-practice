@@ -16,6 +16,8 @@ const buttonVariants = cva(
         ghost: "border-transparent bg-transparent shadow-none hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
         destructive:
           "bg-destructive text-destructive-foreground shadow-md hover:translate-y-px hover:bg-destructive/90 hover:shadow-sm",
+        success:
+          "border-foreground bg-[var(--swell-success)] text-foreground shadow-md hover:translate-y-px hover:bg-[color-mix(in_oklch,var(--swell-success)_84%,var(--foreground))] hover:shadow-sm",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {

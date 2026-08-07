@@ -20,6 +20,34 @@ export type CheckInMethod =
   | "manual"
   | "qr";
 
+export const MAX_INVENTORY_TAGS = 12;
+export const MAX_INVENTORY_TAG_LENGTH = 32;
+export const MAX_ASSET_PURCHASE_URL_LENGTH = 2048;
+export const CABLE_INVENTORY_TAG = "Cables";
+export const INVENTORY_ASSET_CODE_LENGTH = 4;
+export const INVENTORY_ASSET_CODE_SCHEME_VERSION = 2;
+export const INVENTORY_ASSET_CODE_STARTS = {
+  cable: 1,
+  microphone: 100,
+  stand: 200,
+  instrument: 300,
+  pedal: 400,
+  rack: 500,
+  general: 600,
+} as const;
+export type InventoryAssetCodeGroup = keyof typeof INVENTORY_ASSET_CODE_STARTS;
+const INVENTORY_ASSET_CODE_ENDS: Record<InventoryAssetCodeGroup, number> = {
+  cable: 99,
+  microphone: 199,
+  stand: 299,
+  instrument: 399,
+  pedal: 499,
+  rack: 599,
+  general: 9999,
+};
+export const CABLE_COLOR_OPTIONS = ["black", "grey", "white", "blue", "purple", "red", "green", "orange", "yellow"] as const;
+export type CableColor = (typeof CABLE_COLOR_OPTIONS)[number];
+
 export interface GearParty {
   id: string;
   name: string;
@@ -48,12 +76,20 @@ export interface PublicGearAsset {
 export interface InventoryAsset {
   id: string;
   assetTag: string;
+  assetCodeGroup?: InventoryAssetCodeGroup;
+  assetCodeVersion?: number;
   definitionId: string;
   label: string;
+  cableManufacturer?: string;
+  cableLengthInches?: number;
+  cableColor?: CableColor;
   lifecycleStatus: InventoryAssetLifecycle;
+  stageOnly: boolean;
+  tags: string[];
   ownerPartyId?: string;
   currentLocationId?: string;
   serialNumber?: string;
+  purchaseUrl?: string;
   notes?: string;
   photos: EquipmentImage[];
   sourceSetupId?: string;
@@ -174,6 +210,148 @@ export function normalizeGearSearchText(value: string) {
     .replace(/[^A-Z0-9]/g, "");
 }
 
+export function normalizeInventoryTags(values: Iterable<string>) {
+  const tags: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const normalizedTag = value.trim().replace(/\s+/g, " ");
+    const tag = normalizedTag.toLocaleLowerCase() === CABLE_INVENTORY_TAG.toLocaleLowerCase()
+      ? CABLE_INVENTORY_TAG
+      : normalizedTag;
+    if (!tag || tag.length > MAX_INVENTORY_TAG_LENGTH) continue;
+    const key = tag.toLocaleLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    tags.push(tag);
+  }
+  return tags;
+}
+
+export function isCableInventoryAsset(asset: Pick<InventoryAsset, "tags">) {
+  const cableTagKey = CABLE_INVENTORY_TAG.toLocaleLowerCase();
+  return asset.tags.some((tag) => tag.trim().toLocaleLowerCase() === cableTagKey);
+}
+
+export function normalizeCableColor(value: unknown): CableColor | undefined {
+  return typeof value === "string" && CABLE_COLOR_OPTIONS.includes(value.toLocaleLowerCase() as CableColor)
+    ? value.toLocaleLowerCase() as CableColor
+    : undefined;
+}
+
+export function cableColorLabel(value: CableColor) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+export function normalizeAssetPurchaseUrl(value: unknown) {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > MAX_ASSET_PURCHASE_URL_LENGTH) return undefined;
+  try {
+    const url = new URL(trimmed);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function normalizeCableLengthInches(value: unknown) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return undefined;
+  return Math.round(value * 1000) / 1000;
+}
+
+export function formatCableLength(value: unknown) {
+  const normalized = normalizeCableLengthInches(value);
+  if (!normalized) return "";
+
+  const rounded = Math.round(normalized * 100) / 100;
+  if (rounded < 12) return `${formatMeasurement(rounded)}\"`;
+
+  let feet = Math.floor(rounded / 12);
+  let inches = Math.round((rounded - feet * 12) * 100) / 100;
+  if (inches >= 12) {
+    feet += 1;
+    inches = 0;
+  }
+  return inches ? `${feet}' ${formatMeasurement(inches)}\"` : `${feet}'`;
+}
+
+export function formatCableAssetLabel(label: string, cableLengthInches: unknown) {
+  const trimmedLabel = label.trim();
+  const formattedLength = formatCableLength(cableLengthInches);
+  if (!formattedLength || trimmedLabel === formattedLength || trimmedLabel.startsWith(`${formattedLength} `)) return trimmedLabel;
+  return `${formattedLength} ${trimmedLabel}`;
+}
+
+function formatMeasurement(value: number) {
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value);
+}
+
+export function isInventoryAssetCode(value: string) {
+  const code = value.trim();
+  return /^\d{4}$/.test(code) && code !== "0000";
+}
+
+export function normalizeInventoryAssetCode(value: string) {
+  const digits = value.trim();
+  if (!/^\d{1,4}$/.test(digits)) return "";
+  const code = digits.padStart(INVENTORY_ASSET_CODE_LENGTH, "0");
+  return code === "0000" ? "" : code;
+}
+
+export function createInventoryAssetCode(
+  existingCodes: Iterable<string>,
+  group: InventoryAssetCodeGroup = "general",
+) {
+  const used = new Set(
+    Array.from(existingCodes, (value) => value.trim()).filter(isInventoryAssetCode),
+  );
+  for (let value = INVENTORY_ASSET_CODE_STARTS[group]; value <= INVENTORY_ASSET_CODE_ENDS[group]; value += 1) {
+    const code = String(value).padStart(INVENTORY_ASSET_CODE_LENGTH, "0");
+    if (!used.has(code)) return code;
+  }
+  if (group !== "general") {
+    for (let value = INVENTORY_ASSET_CODE_STARTS.general; value <= INVENTORY_ASSET_CODE_ENDS.general; value += 1) {
+      const code = String(value).padStart(INVENTORY_ASSET_CODE_LENGTH, "0");
+      if (!used.has(code)) return code;
+    }
+  }
+  throw new Error("No four-digit inventory IDs remain.");
+}
+
+export function inferInventoryAssetCodeGroup(input: {
+  isCable?: boolean;
+  label?: string;
+  tags?: Iterable<string>;
+  definitionName?: string;
+  definitionCategory?: string;
+}): InventoryAssetCodeGroup {
+  if (input.isCable) return "cable";
+  const searchable = [
+    input.label,
+    input.definitionName,
+    input.definitionCategory,
+    ...Array.from(input.tags ?? []),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase();
+
+  if (/\b(stand|stands|tripod|tripods|boom|booms)\b/.test(searchable)) return "stand";
+  if (/\b(mic|mics|microphone|microphones)\b/.test(searchable)) return "microphone";
+  if (/\b(pedal|pedals|stompbox|stompboxes|footswitch|footswitches)\b/.test(searchable)) return "pedal";
+  if (/\b(instrument|instruments|guitar|guitars|bass|basses|keyboard|keyboards|piano|pianos|synth|synthesizer|synthesizers|drum|drums|cymbal|cymbals|sax|saxophone|saxophones|trumpet|trumpets|trombone|trombones|horn|horns|violin|violins|cello|cellos|accordion|accordions|percussion)\b/.test(searchable)) return "instrument";
+  if (/\b(rack|racks|mixer|mixers|console|consoles|stage box|stage boxes|direct box|direct boxes|di|wireless|receiver|receivers|transmitter|transmitters|processor|processors|interface|interfaces|amplifier|amplifiers|amp|amps|preamp|preamps|compressor|compressors|equalizer|equalizers|power conditioner|power conditioners)\b/.test(searchable)) return "rack";
+  return "general";
+}
+
+export function normalizeInventoryAssetCodeGroup(value: unknown): InventoryAssetCodeGroup | undefined {
+  return typeof value === "string" && value in INVENTORY_ASSET_CODE_STARTS
+    ? value as InventoryAssetCodeGroup
+    : undefined;
+}
+
 export function canonicalizeAssetTag(value: string) {
   const normalized = value
     .normalize("NFKD")
@@ -187,36 +365,4 @@ export function canonicalizeAssetTag(value: string) {
   const sequence = structured[2].padStart(2, "0");
   const detail = structured[3]?.padStart(2, "0");
   return `${structured[1]}-${sequence}${detail ? `-${detail}` : ""}`;
-}
-
-export function isStandardAssetTag(value: string) {
-  return /^[A-Z]{3}-\d{2,}(?:-\d{2})?$/.test(canonicalizeAssetTag(value));
-}
-
-export function assetTagPrefix(itemName: string) {
-  const normalized = itemName
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "");
-  const tokens = normalized.split(/[^A-Za-z0-9]+/).filter(Boolean);
-  const exactCode = tokens.find((token) => /^[A-Z]{3}$/.test(token));
-  if (exactCode) return exactCode;
-  const shortCodeIndex = tokens.findIndex((token) => /^[A-Z]{2}$/.test(token));
-  if (shortCodeIndex >= 0) {
-    const nextLetter = tokens.slice(shortCodeIndex + 1).join("").match(/[A-Za-z]/)?.[0];
-    if (nextLetter) return `${tokens[shortCodeIndex]}${nextLetter}`.toUpperCase();
-  }
-  const letters = normalized.toUpperCase().replace(/[^A-Z]/g, "");
-  return (letters.slice(0, 3) || "GEA").padEnd(3, "X");
-}
-
-export function createAssetTag(itemName: string, existingTags: Iterable<string> = []) {
-  const prefix = assetTagPrefix(itemName);
-  const matchingTag = new RegExp(`^${prefix}-(\\d+)(?:-\\d{2})?$`, "i");
-  let highestSequence = 0;
-  for (const existingTag of existingTags) {
-    const match = canonicalizeAssetTag(existingTag).match(matchingTag);
-    if (!match) continue;
-    highestSequence = Math.max(highestSequence, Number(match[1]));
-  }
-  return `${prefix}-${String(highestSequence + 1).padStart(2, "0")}`;
 }

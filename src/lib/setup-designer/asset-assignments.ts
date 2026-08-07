@@ -1,4 +1,4 @@
-import type { SetupNode } from "@/lib/setup-designer/domain";
+import type { CableEdge, SetupNode } from "@/lib/setup-designer/domain";
 
 export interface AssetAssignment {
   assetId: string;
@@ -13,6 +13,13 @@ export interface DuplicateAssetAssignment {
   assetLabel?: string;
   first: AssetAssignment;
   second: AssetAssignment;
+}
+
+export interface DuplicateCableAssetAssignment {
+  assetId: string;
+  assetLabel?: string;
+  firstEdgeId: string;
+  secondEdgeId: string;
 }
 
 export function findAssetAssignment(
@@ -63,4 +70,27 @@ export function findDuplicateAssetAssignment(nodes: readonly SetupNode[]): Dupli
 export function duplicateAssetAssignmentMessage(conflict: DuplicateAssetAssignment) {
   const assetName = conflict.assetLabel || conflict.first.assetLabel || conflict.assetId;
   return `${assetName} is already assigned to ${conflict.first.nodeName}. Each physical or planned asset can fulfill only one item in a setup.`;
+}
+
+export function findDuplicateCableAssetAssignment(edges: readonly CableEdge[]): DuplicateCableAssetAssignment | undefined {
+  const assignments = new Map<string, { edgeId: string; assetLabel?: string }>();
+  for (const edge of edges) {
+    const assetId = edge.data.fulfillment === "owned" ? edge.data.assignedInventoryAssetId : undefined;
+    if (!assetId) continue;
+    const first = assignments.get(assetId);
+    if (first) {
+      return {
+        assetId,
+        assetLabel: edge.data.assignedInventoryLabel ?? first.assetLabel,
+        firstEdgeId: first.edgeId,
+        secondEdgeId: edge.id,
+      };
+    }
+    assignments.set(assetId, { edgeId: edge.id, assetLabel: edge.data.assignedInventoryLabel });
+  }
+  return undefined;
+}
+
+export function duplicateCableAssetAssignmentMessage(conflict: DuplicateCableAssetAssignment) {
+  return `${conflict.assetLabel || conflict.assetId} is assigned to more than one cable run. Each tagged cable can fulfill only one run in a setup.`;
 }

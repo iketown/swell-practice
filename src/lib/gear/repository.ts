@@ -18,16 +18,26 @@ import { sanitizeFilename } from "@/lib/domain";
 import { db, hasFirebaseConfig, storage } from "@/lib/firebase";
 import {
   canonicalizeAssetTag,
-  createAssetTag,
+  createInventoryAssetCode,
   createGearId,
-  isStandardAssetTag,
+  inferInventoryAssetCodeGroup,
+  isCableInventoryAsset,
+  isInventoryAssetCode,
   lifecycleForOrderStatus,
+  MAX_INVENTORY_TAGS,
+  INVENTORY_ASSET_CODE_SCHEME_VERSION,
+  normalizeAssetPurchaseUrl,
+  normalizeCableColor,
+  normalizeCableLengthInches,
+  normalizeInventoryAssetCodeGroup,
+  normalizeInventoryTags,
   type CheckInMethod,
   type GearLocation,
   type GearLocationKind,
   type GearParty,
   type GearPartyKind,
   type InventoryAsset,
+  type InventoryAssetCodeGroup,
   type InventoryAssetLifecycle,
   type InventoryCheckIn,
   type PaymentStatus,
@@ -36,9 +46,19 @@ import {
   type PurchaseOrderLine,
   type PurchaseOrderStatus,
 } from "@/lib/gear/domain";
-import type { EquipmentImage } from "@/lib/setup-designer/domain";
+import type { EquipmentImage, EquipmentTemplate } from "@/lib/setup-designer/domain";
+import { listEquipmentTemplates } from "@/lib/setup-designer/repository";
 
 const DEMO_STORE_KEY = "swell-parts:gear:v1";
+const INVENTORY_CODE_GROUP_ORDER: InventoryAssetCodeGroup[] = [
+  "microphone",
+  "stand",
+  "instrument",
+  "pedal",
+  "rack",
+  "general",
+  "cable",
+];
 
 interface GearDemoStore {
   parties: GearParty[];
@@ -51,12 +71,19 @@ interface GearDemoStore {
 export interface InventoryAssetInput {
   id?: string;
   assetTag?: string;
+  assetCodeGroup?: InventoryAssetCodeGroup;
   definitionId: string;
   label: string;
+  cableManufacturer?: string;
+  cableLengthInches?: number;
+  cableColor?: InventoryAsset["cableColor"];
   lifecycleStatus: InventoryAssetLifecycle;
+  stageOnly?: boolean;
+  tags?: string[];
   ownerPartyId?: string;
   currentLocationId?: string;
   serialNumber?: string;
+  purchaseUrl?: string;
   notes?: string;
   sourceSetupId?: string;
   photos?: EquipmentImage[];
@@ -106,10 +133,14 @@ function seedDemoStore(): GearDemoStore {
     assets: [
       {
         id: "asset-sm58-ike-01",
-        assetTag: "SWL-SM580001",
+        assetTag: "0100",
+        assetCodeGroup: "microphone",
+        assetCodeVersion: INVENTORY_ASSET_CODE_SCHEME_VERSION,
         definitionId: "template-vocal-mic",
         label: "Ike's SM58 #1",
         lifecycleStatus: "active",
+        stageOnly: false,
+        tags: [],
         ownerPartyId: "party-ike",
         currentLocationId: "location-ike-house",
         photos: [],
@@ -118,10 +149,14 @@ function seedDemoStore(): GearDemoStore {
       },
       {
         id: "asset-radial-jdi-planned",
-        assetTag: "SWL-JDI00002",
+        assetTag: "0500",
+        assetCodeGroup: "rack",
+        assetCodeVersion: INVENTORY_ASSET_CODE_SCHEME_VERSION,
         definitionId: "template-guitar-di",
         label: "Second Radial JDI",
         lifecycleStatus: "planned",
+        stageOnly: false,
+        tags: [],
         ownerPartyId: "party-the-swell",
         notes: "Needed for the expanded live setup.",
         photos: [],
@@ -151,7 +186,15 @@ function readDemoStore() {
     return {
       parties: Array.isArray(value.parties) ? value.parties : structuredClone(DEFAULT_PARTIES),
       locations: Array.isArray(value.locations) ? value.locations : structuredClone(DEFAULT_LOCATIONS),
-      assets: Array.isArray(value.assets) ? value.assets : [],
+      assets: Array.isArray(value.assets) ? value.assets.map((asset) => ({
+        ...asset,
+        cableManufacturer: typeof asset.cableManufacturer === "string" && asset.cableManufacturer.trim() ? asset.cableManufacturer.trim() : undefined,
+        cableLengthInches: normalizeCableLengthInches(asset.cableLengthInches),
+        cableColor: normalizeCableColor(asset.cableColor),
+        purchaseUrl: normalizeAssetPurchaseUrl(asset.purchaseUrl),
+        stageOnly: asset.stageOnly === true,
+        tags: normalizeInventoryTags(asset.tags ?? []).slice(0, MAX_INVENTORY_TAGS),
+      })) : [],
       orders: Array.isArray(value.orders) ? value.orders : [],
       checkIns: Array.isArray(value.checkIns) ? value.checkIns : [],
     };
@@ -238,12 +281,24 @@ function assetFromData(id: string, value: Record<string, unknown>): InventoryAss
   return {
     id,
     assetTag: String(value.assetTag ?? id),
+    assetCodeGroup: normalizeInventoryAssetCodeGroup(value.assetCodeGroup),
+    assetCodeVersion: typeof value.assetCodeVersion === "number" && Number.isInteger(value.assetCodeVersion)
+      ? value.assetCodeVersion
+      : undefined,
     definitionId: String(value.definitionId ?? ""),
     label: String(value.label ?? "Unnamed gear"),
+    cableManufacturer: stringValue(value.cableManufacturer),
+    cableLengthInches: normalizeCableLengthInches(value.cableLengthInches),
+    cableColor: normalizeCableColor(value.cableColor),
     lifecycleStatus: lifecycleValues.includes(value.lifecycleStatus as InventoryAssetLifecycle) ? value.lifecycleStatus as InventoryAssetLifecycle : "planned",
+    stageOnly: value.stageOnly === true,
+    tags: Array.isArray(value.tags)
+      ? normalizeInventoryTags(value.tags.filter((tag): tag is string => typeof tag === "string")).slice(0, MAX_INVENTORY_TAGS)
+      : [],
     ownerPartyId: stringValue(value.ownerPartyId),
     currentLocationId: stringValue(value.currentLocationId),
     serialNumber: stringValue(value.serialNumber),
+    purchaseUrl: normalizeAssetPurchaseUrl(value.purchaseUrl),
     notes: stringValue(value.notes),
     photos: Array.isArray(value.photos) ? value.photos.flatMap((item) => {
       const image = imageFromData(item);
@@ -359,9 +414,99 @@ export async function createGearLocation(input: { name: string; kind: GearLocati
 }
 
 export async function listInventoryAssets() {
-  if (isDemoMode() || !db) return readDemoStore().assets.sort((a, b) => b.updatedAt - a.updatedAt);
-  const snapshots = await getDocs(collection(db, "inventoryAssets"));
-  return snapshots.docs.map((item) => assetFromData(item.id, item.data())).sort((a, b) => b.updatedAt - a.updatedAt);
+  const assets = isDemoMode() || !db
+    ? readDemoStore().assets
+    : (await getDocs(collection(db, "inventoryAssets"))).docs.map((item) => assetFromData(item.id, item.data()));
+  const definitions = await listEquipmentTemplates(true).catch(() => []);
+  const migrated = await assignMissingInventoryAssetCodes(assets, definitions);
+  return migrated.sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+function assetCodeGroupFor(
+  asset: InventoryAsset,
+  definitionsById: ReadonlyMap<string, EquipmentTemplate>,
+) {
+  if (asset.assetCodeVersion === INVENTORY_ASSET_CODE_SCHEME_VERSION && asset.assetCodeGroup) return asset.assetCodeGroup;
+  const definition = definitionsById.get(asset.definitionId);
+  return inferInventoryAssetCodeGroup({
+    isCable: isCableInventoryAsset(asset),
+    label: asset.label,
+    tags: asset.tags,
+    definitionName: definition?.name,
+    definitionCategory: definition?.category,
+  });
+}
+
+async function assignMissingInventoryAssetCodes(
+  assets: InventoryAsset[],
+  definitions: EquipmentTemplate[],
+) {
+  const definitionsById = new Map(definitions.map((definition) => [definition.id, definition]));
+  const usedCodes = new Set(assets
+    .filter((asset) => asset.assetCodeVersion === INVENTORY_ASSET_CODE_SCHEME_VERSION)
+    .map((asset) => asset.assetTag)
+    .filter(isInventoryAssetCode));
+  const replacements = new Map<string, { code: string; group: InventoryAssetCodeGroup }>();
+  const orderedAssets = [...assets].sort((left, right) => {
+    const leftGroup = assetCodeGroupFor(left, definitionsById);
+    const rightGroup = assetCodeGroupFor(right, definitionsById);
+    return INVENTORY_CODE_GROUP_ORDER.indexOf(leftGroup) - INVENTORY_CODE_GROUP_ORDER.indexOf(rightGroup)
+      || left.createdAt - right.createdAt
+      || left.id.localeCompare(right.id);
+  });
+
+  for (const asset of orderedAssets) {
+    const group = assetCodeGroupFor(asset, definitionsById);
+    const code = asset.assetCodeVersion === INVENTORY_ASSET_CODE_SCHEME_VERSION && isInventoryAssetCode(asset.assetTag)
+      ? asset.assetTag
+      : createInventoryAssetCode(usedCodes, group);
+    usedCodes.add(code);
+    if (code !== asset.assetTag || group !== asset.assetCodeGroup || asset.assetCodeVersion !== INVENTORY_ASSET_CODE_SCHEME_VERSION) {
+      replacements.set(asset.id, { code, group });
+    }
+  }
+  if (!replacements.size) return assets;
+
+  const migrated = assets.map((asset) => {
+    const replacement = replacements.get(asset.id);
+    return replacement ? {
+      ...asset,
+      assetTag: replacement.code,
+      assetCodeGroup: replacement.group,
+      assetCodeVersion: INVENTORY_ASSET_CODE_SCHEME_VERSION,
+    } : asset;
+  });
+  if (isDemoMode() || !db) {
+    const store = readDemoStore();
+    store.assets = store.assets.map((asset) => {
+      const replacement = replacements.get(asset.id);
+      return replacement ? {
+        ...asset,
+        assetTag: replacement.code,
+        assetCodeGroup: replacement.group,
+        assetCodeVersion: INVENTORY_ASSET_CODE_SCHEME_VERSION,
+      } : asset;
+    });
+    writeDemoStore(store);
+    return migrated;
+  }
+
+  const changedAssets = migrated.filter((asset) => replacements.has(asset.id));
+  for (let start = 0; start < changedAssets.length; start += 400) {
+    const batch = writeBatch(db);
+    for (const asset of changedAssets.slice(start, start + 400)) {
+      const replacement = replacements.get(asset.id)!;
+      batch.update(doc(db, "inventoryAssets", asset.id), {
+        assetTag: replacement.code,
+        assetCodeGroup: replacement.group,
+        assetCodeVersion: INVENTORY_ASSET_CODE_SCHEME_VERSION,
+        updatedAt: serverTimestamp(),
+      });
+    }
+    await batch.commit();
+  }
+  await syncPublicGearAssetRecords(migrated);
+  return migrated;
 }
 
 export async function getPublicGearAssetByTag(assetTag: string): Promise<PublicGearAsset | null> {
@@ -389,9 +534,19 @@ export async function getInventoryAssetByTag(assetTag: string): Promise<Inventor
 }
 
 export async function syncPublicGearAssetRecords(assets: InventoryAsset[]) {
-  if (isDemoMode() || !db || !assets.length) return;
+  if (isDemoMode() || !db) return;
   const existingSnapshots = await getDocs(collection(db, "gearPublicAssets"));
   const existing = new Map(existingSnapshots.docs.map((item) => [item.id, publicGearAssetFromData(item.data())]));
+  const currentTags = new Set(assets.map((asset) => canonicalizeAssetTag(asset.assetTag)));
+  const obsoleteSnapshots = existingSnapshots.docs.filter((item) => {
+    const storedTag = canonicalizeAssetTag(String(item.data().assetTag ?? ""));
+    return !isInventoryAssetCode(storedTag) || !currentTags.has(storedTag);
+  });
+  for (let start = 0; start < obsoleteSnapshots.length; start += 400) {
+    const batch = writeBatch(db);
+    for (const snapshot of obsoleteSnapshots.slice(start, start + 400)) batch.delete(snapshot.ref);
+    await batch.commit();
+  }
   const changed = assets.filter((asset) => {
     const stored = existing.get(publicGearAssetId(asset.assetTag));
     return !stored || stored.assetTag !== canonicalizeAssetTag(asset.assetTag) || stored.label !== asset.label;
@@ -448,12 +603,20 @@ async function uploadAssetPhoto(assetId: string, file: File, onProgress?: (progr
 function assetDocumentValue(asset: InventoryAsset) {
   return {
     assetTag: asset.assetTag,
+    assetCodeGroup: asset.assetCodeGroup ?? "general",
+    assetCodeVersion: asset.assetCodeVersion ?? INVENTORY_ASSET_CODE_SCHEME_VERSION,
     definitionId: asset.definitionId,
     label: asset.label,
+    cableManufacturer: asset.cableManufacturer ?? "",
+    cableLengthInches: asset.cableLengthInches ?? null,
+    cableColor: asset.cableColor ?? "",
     lifecycleStatus: asset.lifecycleStatus,
+    stageOnly: asset.stageOnly,
+    tags: asset.tags,
     ownerPartyId: asset.ownerPartyId ?? "",
     currentLocationId: asset.currentLocationId ?? "",
     serialNumber: asset.serialNumber ?? "",
+    purchaseUrl: asset.purchaseUrl ?? "",
     notes: asset.notes ?? "",
     photos: asset.photos,
     sourceSetupId: asset.sourceSetupId ?? "",
@@ -471,11 +634,24 @@ export async function saveInventoryAsset(
   const id = input.id ?? ((isDemoMode() || !firestore) ? createGearId("asset") : doc(collection(firestoreOrThrow(), "inventoryAssets")).id);
   const existingAssets = await listInventoryAssets();
   const previousAsset = existingAssets.find((item) => item.id === id);
-  const assetTag = canonicalizeAssetTag(input.assetTag || createAssetTag(input.label, existingAssets.map((item) => item.assetTag)));
-  const retainsLegacyTag = previousAsset && canonicalizeAssetTag(previousAsset.assetTag) === assetTag;
-  if (!retainsLegacyTag && !isStandardAssetTag(assetTag)) {
-    throw new Error("Use a three-letter ID followed by a sequence, such as HXS-01 or XLR-04-25.");
-  }
+  const tags = normalizeInventoryTags(input.tags ?? []).slice(0, MAX_INVENTORY_TAGS);
+  const isCable = isCableInventoryAsset({ tags });
+  const cableManufacturer = isCable ? input.cableManufacturer?.trim() || undefined : undefined;
+  const cableLengthInches = isCable ? normalizeCableLengthInches(input.cableLengthInches) : undefined;
+  const cableColor = isCable ? normalizeCableColor(input.cableColor) ?? "black" : undefined;
+  const purchaseUrlInput = input.purchaseUrl?.trim() ?? "";
+  const purchaseUrl = purchaseUrlInput ? normalizeAssetPurchaseUrl(purchaseUrlInput) : undefined;
+  if (isCable && !cableLengthInches) throw new Error("Enter the cable length in feet or inches.");
+  if (purchaseUrlInput && !purchaseUrl) throw new Error("Use a complete http:// or https:// purchase URL.");
+  const existingAssetTags = existingAssets.filter((item) => item.id !== id).map((item) => item.assetTag);
+  const assetCodeGroup = input.assetCodeGroup
+    ?? previousAsset?.assetCodeGroup
+    ?? inferInventoryAssetCodeGroup({ isCable, label: input.label, tags });
+  const previousCode = previousAsset && isInventoryAssetCode(previousAsset.assetTag) ? previousAsset.assetTag : "";
+  const requestedCode = isInventoryAssetCode(input.assetTag ?? "") && !existingAssetTags.includes(input.assetTag?.trim() ?? "")
+    ? input.assetTag?.trim() ?? ""
+    : "";
+  const assetTag = previousCode || requestedCode || createInventoryAssetCode(existingAssetTags, assetCodeGroup);
   const duplicate = existingAssets.find((item) => item.id !== id && canonicalizeAssetTag(item.assetTag) === assetTag);
   if (duplicate) throw new Error(`${assetTag} is already assigned to ${duplicate.label}.`);
   const uploaded: EquipmentImage[] = [];
@@ -488,19 +664,26 @@ export async function saveInventoryAsset(
   const asset: InventoryAsset = {
     id,
     assetTag,
+    assetCodeGroup,
+    assetCodeVersion: INVENTORY_ASSET_CODE_SCHEME_VERSION,
     definitionId: input.definitionId,
     label: input.label.trim(),
+    cableManufacturer,
+    cableLengthInches,
+    cableColor,
     lifecycleStatus: input.lifecycleStatus,
+    stageOnly: isCable ? false : input.stageOnly === true,
+    tags,
     ownerPartyId: input.ownerPartyId || undefined,
     currentLocationId: input.currentLocationId || undefined,
-    serialNumber: input.serialNumber?.trim() || undefined,
+    serialNumber: isCable ? undefined : input.serialNumber?.trim() || undefined,
+    purchaseUrl,
     notes: input.notes?.trim() || undefined,
     photos: [...(input.photos ?? []), ...uploaded],
     sourceSetupId: input.sourceSetupId || undefined,
     createdAt: input.createdAt ?? now,
     updatedAt: now,
   };
-  if (!asset.definitionId) throw new Error("Choose a gear definition.");
   if (!asset.label) throw new Error("Asset name is required.");
 
   if (isDemoMode() || !firestore) {
@@ -530,6 +713,65 @@ export async function saveInventoryAsset(
     console.warn("Could not update the public QR label record.", syncError);
   });
   return storedAsset;
+}
+
+export async function deleteInventoryAssets(assets: readonly InventoryAsset[]) {
+  if (!assets.length) return;
+  const deletedAssetIds = new Set(assets.map((asset) => asset.id));
+
+  if (isDemoMode() || !db) {
+    const store = readDemoStore();
+    store.assets = store.assets.filter((asset) => !deletedAssetIds.has(asset.id));
+    store.checkIns = store.checkIns.filter((checkIn) => !deletedAssetIds.has(checkIn.assetId));
+    store.orders = store.orders.flatMap((order): PurchaseOrder[] => {
+      const lines = order.lines.flatMap((line): PurchaseOrderLine[] => {
+        const assetIds = line.assetIds.filter((assetId) => !deletedAssetIds.has(assetId));
+        return assetIds.length ? [{ ...line, assetIds, quantity: assetIds.length }] : [];
+      });
+      return lines.length ? [{ ...order, lines, updatedAt: Date.now() }] : [];
+    });
+    writeDemoStore(store);
+    return;
+  }
+
+  const firestore = firestoreOrThrow();
+  const referencesToDelete: Array<ReturnType<typeof doc>> = [];
+  for (const asset of assets) {
+    const checkIns = await getDocs(collection(firestore, "inventoryAssets", asset.id, "checkIns"));
+    referencesToDelete.push(...checkIns.docs.map((snapshot) => snapshot.ref));
+    referencesToDelete.push(doc(firestore, "inventoryAssets", asset.id));
+    referencesToDelete.push(doc(firestore, "gearPublicAssets", publicGearAssetId(asset.assetTag)));
+  }
+  for (let start = 0; start < referencesToDelete.length; start += 400) {
+    const batch = writeBatch(firestore);
+    for (const reference of referencesToDelete.slice(start, start + 400)) batch.delete(reference);
+    await batch.commit();
+  }
+
+  const orderSnapshots = await getDocs(collection(firestore, "purchaseOrders"));
+  const affectedOrders = orderSnapshots.docs.flatMap((snapshot) => {
+    const order = orderFromData(snapshot.id, snapshot.data());
+    if (!order.lines.some((line) => line.assetIds.some((assetId) => deletedAssetIds.has(assetId)))) return [];
+    const lines = order.lines.flatMap((line): PurchaseOrderLine[] => {
+      const assetIds = line.assetIds.filter((assetId) => !deletedAssetIds.has(assetId));
+      return assetIds.length ? [{ ...line, assetIds, quantity: assetIds.length }] : [];
+    });
+    return [{ snapshot, order: { ...order, lines, updatedAt: Date.now() } }];
+  });
+  for (let start = 0; start < affectedOrders.length; start += 400) {
+    const batch = writeBatch(firestore);
+    for (const { snapshot, order } of affectedOrders.slice(start, start + 400)) {
+      if (!order.lines.length) {
+        batch.delete(snapshot.ref);
+      } else {
+        batch.set(snapshot.ref, {
+          ...orderDocumentValue(order),
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+      }
+    }
+    await batch.commit();
+  }
 }
 
 export async function listPurchaseOrders() {

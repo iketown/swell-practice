@@ -17,12 +17,20 @@ import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 
 import { sanitizeFilename } from "@/lib/domain";
 import { db, hasFirebaseConfig, storage } from "@/lib/firebase";
-import { duplicateAssetAssignmentMessage, findDuplicateAssetAssignment } from "@/lib/setup-designer/asset-assignments";
+import { normalizeCableDefinitionEnds } from "@/lib/setup-designer/cable-definitions";
+import {
+  duplicateAssetAssignmentMessage,
+  duplicateCableAssetAssignmentMessage,
+  findDuplicateAssetAssignment,
+  findDuplicateCableAssetAssignment,
+} from "@/lib/setup-designer/asset-assignments";
 import {
   createSetupId,
   emptySetupGraph,
+  type ConnectorSnapshot,
   type EquipmentImage,
   type EquipmentAiImport,
+  type EquipmentPhysicalDimensions,
   type EquipmentPurchaseSource,
   type EquipmentReferenceImage,
   type EquipmentTemplate,
@@ -74,15 +82,27 @@ function readDemoStore(): DemoStore {
   try {
     const parsed = JSON.parse(stored) as DemoStore;
     if (!parsed || !Array.isArray(parsed.setups) || !parsed.graphs || !Array.isArray(parsed.templates)) return seedDemoStore();
-    return {
-      ...parsed,
-      templates: parsed.templates.map((template) => ({
+    const normalizedTemplates = parsed.templates.map((template) => {
+      const ports = equipmentPortsFromData(template.ports);
+      const cableEnds = normalizeCableDefinitionEnds(template.cableEnds);
+      const definitionKind = template.definitionKind === "cable" || cableEnds ? "cable" : "equipment";
+      return {
         ...template,
+        definitionKind,
         equipmentKind: template.equipmentKind === "snake" || template.equipmentKind === "split-snake" ? template.equipmentKind : "device",
         transport: transportFromData(template.transport),
-        ports: equipmentPortsFromData(template.ports),
+        physicalDimensions: physicalDimensionsFromData(template.physicalDimensions),
+        ...(definitionKind === "cable" && cableEnds ? { cableEnds } : { cableEnds: undefined }),
+        ports: definitionKind === "cable" ? [] : ports,
+        showInSignalView: definitionKind === "cable" ? false : typeof template.showInSignalView === "boolean" ? template.showInSignalView : ports.length > 0,
         referenceImages: Array.isArray(template.referenceImages) ? template.referenceImages : [],
-      })),
+      } satisfies EquipmentTemplate;
+    });
+    const normalizedTemplateIds = new Set(normalizedTemplates.map((template) => template.id));
+    return {
+      ...parsed,
+      graphs: Object.fromEntries(Object.entries(parsed.graphs).map(([setupId, graph]) => [setupId, setupGraphFromData(graph, graph?.revision ?? 0)])),
+      templates: [...normalizedTemplates, ...SAMPLE_EQUIPMENT_TEMPLATES.filter((template) => !normalizedTemplateIds.has(template.id))],
     };
   } catch {
     return seedDemoStore();
@@ -107,7 +127,7 @@ function setupMetadataFromData(id: string, value: Record<string, unknown>): Setu
     description: typeof value.description === "string" && value.description ? value.description : undefined,
     status: value.status === "archived" ? "archived" : "active",
     sourceSetupId: typeof value.sourceSetupId === "string" ? value.sourceSetupId : undefined,
-    graphSchemaVersion: 1,
+    graphSchemaVersion: Number(value.graphSchemaVersion) === 2 ? 2 : 1,
     revision: Number(value.revision ?? 0),
     nodeCount: Number(value.nodeCount ?? 0),
     cableCount: Number(value.cableCount ?? 0),
@@ -150,6 +170,25 @@ function purchaseSourceFromData(value: unknown): EquipmentPurchaseSource | undef
     priceDisplay: typeof data.priceDisplay === "string" && data.priceDisplay ? data.priceDisplay : undefined,
     observedAt: Number(data.observedAt ?? Date.now()),
   };
+}
+
+function physicalDimensionsFromData(value: unknown): EquipmentPhysicalDimensions | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const data = value as Record<string, unknown>;
+  const positiveNumber = (candidate: unknown) => {
+    const number = Number(candidate);
+    return Number.isFinite(number) && number > 0 ? number : undefined;
+  };
+  const dimensions: EquipmentPhysicalDimensions = {
+    widthInches: positiveNumber(data.widthInches),
+    depthInches: positiveNumber(data.depthInches),
+    heightInches: positiveNumber(data.heightInches),
+    weightPounds: positiveNumber(data.weightPounds),
+    sourceText: typeof data.sourceText === "string" && data.sourceText.trim() ? data.sourceText.trim() : undefined,
+  };
+  return dimensions.widthInches || dimensions.depthInches || dimensions.heightInches || dimensions.weightPounds || dimensions.sourceText
+    ? dimensions
+    : undefined;
 }
 
 function referenceImagesFromData(value: unknown): EquipmentReferenceImage[] {
@@ -212,9 +251,12 @@ function transportFromData(value: unknown): EquipmentTransportTopology | undefin
 }
 
 function templateFromData(id: string, value: Record<string, unknown>): EquipmentTemplate {
+  const cableEnds = normalizeCableDefinitionEnds(value.cableEnds);
+  const definitionKind = value.definitionKind === "cable" || cableEnds ? "cable" : "equipment";
   return {
     id,
     name: String(value.name ?? "Untitled equipment"),
+    definitionKind,
     manufacturer: typeof value.manufacturer === "string" && value.manufacturer ? value.manufacturer : undefined,
     model: typeof value.model === "string" && value.model ? value.model : undefined,
     category: String(value.category ?? "Other"),
@@ -222,15 +264,18 @@ function templateFromData(id: string, value: Record<string, unknown>): Equipment
     transport: transportFromData(value.transport),
     description: typeof value.description === "string" && value.description ? value.description : undefined,
     notes: typeof value.notes === "string" && value.notes ? value.notes : undefined,
+    physicalDimensions: physicalDimensionsFromData(value.physicalDimensions),
     purchaseSource: purchaseSourceFromData(value.purchaseSource),
     referenceImages: referenceImagesFromData(value.referenceImages),
     aiImport: aiImportFromData(value.aiImport),
     image: imageFromData(value.image),
+    stageImage: imageFromData(value.stageImage),
     detailImages: imagesFromData(value.detailImages),
-    ports: equipmentPortsFromData(value.ports),
+    ...(definitionKind === "cable" && cableEnds ? { cableEnds } : {}),
+    ports: definitionKind === "cable" ? [] : equipmentPortsFromData(value.ports),
+    showInSignalView: definitionKind === "cable" ? false : typeof value.showInSignalView === "boolean" ? value.showInSignalView : equipmentPortsFromData(value.ports).length > 0,
     showPortNumbers: value.showPortNumbers !== false,
     showPortLabels: value.showPortLabels !== false,
-    ownedUnits: Array.isArray(value.ownedUnits) ? structuredClone(value.ownedUnits) as EquipmentTemplate["ownedUnits"] : [],
     version: Number(value.version ?? 1),
     status: value.status === "archived" ? "archived" : "active",
   };
@@ -263,7 +308,7 @@ export async function getSetupWorkspace(setupId: string): Promise<SetupWorkspace
     const store = readDemoStore();
     const metadata = store.setups.find((setup) => setup.id === setupId);
     const graph = store.graphs[setupId];
-    return metadata && graph ? { metadata: structuredClone(metadata), graph: structuredClone(graph) } : null;
+    return metadata && graph ? { metadata: structuredClone(metadata), graph: setupGraphFromData(graph, metadata.revision) } : null;
   }
   const firestore = firestoreOrThrow();
   const [metadataSnapshot, graphSnapshot] = await Promise.all([
@@ -287,7 +332,7 @@ export async function createSetup(name: string, description = "", actorId = "adm
     name: trimmedName,
     ...(description.trim() ? { description: description.trim() } : {}),
     status: "active",
-    graphSchemaVersion: 1,
+    graphSchemaVersion: 2,
     revision: 0,
     nodeCount: 0,
     cableCount: 0,
@@ -309,7 +354,7 @@ export async function createSetup(name: string, description = "", actorId = "adm
     name: metadata.name,
     description: metadata.description ?? "",
     status: "active",
-    graphSchemaVersion: 1,
+    graphSchemaVersion: 2,
     revision: 0,
     nodeCount: 0,
     cableCount: 0,
@@ -386,6 +431,8 @@ export async function saveSetupWorkspace(
   const cableCount = externalCableCount(graph.edges);
   const duplicateAsset = findDuplicateAssetAssignment(graph.nodes);
   if (duplicateAsset) throw new Error(duplicateAssetAssignmentMessage(duplicateAsset));
+  const duplicateCableAsset = findDuplicateCableAssetAssignment(graph.edges);
+  if (duplicateCableAsset) throw new Error(duplicateCableAssetAssignmentMessage(duplicateCableAsset));
   if (isDemoMode() || !db) {
     const store = readDemoStore();
     const index = store.setups.findIndex((setup) => setup.id === setupId);
@@ -395,6 +442,7 @@ export async function saveSetupWorkspace(
       ...store.setups[index],
       ...(sourceSetupId ? { sourceSetupId } : {}),
       revision: nextRevision,
+      graphSchemaVersion: graph.schemaVersion,
       nodeCount: equipmentCount,
       cableCount,
       updatedAt: Date.now(),
@@ -415,6 +463,7 @@ export async function saveSetupWorkspace(
     transaction.update(metadataRef, {
       ...(sourceSetupId ? { sourceSetupId } : {}),
       revision: nextRevision,
+      graphSchemaVersion: graph.schemaVersion,
       nodeCount: equipmentCount,
       cableCount,
       updatedBy: actorId,
@@ -423,6 +472,56 @@ export async function saveSetupWorkspace(
     transaction.set(graphRef, { ...graph, updatedAt: serverTimestamp() });
   });
   return nextRevision;
+}
+
+export async function unassignInventoryAssetsFromSetups(assetIds: Iterable<string>, actorId = "admin") {
+  const deletedAssetIds = new Set(Array.from(assetIds, (assetId) => assetId.trim()).filter(Boolean));
+  if (!deletedAssetIds.size) return 0;
+
+  const setups = await listSetups(true);
+  let updatedSetupCount = 0;
+  for (const setup of setups) {
+    const workspace = await getSetupWorkspace(setup.id);
+    if (!workspace) continue;
+    let changed = false;
+    const nodes = workspace.graph.nodes.map((node) => {
+      if (!node.data.assignedAssetId || !deletedAssetIds.has(node.data.assignedAssetId)) return node;
+      changed = true;
+      const data = { ...node.data };
+      delete data.assignedAssetId;
+      delete data.assignedAssetLabel;
+      return {
+        ...node,
+        data: {
+          ...data,
+          fulfillment: "unplanned" as const,
+        },
+      };
+    });
+    const edges = workspace.graph.edges.map((edge) => {
+      if (!edge.data.assignedInventoryAssetId || !deletedAssetIds.has(edge.data.assignedInventoryAssetId)) return edge;
+      changed = true;
+      const data = { ...edge.data };
+      delete data.assignedInventoryAssetId;
+      delete data.assignedInventoryLabel;
+      return {
+        ...edge,
+        data: {
+          ...data,
+          fulfillment: "unplanned" as const,
+        },
+      };
+    });
+    if (!changed) continue;
+    await saveSetupWorkspace(
+      setup.id,
+      { ...workspace.graph, nodes, edges },
+      workspace.metadata.revision,
+      actorId,
+    );
+    updatedSetupCount += 1;
+  }
+  return updatedSetupCount;
 }
 
 export async function listEquipmentTemplates(includeArchived = false): Promise<EquipmentTemplate[]> {
@@ -479,6 +578,7 @@ async function uploadEquipmentImage(templateId: string, file: File, onProgress?:
 function equipmentTemplateDocumentValue(template: EquipmentTemplate) {
   return {
     name: template.name,
+    definitionKind: template.definitionKind,
     manufacturer: template.manufacturer ?? "",
     model: template.model ?? "",
     category: template.category,
@@ -492,6 +592,13 @@ function equipmentTemplateDocumentValue(template: EquipmentTemplate) {
     } : null,
     description: template.description ?? "",
     notes: template.notes ?? "",
+    physicalDimensions: template.physicalDimensions ? {
+      widthInches: template.physicalDimensions.widthInches ?? null,
+      depthInches: template.physicalDimensions.depthInches ?? null,
+      heightInches: template.physicalDimensions.heightInches ?? null,
+      weightPounds: template.physicalDimensions.weightPounds ?? null,
+      sourceText: template.physicalDimensions.sourceText ?? "",
+    } : null,
     purchaseSource: template.purchaseSource ? {
       url: template.purchaseSource.url,
       vendor: template.purchaseSource.vendor ?? "",
@@ -514,7 +621,12 @@ function equipmentTemplateDocumentValue(template: EquipmentTemplate) {
       warnings: template.aiImport.warnings,
     } : null,
     image: template.image ?? null,
+    stageImage: template.stageImage ?? null,
     detailImages: template.detailImages ?? [],
+    cableEnds: template.definitionKind === "cable" && template.cableEnds ? {
+      end1: template.cableEnds.end1.map(cableConnectorDocumentValue),
+      end2: template.cableEnds.end2.map(cableConnectorDocumentValue),
+    } : null,
     ports: template.ports.map((port) => ({
       id: port.id,
       direction: port.direction,
@@ -534,14 +646,19 @@ function equipmentTemplateDocumentValue(template: EquipmentTemplate) {
     })),
     showPortNumbers: template.showPortNumbers,
     showPortLabels: template.showPortLabels,
-    ownedUnits: template.ownedUnits.map((unit) => ({
-      id: unit.id,
-      label: unit.label,
-      owner: unit.owner ?? "",
-      notes: unit.notes ?? "",
-    })),
+    showInSignalView: template.showInSignalView,
     version: template.version,
     status: template.status,
+  };
+}
+
+function cableConnectorDocumentValue(connector: ConnectorSnapshot) {
+  return {
+    typeId: connector.typeId,
+    label: connector.label,
+    gender: connector.gender,
+    specification: connector.specification ?? "",
+    acceptedCableTypeIds: connector.acceptedCableTypeIds ?? [],
   };
 }
 
@@ -557,17 +674,19 @@ export async function updateEquipmentTemplateImages(
   template: EquipmentTemplate,
   files: {
     iconFile?: File;
+    stageFile?: File;
     detailFiles?: File[];
   },
   onProgress?: (progress: number) => void,
 ) {
   const uploads = [
     ...(files.iconFile ? [{ kind: "icon" as const, file: files.iconFile }] : []),
+    ...(files.stageFile ? [{ kind: "stage" as const, file: files.stageFile }] : []),
     ...(files.detailFiles ?? []).map((file) => ({ kind: "detail" as const, file })),
   ];
   if (!uploads.length) return template;
 
-  const uploaded: Array<{ kind: "icon" | "detail"; image: EquipmentImage }> = [];
+  const uploaded: Array<{ kind: "icon" | "stage" | "detail"; image: EquipmentImage }> = [];
   for (const [index, upload] of uploads.entries()) {
     const image = await uploadEquipmentImage(template.id, upload.file, (fileProgress) => {
       onProgress?.(Math.round(((index + fileProgress / 100) / uploads.length) * 100));
@@ -576,10 +695,12 @@ export async function updateEquipmentTemplateImages(
   }
 
   const icon = uploaded.find((item) => item.kind === "icon")?.image;
+  const stageImage = uploaded.find((item) => item.kind === "stage")?.image;
   const details = uploaded.filter((item) => item.kind === "detail").map((item) => item.image);
   const updated: EquipmentTemplate = {
     ...structuredClone(template),
     ...(icon ? { image: icon } : {}),
+    ...(stageImage ? { stageImage } : {}),
     detailImages: [...(template.detailImages ?? []), ...details],
     version: template.version + 1,
   };
@@ -607,10 +728,15 @@ export async function createEquipmentTemplate(
 ) {
   const templateId = isDemoMode() || !db ? createSetupId("template") : doc(collection(firestoreOrThrow(), "equipmentTemplates")).id;
   const image = imageFile ? await uploadEquipmentImage(templateId, imageFile, onProgress) : undefined;
+  const cableEnds = input.definitionKind === "cable" ? normalizeCableDefinitionEnds(input.cableEnds) : undefined;
+  if (input.definitionKind === "cable" && !cableEnds) throw new Error("Cable definitions need at least one connector on each end.");
   const templateValue: EquipmentTemplate = {
     ...structuredClone(input),
     id: templateId,
     ...(image ? { image } : {}),
+    cableEnds,
+    ports: input.definitionKind === "cable" ? [] : structuredClone(input.ports),
+    showInSignalView: input.definitionKind === "cable" ? false : input.showInSignalView,
     version: 1,
     status: "active",
   };
@@ -636,9 +762,14 @@ export async function updateEquipmentTemplate(
   onProgress?: (progress: number) => void,
 ) {
   const image = imageFile ? await uploadEquipmentImage(template.id, imageFile, onProgress) : template.image;
+  const cableEnds = template.definitionKind === "cable" ? normalizeCableDefinitionEnds(template.cableEnds) : undefined;
+  if (template.definitionKind === "cable" && !cableEnds) throw new Error("Cable definitions need at least one connector on each end.");
   const updated: EquipmentTemplate = {
     ...structuredClone(template),
     ...(image ? { image } : {}),
+    cableEnds,
+    ports: template.definitionKind === "cable" ? [] : structuredClone(template.ports),
+    showInSignalView: template.definitionKind === "cable" ? false : template.showInSignalView,
     version: template.version + 1,
     status: "active",
   };

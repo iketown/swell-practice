@@ -4,6 +4,51 @@ export type PortDirection = "input" | "output";
 export type ConnectorGender = "male" | "female" | "none";
 export type FulfillmentStatus = "unplanned" | "owned" | "rent" | "buy";
 export type EquipmentKind = "device" | "snake" | "split-snake";
+export type GearDefinitionKind = "equipment" | "cable";
+export type SetupWorkspaceView = "signal" | "stage";
+export type StageConnectionSide = "top" | "right" | "bottom" | "left";
+
+export interface StageConnectionAnchor {
+  side: StageConnectionSide;
+  /** Position along the selected side, expressed from 0 to 1. */
+  offset: number;
+}
+
+export interface StagePosition {
+  xFeet: number;
+  yFeet: number;
+  widthFeet?: number;
+  depthFeet?: number;
+  rotationDegrees?: number;
+  inputAnchor?: StageConnectionAnchor;
+  outputAnchor?: StageConnectionAnchor;
+}
+
+export interface StageWaypoint {
+  id: string;
+  label: string;
+  position: {
+    xFeet: number;
+    yFeet: number;
+  };
+}
+
+export interface StageArea {
+  id: string;
+  label: string;
+  xFeet: number;
+  yFeet: number;
+  widthFeet: number;
+  depthFeet: number;
+}
+
+export interface StagePlan {
+  widthFeet: number;
+  depthFeet: number;
+  viewport: Viewport;
+  areas: StageArea[];
+  waypoints: StageWaypoint[];
+}
 
 export interface EquipmentTransportEndpoint {
   id: string;
@@ -25,6 +70,11 @@ export interface ConnectorSnapshot {
   gender: ConnectorGender;
   specification?: string;
   acceptedCableTypeIds?: string[];
+}
+
+export interface CableDefinitionEnds {
+  end1: ConnectorSnapshot[];
+  end2: ConnectorSnapshot[];
 }
 
 export interface EquipmentPort {
@@ -64,6 +114,19 @@ export interface EquipmentPurchaseSource {
   observedAt: number;
 }
 
+export interface EquipmentPhysicalDimensions {
+  /** Left-to-right width of the product, normalized to inches. */
+  widthInches?: number;
+  /** Front-to-back depth of the product, normalized to inches. */
+  depthInches?: number;
+  /** Bottom-to-top height of the product, normalized to inches. */
+  heightInches?: number;
+  /** Product weight normalized to pounds. */
+  weightPounds?: number;
+  /** Original dimension text retained so an administrator can verify axis interpretation. */
+  sourceText?: string;
+}
+
 export interface EquipmentAiImport {
   model: string;
   sourceUrl: string;
@@ -76,16 +139,10 @@ export interface EquipmentAiImport {
   warnings: string[];
 }
 
-export interface OwnedEquipmentUnit {
-  id: string;
-  label: string;
-  owner?: string;
-  notes?: string;
-}
-
 export interface EquipmentTemplate {
   id: string;
   name: string;
+  definitionKind: GearDefinitionKind;
   manufacturer?: string;
   model?: string;
   category: string;
@@ -93,15 +150,18 @@ export interface EquipmentTemplate {
   transport?: EquipmentTransportTopology;
   description?: string;
   notes?: string;
+  physicalDimensions?: EquipmentPhysicalDimensions;
   purchaseSource?: EquipmentPurchaseSource;
   referenceImages: EquipmentReferenceImage[];
   aiImport?: EquipmentAiImport;
   image?: EquipmentImage;
+  stageImage?: EquipmentImage;
   detailImages?: EquipmentImage[];
+  cableEnds?: CableDefinitionEnds;
   ports: EquipmentPort[];
+  showInSignalView: boolean;
   showPortNumbers: boolean;
   showPortLabels: boolean;
-  ownedUnits: OwnedEquipmentUnit[];
   version: number;
   status: "active" | "archived";
 }
@@ -114,6 +174,7 @@ export interface ImportedEquipmentDraft {
   equipmentKind: EquipmentKind;
   transport?: EquipmentTransportTopology;
   description?: string;
+  physicalDimensions?: EquipmentPhysicalDimensions;
   purchaseSource: EquipmentPurchaseSource;
   ports: EquipmentPort[];
   referenceImages: EquipmentReferenceImage[];
@@ -138,9 +199,12 @@ export interface EquipmentNodeData extends Record<string, unknown> {
   transportEndpointLabel?: string;
   transportPrimary?: boolean;
   transportChannelLabels?: Record<string, string>;
+  physicalDimensions?: EquipmentPhysicalDimensions;
   notes?: string;
   image?: Pick<EquipmentImage, "storagePath" | "downloadUrl" | "contentType">;
+  stageImage?: Pick<EquipmentImage, "storagePath" | "downloadUrl" | "contentType">;
   ports: EquipmentPort[];
+  showInSignalView?: boolean;
   showPortNumbers: boolean;
   showPortLabels: boolean;
   isExpanded?: boolean;
@@ -148,13 +212,19 @@ export interface EquipmentNodeData extends Record<string, unknown> {
   assignedAssetLabel?: string;
   providerPartyId?: string;
   providerPartyName?: string;
-  // Legacy template-local units remain readable while setups migrate to inventoryAssets.
-  assignedUnitId?: string;
-  assignedUnitLabel?: string;
   fulfillment: FulfillmentStatus;
 }
 
-export type SetupNode = Node<EquipmentNodeData, "equipment">;
+export type SetupNode = Node<EquipmentNodeData, "equipment"> & {
+  stagePosition?: StagePosition;
+};
+
+export interface StageRoute {
+  waypointIds: string[];
+  sourceDropFeet: number;
+  targetDropFeet: number;
+  serviceSlackFeet: number;
+}
 
 export interface CableEdgeData extends Record<string, unknown> {
   name?: string;
@@ -166,7 +236,9 @@ export interface CableEdgeData extends Record<string, unknown> {
   cableSpecification?: string;
   estimatedLength?: number;
   lengthUnit: "ft" | "m";
+  stageRoute?: StageRoute;
   fulfillment: FulfillmentStatus;
+  assignedInventoryAssetId?: string;
   assignedInventoryLabel?: string;
   notes?: string;
   exception?: {
@@ -190,11 +262,12 @@ export type CableEdge = Edge<CableEdgeData, "signalCable"> & {
 };
 
 export interface SetupGraph {
-  schemaVersion: 1;
+  schemaVersion: 2;
   revision: number;
   nodes: SetupNode[];
   edges: CableEdge[];
   viewport: Viewport;
+  stage: StagePlan;
 }
 
 export interface SetupMetadata {
@@ -203,7 +276,7 @@ export interface SetupMetadata {
   description?: string;
   status: "active" | "archived";
   sourceSetupId?: string;
-  graphSchemaVersion: 1;
+  graphSchemaVersion: 1 | 2;
   revision: number;
   nodeCount: number;
   cableCount: number;
@@ -234,6 +307,7 @@ export interface CableRunRow {
   length?: number;
   lengthUnit: "ft" | "m";
   fulfillment: FulfillmentStatus;
+  assignedInventoryAssetId?: string;
   assignedInventoryLabel?: string;
   notes?: string;
   exceptionReason?: string;
@@ -257,7 +331,7 @@ export interface EquipmentUsageRow {
   nodeId: string;
   name: string;
   category: string;
-  assignedUnitLabel?: string;
+  assignmentLabel?: string;
   fulfillment: FulfillmentStatus;
   inputCount: number;
   outputCount: number;
@@ -273,10 +347,17 @@ export function createSetupId(prefix: string) {
 
 export function emptySetupGraph(revision = 0): SetupGraph {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     revision,
     nodes: [],
     edges: [],
     viewport: { x: 0, y: 0, zoom: 1 },
+    stage: {
+      widthFeet: 40,
+      depthFeet: 24,
+      viewport: { x: 48, y: 72, zoom: 0.72 },
+      areas: [],
+      waypoints: [],
+    },
   };
 }

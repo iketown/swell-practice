@@ -138,7 +138,7 @@ export function EquipmentNode({ id, data, selected, isConnectable }: NodeProps<S
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-sm font-semibold">{data.name}</h2>
-          <p className="truncate text-xs text-muted-foreground">{data.transportEndpointLabel || data.assignedUnitLabel || data.category}</p>
+          <p className="truncate text-xs text-muted-foreground">{data.transportEndpointLabel || data.assignedAssetLabel || data.providerPartyName || data.category}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <Badge variant={data.fulfillment === "owned" ? "default" : "secondary"} className="capitalize">

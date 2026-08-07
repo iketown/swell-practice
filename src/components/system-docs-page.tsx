@@ -284,19 +284,19 @@ export function SystemDocsPage() {
         <section className="swell-panel p-5 sm:p-7" aria-labelledby="asset-id-heading">
           <div className="max-w-3xl">
             <div className="flex flex-wrap items-center gap-2"><Badge variant="secondary">Available now</Badge><p className="swell-page-kicker">Permanent asset IDs</p></div>
-            <h2 id="asset-id-heading" className="mt-2 text-2xl font-semibold tracking-tight">Short enough to type, structured enough to recognize</h2>
+            <h2 id="asset-id-heading" className="mt-2 text-2xl font-semibold tracking-tight">One four-digit check-in system for every item</h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground sm:text-base">
-              Every new asset receives a suggested uppercase ID based on the item. The system finds the highest existing sequence for that three-letter prefix and suggests the next one without reusing retired IDs.
+              Every new asset receives an automatic four-digit ID. Category starting points keep the numbers recognizable while one global uniqueness check prevents collisions.
             </p>
           </div>
           <div className="mt-6 grid gap-3 md:grid-cols-3">
-            <Definition term="Ordinary gear"><code className="text-foreground">HXS-01</code> is the first HX Stomp asset. The next HXS item is suggested as <code className="text-foreground">HXS-02</code>.</Definition>
-            <Definition term="Cables"><code className="text-foreground">XLR-04-25</code> means XLR cable 04 at 25 ft. The last segment records length and does not affect the next XLR sequence.</Definition>
-            <Definition term="Forgiving search">Typing <code className="text-foreground">trs31</code>, <code className="text-foreground">TRS-31</code>, or <code className="text-foreground">tRs31</code> finds official ID <code className="text-foreground">TRS-31-15</code>.</Definition>
+            <Definition term="Category starts">Microphones begin at <code className="text-foreground">0100</code>, stands at <code className="text-foreground">0200</code>, instruments at <code className="text-foreground">0300</code>, pedals at <code className="text-foreground">0400</code>, and rack gear at <code className="text-foreground">0500</code>.</Definition>
+            <Definition term="Cables"><code className="text-foreground">0016</code> is a permanent inventory ID. Cable length is stored separately as total inches, with synchronized Feet and Total inches fields.</Definition>
+            <Definition term="Shared definitions">A 6 ft and 10 ft <code className="text-foreground">XLRM → TRSM</code> reuse one definition. Different endpoints, such as <code className="text-foreground">XLRM → XLRF</code>, use another.</Definition>
           </div>
           <div className="mt-4 grid gap-3 rounded-lg bg-muted/45 p-4 md:grid-cols-2">
-            <div><p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Cable barcode</p><p className="mt-1 text-sm">Code 128 encodes the bare ID, such as <code>XLR-04-25</code>, to keep the heat-shrink label narrow.</p></div>
-            <div><p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">QR destination</p><p className="mt-1 text-sm">A QR label points to <code>theswell.live/g/xlr-04-25</code>, which opens Gear already filtered to the matching asset.</p></div>
+            <div><p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Cable barcode</p><p className="mt-1 text-sm">Code 128 encodes only the four digits, such as <code>0016</code>, so the bars remain wide enough to scan on the narrow cord label.</p></div>
+            <div><p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Printed title</p><p className="mt-1 text-sm">The sheet label combines the saved length, connector title, and ID, such as <code>6&apos; XLRM → TRSM 0016</code>.</p></div>
           </div>
         </section>
 
@@ -516,8 +516,9 @@ EquipmentPort {
 }
 
 InventoryAsset {
-  id, assetTag, definitionId, label,
-  // assetTag: HXS-01 or cable form XLR-04-25
+  id, assetTag, definitionId?, label, tags,
+  // assetTag: globally unique four-digit ID, such as 0100
+  cableLengthInches?,
   lifecycleStatus: "planned" | "cart" | "ordered" |
     "in_transit" | "awaiting_check_in" | "active" |
     "retired" | "cancelled",
@@ -778,10 +779,11 @@ Firebase Storage:
                   <Decision>Cable length comes from the physical route, never from React Flow screen pixels.</Decision>
                   <Decision>Every equipment and cable requirement can use an exact asset, an outside provider, or a purchase.</Decision>
                   <Decision>A planned asset receives its permanent asset ID before purchase; ownership and physical possession remain separate facts.</Decision>
-                  <Decision>Asset IDs use a canonical uppercase three-letter prefix and sequence. Cable IDs may add a final two-digit length; lookup ignores case and punctuation.</Decision>
+                  <Decision>Every asset uses one globally unique four-digit numeric ID. Cables begin at 0001, microphones at 0100, stands at 0200, instruments at 0300, pedals at 0400, rack gear at 0500, and uncategorized gear at 0600.</Decision>
                   <Decision>Purchase orders group reserved assets and store workflow metadata, while check-in remains the boundary that establishes physical possession and location.</Decision>
                   <Decision>Owners and setup providers come from one open-ended party registry that supports members, hired musicians, venues, and companies.</Decision>
                   <Decision>Combo XLR/TRS is a port-only type that accepts XLR or TRS male cable ends without turning the cable itself into a combo connector.</Decision>
+                  <Decision>Equipment definitions have directional inputs and outputs. Cable definitions are bidirectional and contain End 1 and End 2, with one or more connectors allowed on either end for splits.</Decision>
                   <Decision>Each gear definition has one transparent icon and may have reusable inspection photos. Each physical asset has its own documentary photo gallery.</Decision>
                   <Decision>Check-ins are append-only; current and effective locations are denormalized last-known snapshots.</Decision>
                   <Decision>Containers keep expected manifests separate from actual contained assets.</Decision>

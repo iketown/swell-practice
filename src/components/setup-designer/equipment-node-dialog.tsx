@@ -1,7 +1,6 @@
 "use client";
 
-import { BoxesIcon, ExternalLinkIcon, PackagePlusIcon, SaveIcon, Trash2Icon } from "lucide-react";
-import Link from "next/link";
+import { ArrowRightLeftIcon, ExternalLinkIcon, PackagePlusIcon, SaveIcon, Trash2Icon } from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
 
 import { GearAssetDialog } from "@/components/gear/gear-asset-dialog";
@@ -10,9 +9,35 @@ import {
   cropEquipmentIcon,
   type PendingEquipmentIcon,
 } from "@/components/setup-designer/equipment-icon-editor";
+import type { EquipmentImageSource } from "@/components/setup-designer/equipment-image-source-picker";
 import { EquipmentPhotoGallery } from "@/components/setup-designer/equipment-photo-gallery";
 import { EquipmentPortEditor } from "@/components/setup-designer/equipment-port-editor";
+import {
+  cropEquipmentStageImage,
+  EquipmentStageImageEditor,
+  type PendingEquipmentStageImage,
+} from "@/components/setup-designer/equipment-stage-image-editor";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox";
 import {
   Dialog,
   DialogContent,
@@ -28,14 +53,13 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { lifecycleLabel, type GearLocation, type GearParty, type InventoryAsset } from "@/lib/gear/domain";
-import { findAssetAssignment } from "@/lib/setup-designer/asset-assignments";
+import { findAssetAssignment, type AssetAssignment } from "@/lib/setup-designer/asset-assignments";
 import type { EquipmentNodeData, EquipmentTemplate, FulfillmentStatus, SetupNode } from "@/lib/setup-designer/domain";
 import { updateEquipmentTemplateImages } from "@/lib/setup-designer/repository";
 
 interface EquipmentNodeDialogProps {
   node: SetupNode | null;
   setupId: string;
-  gearHref: string;
   templates: EquipmentTemplate[];
   assets: InventoryAsset[];
   parties: GearParty[];
@@ -43,39 +67,125 @@ interface EquipmentNodeDialogProps {
   setupNodes: SetupNode[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (nodeId: string, data: EquipmentNodeData) => string | null;
+  onSave: (nodeId: string, data: EquipmentNodeData, options?: { reassignAssetFromNodeId?: string }) => string | null;
   onDelete: (nodeId: string) => void;
   onTemplateUpdated: (template: EquipmentTemplate) => void;
   onAssetCreated: (asset: InventoryAsset) => void;
 }
 
-export function EquipmentNodeDialog({ node, setupId, gearHref, templates, assets, parties, locations, setupNodes, open, onOpenChange, onSave, onDelete, onTemplateUpdated, onAssetCreated }: EquipmentNodeDialogProps) {
+export function EquipmentNodeDialog({ node, setupId, templates, assets, parties, locations, setupNodes, open, onOpenChange, onSave, onDelete, onTemplateUpdated, onAssetCreated }: EquipmentNodeDialogProps) {
   const [draft, setDraft] = useState<EquipmentNodeData | null>(() => node ? structuredClone(node.data) : null);
   const [pendingIcon, setPendingIcon] = useState<PendingEquipmentIcon | null>(null);
+  const [pendingStageImage, setPendingStageImage] = useState<PendingEquipmentStageImage | null>(null);
   const [pendingDetailFiles, setPendingDetailFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [assetDialogOpen, setAssetDialogOpen] = useState(false);
+  const [pendingAssetReassignment, setPendingAssetReassignment] = useState<{ asset: InventoryAsset; assignment: AssetAssignment } | null>(null);
+  const [approvedAssetReassignment, setApprovedAssetReassignment] = useState<AssetAssignment | null>(null);
+  const assignedAssetId = draft?.assignedAssetId;
+  const draftTemplateId = draft?.templateId;
   const template = useMemo(() => templates.find((item) => item.id === draft?.templateId), [draft?.templateId, templates]);
-  const matchingAssets = useMemo(() => assets.filter((asset) => asset.definitionId === draft?.templateId && asset.lifecycleStatus !== "retired" && asset.lifecycleStatus !== "cancelled"), [assets, draft?.templateId]);
-  const assetUsageById = useMemo(() => new Map(matchingAssets.flatMap((asset) => {
+  const templateById = useMemo(() => new Map(templates.map((item) => [item.id, item])), [templates]);
+  const partyById = useMemo(() => new Map(parties.map((party) => [party.id, party])), [parties]);
+  const locationById = useMemo(() => new Map(locations.map((location) => [location.id, location])), [locations]);
+  const eligibleAssets = useMemo(() => assets
+    .filter((asset) => (
+      asset.id === assignedAssetId
+      || (asset.lifecycleStatus !== "retired" && asset.lifecycleStatus !== "cancelled")
+    ))
+    .sort((left, right) => {
+      if (left.id === assignedAssetId) return -1;
+      if (right.id === assignedAssetId) return 1;
+      const leftMatchesDefinition = Boolean(draftTemplateId && left.definitionId === draftTemplateId);
+      const rightMatchesDefinition = Boolean(draftTemplateId && right.definitionId === draftTemplateId);
+      if (leftMatchesDefinition !== rightMatchesDefinition) return leftMatchesDefinition ? -1 : 1;
+      return left.label.localeCompare(right.label) || left.assetTag.localeCompare(right.assetTag);
+    }), [assets, assignedAssetId, draftTemplateId]);
+  const assetUsageById = useMemo(() => new Map(eligibleAssets.flatMap((asset) => {
     const assignment = findAssetAssignment(setupNodes, asset.id, node?.id);
     return assignment ? [[asset.id, assignment] as const] : [];
-  })), [matchingAssets, node?.id, setupNodes]);
+  })), [eligibleAssets, node?.id, setupNodes]);
+  const assetSearchTextById = useMemo(() => new Map(eligibleAssets.map((asset) => {
+    const assetTemplate = templateById.get(asset.definitionId);
+    const owner = asset.ownerPartyId ? partyById.get(asset.ownerPartyId) : undefined;
+    const location = asset.currentLocationId ? locationById.get(asset.currentLocationId) : undefined;
+    return [asset.id, inventoryAssetSearchText(asset, assetTemplate, owner?.name, location?.name)] as const;
+  })), [eligibleAssets, locationById, partyById, templateById]);
   const selectedAssetConflict = draft?.fulfillment === "owned" && draft.assignedAssetId
     ? assetUsageById.get(draft.assignedAssetId)
     : undefined;
-  const availableAssetCount = matchingAssets.filter((asset) => !assetUsageById.has(asset.id)).length;
+  const approvedSelectedAssetReassignment = selectedAssetConflict
+    && approvedAssetReassignment?.assetId === selectedAssetConflict.assetId
+    && approvedAssetReassignment.nodeId === selectedAssetConflict.nodeId
+    ? approvedAssetReassignment
+    : undefined;
+  const blockingAssetConflict = approvedSelectedAssetReassignment ? undefined : selectedAssetConflict;
+  const availableAssetCount = eligibleAssets.filter((asset) => !assetUsageById.has(asset.id)).length;
+  const selectedAsset = useMemo(() => assets.find((asset) => asset.id === draft?.assignedAssetId), [assets, draft?.assignedAssetId]);
+  const equipmentImageSources = useMemo<EquipmentImageSource[]>(() => [
+    ...(draft?.image?.downloadUrl ? [{
+      id: `signal:node:${draft.image.storagePath}`,
+      url: draft.image.downloadUrl,
+      filename: template?.image?.filename || `${draft.name}-signal`,
+      label: "Current SIGNAL icon",
+      kind: "signal" as const,
+    }] : []),
+    ...(template?.image?.downloadUrl ? [{
+      id: `signal:definition:${template.image.storagePath}`,
+      url: template.image.downloadUrl,
+      filename: template.image.filename,
+      label: "Definition SIGNAL icon",
+      kind: "signal" as const,
+    }] : []),
+    ...(draft?.stageImage?.downloadUrl ? [{
+      id: `stage:node:${draft.stageImage.storagePath}`,
+      url: draft.stageImage.downloadUrl,
+      filename: template?.stageImage?.filename || `${draft.name}-stage`,
+      label: "Current STAGE image",
+      kind: "stage" as const,
+    }] : []),
+    ...(template?.stageImage?.downloadUrl ? [{
+      id: `stage:definition:${template.stageImage.storagePath}`,
+      url: template.stageImage.downloadUrl,
+      filename: template.stageImage.filename,
+      label: "Definition STAGE image",
+      kind: "stage" as const,
+    }] : []),
+    ...(template?.detailImages ?? []).map((image, index) => ({
+      id: `detail:${image.storagePath}`,
+      url: image.downloadUrl,
+      filename: image.filename,
+      label: image.filename || `Detail photo ${index + 1}`,
+      kind: "detail" as const,
+    })),
+    ...(template?.referenceImages ?? []).map((image, index) => ({
+      id: `reference:${image.url}`,
+      url: image.url,
+      filename: filenameFromUrl(image.url, `reference-${index + 1}`),
+      label: image.altText || `Web reference ${index + 1}`,
+      kind: "reference" as const,
+    })),
+    ...(selectedAsset ? selectedAsset.photos.map((image, index) => ({
+      id: `asset:${selectedAsset.id}:${image.storagePath}`,
+      url: image.downloadUrl,
+      filename: image.filename,
+      label: `${selectedAsset.label} · ${image.filename || `Photo ${index + 1}`}`,
+      kind: "asset" as const,
+    })) : []),
+  ], [draft, selectedAsset, template]);
 
   if (!node || !draft) return null;
   const nodeId = node.id;
+  const stageWidthFeet = node.stagePosition?.widthFeet ?? 1;
+  const stageDepthFeet = node.stagePosition?.depthFeet ?? 1;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft?.name.trim() || saving) return;
-    if (selectedAssetConflict) {
-      setError(`${draft.assignedAssetLabel || "This asset"} is already being used in this setup by ${selectedAssetConflict.nodeName}.`);
+    if (blockingAssetConflict) {
+      setError(`${draft.assignedAssetLabel || "This asset"} is already being used in this setup by ${blockingAssetConflict.nodeName}.`);
       return;
     }
     setSaving(true);
@@ -86,14 +196,16 @@ export function EquipmentNodeDialog({ node, setupId, gearHref, templates, assets
         ...draft,
         name: draft.name.trim(),
         assignedAssetLabel: draft.assignedAssetLabel?.trim() || undefined,
-        assignedUnitLabel: draft.assignedUnitLabel?.trim() || undefined,
       };
 
-      if (pendingIcon || pendingDetailFiles.length) {
+      if (pendingIcon || pendingStageImage || pendingDetailFiles.length) {
         if (!template) throw new Error("This node is not linked to an equipment template, so its photos cannot be stored yet.");
         const iconFile = pendingIcon ? await cropEquipmentIcon(pendingIcon) : undefined;
+        const stageAspect = Math.max(0.05, stageWidthFeet / Math.max(0.05, stageDepthFeet));
+        const stageFile = pendingStageImage ? await cropEquipmentStageImage(pendingStageImage, stageAspect) : undefined;
         const updatedTemplate = await updateEquipmentTemplateImages(template, {
           iconFile,
+          stageFile,
           detailFiles: pendingDetailFiles,
         }, setUploadProgress);
         nextDraft = {
@@ -106,11 +218,20 @@ export function EquipmentNodeDialog({ node, setupId, gearHref, templates, assets
               contentType: updatedTemplate.image.contentType,
             },
           } : {}),
+          ...(stageFile && updatedTemplate.stageImage ? {
+            stageImage: {
+              storagePath: updatedTemplate.stageImage.storagePath,
+              downloadUrl: updatedTemplate.stageImage.downloadUrl,
+              contentType: updatedTemplate.stageImage.contentType,
+            },
+          } : {}),
         };
         onTemplateUpdated(updatedTemplate);
       }
 
-      const saveError = onSave(nodeId, nextDraft);
+      const saveError = onSave(nodeId, nextDraft, approvedSelectedAssetReassignment ? {
+        reassignAssetFromNodeId: approvedSelectedAssetReassignment.nodeId,
+      } : undefined);
       if (saveError) {
         setError(saveError);
         return;
@@ -121,6 +242,26 @@ export function EquipmentNodeDialog({ node, setupId, gearHref, templates, assets
     } finally {
       setSaving(false);
     }
+  }
+
+  function applyAssetSelection(asset: InventoryAsset | null, reassignment?: AssetAssignment) {
+    setError(null);
+    setApprovedAssetReassignment(reassignment ?? null);
+    if (!asset) {
+      setDraft({
+        ...draft!,
+        assignedAssetId: undefined,
+        assignedAssetLabel: undefined,
+        showInSignalView: template?.showInSignalView ?? draft!.showInSignalView,
+      });
+      return;
+    }
+    setDraft({
+      ...draft!,
+      assignedAssetId: asset.id,
+      assignedAssetLabel: asset.label,
+      showInSignalView: asset.stageOnly ? false : template?.showInSignalView ?? draft!.showInSignalView,
+    });
   }
 
   return (
@@ -135,16 +276,18 @@ export function EquipmentNodeDialog({ node, setupId, gearHref, templates, assets
         <form id="equipment-node-form" onSubmit={submit} className="flex flex-col gap-5">
           <FieldGroup className="grid gap-5 md:grid-cols-[220px_minmax(0,1fr)]">
             <Field>
-              <FieldLabel>Stage-plot icon</FieldLabel>
+              <FieldLabel>SIGNAL diagram icon</FieldLabel>
               <EquipmentIconEditor
                 nodeName={draft.name}
                 currentImageUrl={draft.image?.downloadUrl}
                 currentFilename={template?.image?.filename}
+                sourceImages={equipmentImageSources}
+                pendingDetailFiles={pendingDetailFiles}
                 pendingIcon={pendingIcon}
                 onPendingIconChange={setPendingIcon}
                 disabled={saving}
               />
-              <FieldDescription>This reusable icon is shown on every new diagram node made from this equipment.</FieldDescription>
+              <FieldDescription>This reusable square icon is used in the logical SIGNAL diagram.</FieldDescription>
             </Field>
 
             <FieldGroup className="grid content-start gap-4 sm:grid-cols-2">
@@ -157,10 +300,11 @@ export function EquipmentNodeDialog({ node, setupId, gearHref, templates, assets
                 <Select value={draft.fulfillment} onValueChange={(value) => {
                   if (!value) return;
                   const fulfillment = value as FulfillmentStatus;
+                  setApprovedAssetReassignment(null);
                   setDraft({
                     ...draft,
                     fulfillment,
-                    ...(fulfillment === "owned" ? { providerPartyId: undefined, providerPartyName: undefined } : { assignedAssetId: undefined, assignedAssetLabel: undefined, assignedUnitId: undefined, assignedUnitLabel: undefined }),
+                    ...(fulfillment === "owned" ? { providerPartyId: undefined, providerPartyName: undefined } : { assignedAssetId: undefined, assignedAssetLabel: undefined }),
                     ...(fulfillment === "rent" ? {} : { providerPartyId: undefined, providerPartyName: undefined }),
                   });
                 }} disabled={saving}>
@@ -175,63 +319,79 @@ export function EquipmentNodeDialog({ node, setupId, gearHref, templates, assets
               </Field>
               {draft.fulfillment === "owned" ? (
                 <>
-                  <Field className="sm:col-span-2" data-invalid={Boolean(selectedAssetConflict)}>
+                  <Field className="sm:col-span-2" data-invalid={Boolean(blockingAssetConflict)}>
                     <div className="flex flex-wrap items-end justify-between gap-2">
                       <div><FieldLabel htmlFor="node-inventory-asset">Exact gear asset</FieldLabel><FieldDescription>Select an on-hand or planned item. Planned assets already have their permanent QR identity.</FieldDescription></div>
-                      <div className="flex flex-wrap gap-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => setAssetDialogOpen(true)} disabled={!template || saving}><PackagePlusIcon data-icon="inline-start" />Create planned asset</Button>
-                        <Link href={gearHref} className="inline-flex items-center gap-1 text-xs font-medium underline underline-offset-4"><BoxesIcon className="size-3.5" aria-hidden />Open gear</Link>
-                      </div>
+                      <Button type="button" variant="outline" size="sm" onClick={() => setAssetDialogOpen(true)} disabled={!template || saving}><PackagePlusIcon data-icon="inline-start" />Create planned asset</Button>
                     </div>
-                    <Select value={draft.assignedAssetId ?? "none"} onValueChange={(value) => {
-                      if (!value || value === "none") {
-                        setError(null);
-                        setDraft({ ...draft, assignedAssetId: undefined, assignedAssetLabel: undefined });
-                        return;
-                      }
-                      const existingAssignment = assetUsageById.get(value);
-                      if (existingAssignment) {
-                        setError(`Already being used in this setup by ${existingAssignment.nodeName}.`);
-                        return;
-                      }
-                      const asset = matchingAssets.find((item) => item.id === value);
-                      setError(null);
-                      setDraft({ ...draft, assignedAssetId: asset?.id, assignedAssetLabel: asset?.label });
-                    }} disabled={saving}>
-                      <SelectTrigger id="node-inventory-asset" className="w-full" aria-invalid={Boolean(selectedAssetConflict)}><SelectValue /></SelectTrigger>
-                      <SelectContent><SelectGroup>
-                        <SelectItem value="none">Not assigned yet</SelectItem>
-                        {matchingAssets.map((asset) => {
-                          const assignment = assetUsageById.get(asset.id);
-                          return (
-                            <SelectItem key={asset.id} value={asset.id} disabled={Boolean(assignment)}>
-                              <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                                <span className="truncate">{asset.label} · {lifecycleLabel(asset.lifecycleStatus)}</span>
-                                {assignment ? <span className="shrink-0 text-xs font-medium text-destructive">Already used by {assignment.nodeName}</span> : null}
-                              </span>
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectGroup></SelectContent>
-                    </Select>
-                    {selectedAssetConflict ? <p className="text-sm font-medium text-destructive" role="alert">Already being used in this setup by {selectedAssetConflict.nodeName}. Choose another asset or a different fulfillment source.</p> : null}
-                    {!matchingAssets.length ? <FieldDescription>No matching assets yet. Create a planned one without leaving this setup.</FieldDescription> : null}
-                    {matchingAssets.length > 0 && availableAssetCount === 0 && !selectedAssetConflict ? <FieldDescription>Every matching asset is already used in this setup. Create another planned asset or choose an outside provider.</FieldDescription> : null}
+                    <Combobox
+                      items={eligibleAssets}
+                      value={selectedAsset ?? null}
+                      onValueChange={(asset) => {
+                        if (!asset) {
+                          applyAssetSelection(null);
+                          return;
+                        }
+                        const existingAssignment = assetUsageById.get(asset.id);
+                        if (existingAssignment) {
+                          setPendingAssetReassignment({ asset, assignment: existingAssignment });
+                          return;
+                        }
+                        applyAssetSelection(asset);
+                      }}
+                      itemToStringLabel={(asset) => `${asset.label} · ${asset.assetTag}`}
+                      itemToStringValue={(asset) => asset.id}
+                      isItemEqualToValue={(item, value) => item.id === value.id}
+                      filter={(asset, query) => inventoryAssetMatchesSearch(assetSearchTextById.get(asset.id) ?? "", query)}
+                      autoHighlight
+                      disabled={saving}
+                    >
+                      <ComboboxInput
+                        id="node-inventory-asset"
+                        className="w-full"
+                        placeholder="Search inventory by name, ID, tag, owner, or location..."
+                        showClear
+                        aria-invalid={Boolean(blockingAssetConflict)}
+                      />
+                      <ComboboxContent side="bottom" align="start" sideOffset={4}>
+                        <ComboboxEmpty>No inventory matches that search.</ComboboxEmpty>
+                        <ComboboxList>
+                          {(asset) => {
+                            const assignment = assetUsageById.get(asset.id);
+                            const assetTemplate = templateById.get(asset.definitionId);
+                            const owner = asset.ownerPartyId ? partyById.get(asset.ownerPartyId) : undefined;
+                            const location = asset.currentLocationId ? locationById.get(asset.currentLocationId) : undefined;
+                            return (
+                              <ComboboxItem key={asset.id} value={asset}>
+                                <span className="flex min-w-0 flex-1 items-center justify-between gap-4 py-0.5">
+                                  <span className="flex min-w-0 flex-col">
+                                    <span className="truncate font-medium">
+                                      {asset.label} · {asset.assetTag}{assignment ? " · Assigned" : ""}
+                                    </span>
+                                    <span className="truncate text-xs text-muted-foreground">
+                                      {lifecycleLabel(asset.lifecycleStatus)}
+                                      {assetTemplate ? ` · ${assetTemplate.manufacturer ? `${assetTemplate.manufacturer} ` : ""}${assetTemplate.model || assetTemplate.name}` : " · No reusable definition"}
+                                      {owner ? ` · ${owner.name}` : ""}
+                                      {location ? ` · ${location.name}` : ""}
+                                    </span>
+                                  </span>
+                                  {assignment
+                                    ? <Badge variant="outline" className="max-w-52 shrink-0 truncate">Used by {assignment.nodeName}</Badge>
+                                    : draftTemplateId && asset.definitionId === draftTemplateId
+                                      ? <span className="shrink-0 text-xs text-muted-foreground">Definition match</span>
+                                      : null}
+                                </span>
+                              </ComboboxItem>
+                            );
+                          }}
+                        </ComboboxList>
+                      </ComboboxContent>
+                    </Combobox>
+                    {approvedSelectedAssetReassignment ? <FieldDescription>Will be reassigned from {approvedSelectedAssetReassignment.nodeName} when you apply these changes.</FieldDescription> : null}
+                    {blockingAssetConflict ? <p className="text-sm font-medium text-destructive" role="alert">Already being used in this setup by {blockingAssetConflict.nodeName}. Choose it again to confirm reassignment, or select another asset.</p> : null}
+                    {!eligibleAssets.length ? <FieldDescription>No eligible inventory assets yet. Create a planned one without leaving this setup.</FieldDescription> : null}
+                    {eligibleAssets.length > 0 && availableAssetCount === 0 && !blockingAssetConflict ? <FieldDescription>Every inventory asset is currently assigned. Reassign one here or create another planned asset.</FieldDescription> : null}
                   </Field>
-                  {!draft.assignedAssetId && template?.ownedUnits.length ? (
-                    <Field className="sm:col-span-2">
-                      <FieldLabel htmlFor="node-legacy-unit">Legacy owned-unit label</FieldLabel>
-                      <Select value={draft.assignedUnitId ?? "none"} onValueChange={(value) => {
-                        if (!value || value === "none") return setDraft({ ...draft, assignedUnitId: undefined, assignedUnitLabel: undefined });
-                        const unit = template.ownedUnits.find((item) => item.id === value);
-                        setDraft({ ...draft, assignedUnitId: unit?.id, assignedUnitLabel: unit?.label });
-                      }} disabled={saving}>
-                        <SelectTrigger id="node-legacy-unit" className="w-full"><SelectValue /></SelectTrigger>
-                        <SelectContent><SelectGroup><SelectItem value="none">No legacy assignment</SelectItem>{template.ownedUnits.map((unit) => <SelectItem key={unit.id} value={unit.id}>{unit.label}</SelectItem>)}</SelectGroup></SelectContent>
-                      </Select>
-                      <FieldDescription>Older setup assignments remain readable while they are migrated to permanent gear assets.</FieldDescription>
-                    </Field>
-                  ) : null}
                 </>
               ) : null}
               {draft.fulfillment === "rent" ? (
@@ -249,6 +409,25 @@ export function EquipmentNodeDialog({ node, setupId, gearHref, templates, assets
                 </Field>
               ) : null}
             </FieldGroup>
+          </FieldGroup>
+
+          <FieldGroup className="rounded-lg border bg-muted/30 p-3">
+            <Field>
+              <FieldLabel>STAGE overhead image</FieldLabel>
+              <EquipmentStageImageEditor
+                nodeName={draft.name}
+                widthInches={stageWidthFeet * 12}
+                depthInches={stageDepthFeet * 12}
+                currentImageUrl={draft.stageImage?.downloadUrl}
+                currentFilename={template?.stageImage?.filename}
+                sourceImages={equipmentImageSources}
+                pendingDetailFiles={pendingDetailFiles}
+                pendingImage={pendingStageImage}
+                onPendingImageChange={setPendingStageImage}
+                disabled={saving}
+              />
+              <FieldDescription>This reusable overhead photo fills the object’s exact physical footprint in STAGE. Set dimensions before opening this dialog so the crop matches them.</FieldDescription>
+            </Field>
           </FieldGroup>
 
           {template && (template.description || template.purchaseSource) ? (
@@ -286,6 +465,13 @@ export function EquipmentNodeDialog({ node, setupId, gearHref, templates, assets
           ) : null}
 
           <FieldGroup className="grid gap-3 rounded-lg border bg-muted/30 p-3 sm:grid-cols-2">
+            <Field orientation="horizontal" className="sm:col-span-2">
+              <div className="flex flex-1 flex-col gap-1">
+                <FieldLabel htmlFor="show-in-signal">Show in SIGNAL</FieldLabel>
+                <FieldDescription>Turn this off for stands, furniture, and other gear that only needs physical placement.</FieldDescription>
+              </div>
+              <Switch id="show-in-signal" checked={draft.showInSignalView !== false} onCheckedChange={(checked) => setDraft({ ...draft, showInSignalView: checked })} />
+            </Field>
             <Field orientation="horizontal">
               <FieldLabel htmlFor="show-port-numbers">Show port numbers</FieldLabel>
               <Switch id="show-port-numbers" checked={draft.showPortNumbers} onCheckedChange={(checked) => setDraft({ ...draft, showPortNumbers: checked })} />
@@ -306,7 +492,7 @@ export function EquipmentNodeDialog({ node, setupId, gearHref, templates, assets
             <FieldLabel htmlFor="node-notes">Setup notes</FieldLabel>
             <Textarea id="node-notes" value={draft.notes ?? ""} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} placeholder="Power from stage-left circuit." rows={3} disabled={saving} />
           </Field>
-          {saving && (pendingIcon || pendingDetailFiles.length) ? <Progress value={uploadProgress} aria-label={`Equipment photo upload ${uploadProgress}% complete`} /> : null}
+          {saving && (pendingIcon || pendingStageImage || pendingDetailFiles.length) ? <Progress value={uploadProgress} aria-label={`Equipment photo upload ${uploadProgress}% complete`} /> : null}
           {error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}
         </form>
         <DialogFooter className="sm:justify-between">
@@ -316,7 +502,7 @@ export function EquipmentNodeDialog({ node, setupId, gearHref, templates, assets
           </Button>
           <div className="flex flex-col-reverse gap-2 sm:flex-row">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
-            <Button type="submit" form="equipment-node-form" disabled={saving || !draft.name.trim() || Boolean(selectedAssetConflict)}>
+            <Button type="submit" form="equipment-node-form" disabled={saving || !draft.name.trim() || Boolean(blockingAssetConflict)}>
               <SaveIcon data-icon="inline-start" />
               {saving ? "Saving..." : "Apply changes"}
             </Button>
@@ -334,10 +520,83 @@ export function EquipmentNodeDialog({ node, setupId, gearHref, templates, assets
           sourceSetupId={setupId}
           onSaved={(asset) => {
             onAssetCreated(asset);
-            setDraft((current) => current ? { ...current, fulfillment: "owned", assignedAssetId: asset.id, assignedAssetLabel: asset.label } : current);
+            setApprovedAssetReassignment(null);
+            setDraft((current) => current ? {
+              ...current,
+              fulfillment: "owned",
+              assignedAssetId: asset.id,
+              assignedAssetLabel: asset.label,
+              showInSignalView: asset.stageOnly ? false : template?.showInSignalView ?? current.showInSignalView,
+            } : current);
           }}
         />
+        <AlertDialog
+          open={Boolean(pendingAssetReassignment)}
+          onOpenChange={(reassignmentOpen) => {
+            if (!reassignmentOpen) setPendingAssetReassignment(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogMedia>
+                <ArrowRightLeftIcon aria-hidden />
+              </AlertDialogMedia>
+              <AlertDialogTitle>Reassign {pendingAssetReassignment?.asset.label}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This physical item is already used by {pendingAssetReassignment?.assignment.nodeName} in this setup. Reassigning it here removes that connection and makes this instance the only one using it.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => {
+                if (!pendingAssetReassignment) return;
+                applyAssetSelection(pendingAssetReassignment.asset, pendingAssetReassignment.assignment);
+                setPendingAssetReassignment(null);
+              }}>
+                Reassign gear to this instance
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );
+}
+
+function filenameFromUrl(value: string, fallback: string) {
+  try {
+    const filename = new URL(value).pathname.split("/").filter(Boolean).pop();
+    return filename || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function inventoryAssetSearchText(
+  asset: InventoryAsset,
+  assetTemplate: EquipmentTemplate | undefined,
+  ownerName?: string,
+  locationName?: string,
+) {
+  return [
+    asset.label,
+    asset.assetTag,
+    asset.serialNumber,
+    ...(asset.tags ?? []),
+    assetTemplate?.name,
+    assetTemplate?.manufacturer,
+    assetTemplate?.model,
+    assetTemplate?.category,
+    ownerName,
+    locationName,
+    lifecycleLabel(asset.lifecycleStatus),
+  ].filter(Boolean).join(" ").normalize("NFKD").toLocaleLowerCase();
+}
+
+function inventoryAssetMatchesSearch(searchText: string, query: string) {
+  const normalizedQuery = query.trim().normalize("NFKD").toLocaleLowerCase();
+  if (!normalizedQuery) return true;
+  if (searchText.includes(normalizedQuery)) return true;
+  const compactQuery = normalizedQuery.replace(/[^a-z0-9]/g, "");
+  return Boolean(compactQuery) && searchText.replace(/[^a-z0-9]/g, "").includes(compactQuery);
 }
