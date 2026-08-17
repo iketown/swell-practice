@@ -60,6 +60,7 @@ This is not the public marketing site and not the full band OS. It is a practica
 | `/parts/[partSlug]` | Part page showing every song that has assets assigned to that part. |
 | `/admin/songs/new` | Create a new song. |
 | `/admin` | Lightweight admin index with create-song action and song list. |
+| `/admin/traffic` | Admin-only song traffic history grouped by a repeat-browser identifier, with IP, member-link hints, coarse location, filtering, and sorting. |
 | `/admin/members` | Member CRUD and contact details. |
 | `/admin/bands` | Band CRUD and roster editing. |
 | `/assignments/[songSlug]` | Legacy compatibility redirect to the canonical `/assignments` board. |
@@ -485,6 +486,35 @@ An absent `vocalAssignments` field means the song has not been customized and re
 
 An override row is present only when its `partSlugs` differ from the member-song default. Effective parts are `override?.partSlugs ?? default.partSlugs`. An explicit empty override means the member has no parts for that song in that band.
 
+### `trafficEvents/{eventId}`
+
+```ts
+{
+  visitorId: string; // random first-party HttpOnly cookie, not a verified person
+  ip: string;
+  path: string;
+  songSlug: string;
+  mix: string | null;
+  part: string | null;
+  member: string | null; // URL attribution hint only
+  location: {
+    city: string | null;
+    region: string | null;
+    country: string | null;
+    timezone: string | null;
+  };
+  deviceType: "desktop" | "mobile" | "tablet" | "bot";
+  userAgent: string;
+  referrer: string | null;
+  visitedAt: Timestamp;
+  expiresAt: Timestamp; // target for an optional 90-day Firestore TTL policy
+}
+```
+
+`/songs/[songSlug]` records one event after the page hydrates, so link prefetches and visitors without JavaScript do not create page views. Repeat renders of the same URL state within 15 seconds share a deterministic event ID and collapse into one event. The server reads the Vercel-provided client IP and coarse city/region/country headers, so no separate IP geolocation vendor is required. A one-year first-party HttpOnly cookie groups the same browser across changing IP addresses; each event carries a suggested 90-day expiration timestamp that can be enforced by enabling a Firestore TTL policy on `trafficEvents.expiresAt`. The browser cannot read or choose that identifier.
+
+Traffic data is server-only. Firestore client rules expose no traffic collection reads or writes. The public tracking route accepts only a validated song path and known query-field shapes, while the traffic dashboard API requires an administrator Firebase session. Exact IP, browser ID, and the `member` URL value are identification clues rather than proof: IPs can be shared or reassigned, and query parameters can be copied or edited.
+
 This nested structure keeps song pages simple and makes all assets song-scoped. Part pages can use a collection group query against `parts`, filtering by part slug document ID or stored `slug`.
 
 ## 10. Firebase Storage Paths
@@ -541,6 +571,7 @@ v1 decision:
 - Admins can create songs, upload assets, and assign assets to parts.
 - Admins can create/edit members and bands and write member defaults or band-specific overrides.
 - Member pages are read-only and accessible to anyone with the URL under the current v1 access model.
+- Traffic events are written only by the server and are readable only through an admin-authenticated server route.
 
 ## 13. UI Requirements
 
@@ -569,6 +600,7 @@ v1 decision:
 - Default and override states are communicated by color, label, and help text.
 - Audio files should be playable inline where practical.
 - PDFs/videos/zips should open or download using normal links.
+- The traffic dashboard should show repeat-browser history and individual page views, filter across IP/member/song/part/location keywords, and sort page views by visit time, IP, browser ID, member hint, page, or location.
 
 ## 14. MVP Build Phases
 
@@ -657,6 +689,8 @@ v1 decision:
 - Uploading `i_get_around_vox.pdf` suggests assignment to all vocal parts.
 - Assigning one asset to multiple parts surfaces it correctly on every corresponding part page.
 - Build passes locally.
+- Visiting a song URL records its path, selection parameters, server-observed IP, coarse Vercel location, timestamp, and repeat-browser ID without exposing traffic data through Firestore client rules.
+- Visiting `/admin/traffic` as an administrator shows browser return days and a searchable, sortable page-view history; non-admin API requests are rejected.
 - The app can deploy to Vercel with Firebase environment variables.
 - Creating a member captures first name, last name, display name, email, phone, and notes.
 - An administrator can upload and crop a member headshot to a one-to-one square before saving. The processed JPEG is stored at `members/{memberId}/headshot.jpg` and its public URL is recorded on the member document.

@@ -1,4 +1,5 @@
 import { SongPlayerPageClient } from "@/components/song-player-page-client";
+import { TrafficTracker } from "@/components/traffic-tracker";
 
 export default async function SongMixerPage({
   params,
@@ -8,13 +9,26 @@ export default async function SongMixerPage({
   searchParams: Promise<{ mix?: string | string[]; part?: string | string[]; member?: string | string[] }>;
 }) {
   const [{ songSlug }, query] = await Promise.all([params, searchParams]);
+  const mix = queryValue(query.mix);
+  const part = queryValue(query.part);
+  const member = queryValue(query.member);
+
   return (
-    <SongPlayerPageClient
-      slug={songSlug}
-      requestedMix={queryValue(query.mix)}
-      requestedPart={queryValue(query.part)}
-      requestedMember={queryValue(query.member)}
-    />
+    <>
+      <TrafficTracker
+        songSlug={songSlug}
+        path={`/songs/${songSlug}`}
+        mix={mix}
+        part={part}
+        member={member}
+      />
+      <SongPlayerPageClient
+        slug={songSlug}
+        requestedMix={mix}
+        requestedPart={part}
+        requestedMember={member}
+      />
+    </>
   );
 }
 

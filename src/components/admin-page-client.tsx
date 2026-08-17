@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { EyeOffIcon, ExternalLinkIcon, LogOutIcon, PencilIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
+import { ChartNoAxesColumnIncreasingIcon, EyeOffIcon, ExternalLinkIcon, LogOutIcon, PencilIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { AdminSectionNav } from "@/components/admin-section-nav";
 import { SongFilterInput } from "@/components/song-filter-input";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -307,7 +307,14 @@ export function AdminPageClient() {
         </CardContent>
       </Card>
 
-      <div className="flex justify-center py-4">
+      <div className="flex flex-wrap justify-center gap-2 py-4">
+        <Link
+          href={admin.isDemoAdmin ? "/admin/traffic?demo=1" : "/admin/traffic"}
+          className={buttonVariants({ variant: "outline", size: "sm" })}
+        >
+          <ChartNoAxesColumnIncreasingIcon data-icon="inline-start" />
+          Traffic
+        </Link>
         <Button variant="outline" onClick={() => void onSignOut()} disabled={signingOut}>
           <LogOutIcon data-icon="inline-start" />
           {signingOut ? "Signing out..." : "Sign out"}
