@@ -77,6 +77,27 @@ export interface CableDefinitionEnds {
   end2: ConnectorSnapshot[];
 }
 
+export interface ConnectedInventorySnapshot {
+  connectionSetId: string;
+  memberAssetIds: string[];
+  memberAssetTags: string[];
+  inputLabels: string[];
+  outputLabels: string[];
+}
+
+export type CableDefinitionEndKey = "end1" | "end2";
+
+/** A placed cable. Its ports are the cable's physical plugs, not equipment jacks. */
+export interface CableAssemblySnapshot {
+  definitionId: string;
+  definitionVersion: number;
+  ends: CableDefinitionEnds;
+  inputEnd: CableDefinitionEndKey;
+  outputEnd: CableDefinitionEndKey;
+  color: string;
+  connectedInventory?: ConnectedInventorySnapshot;
+}
+
 export interface EquipmentPort {
   id: string;
   direction: PortDirection;
@@ -159,6 +180,12 @@ export interface EquipmentTemplate {
   detailImages?: EquipmentImage[];
   cableEnds?: CableDefinitionEnds;
   ports: EquipmentPort[];
+  /** The item must be placed within reach of a power source. */
+  needsPowerSource: boolean;
+  /** The item travels with a separately labeled adapter. Implies needsPowerSource. */
+  needsPowerAdapter: boolean;
+  /** Runtime-only synthetic template for a connected inventory assembly. */
+  connectedInventory?: ConnectedInventorySnapshot;
   showInSignalView: boolean;
   showPortNumbers: boolean;
   showPortLabels: boolean;
@@ -198,12 +225,19 @@ export interface EquipmentNodeData extends Record<string, unknown> {
   transportEndpointId?: string;
   transportEndpointLabel?: string;
   transportPrimary?: boolean;
+  /** Derived Signal-view source label carried through each transport channel. Never persisted. */
   transportChannelLabels?: Record<string, string>;
+  /** Derived upstream route labels keyed by target port ID. Never persisted. */
+  signalPathLabels?: Record<string, string[]>;
+  /** Present when this node is one physical cable placed in the signal chain. */
+  cableAssembly?: CableAssemblySnapshot;
   physicalDimensions?: EquipmentPhysicalDimensions;
   notes?: string;
   image?: Pick<EquipmentImage, "storagePath" | "downloadUrl" | "contentType">;
   stageImage?: Pick<EquipmentImage, "storagePath" | "downloadUrl" | "contentType">;
   ports: EquipmentPort[];
+  needsPowerSource?: boolean;
+  needsPowerAdapter?: boolean;
   showInSignalView?: boolean;
   showPortNumbers: boolean;
   showPortLabels: boolean;
@@ -239,11 +273,28 @@ export interface CableEdgeData extends Record<string, unknown> {
   stageRoute?: StageRoute;
   fulfillment: FulfillmentStatus;
   assignedInventoryAssetId?: string;
+  assignedInventoryAssetIds?: string[];
   assignedInventoryLabel?: string;
   notes?: string;
   exception?: {
     reason: string;
   };
+  /** Exact reusable cable definition carried by the primary leg of a placed cable. */
+  cableDefinitionId?: string;
+  cableDefinitionVersion?: number;
+  cableEnds?: CableDefinitionEnds;
+  /** Legacy single membership for saved breakout nodes. */
+  cableAssemblyLeg?: {
+    nodeId: string;
+    portId: string;
+    primary: boolean;
+  };
+  /** The placed cable plugs participating in this connector join. */
+  cableAssemblyLegs?: Array<{
+    nodeId: string;
+    portId: string;
+    primary: boolean;
+  }>;
   internalTransport?: {
     assemblyId: string;
     kind: "snake" | "split-snake";
@@ -335,7 +386,48 @@ export interface EquipmentUsageRow {
   fulfillment: FulfillmentStatus;
   inputCount: number;
   outputCount: number;
+  needsPowerSource: boolean;
+  needsPowerAdapter: boolean;
   detail?: string;
+}
+
+export function normalizePowerDependencies(value: {
+  needsPowerSource?: unknown;
+  needsPowerAdapter?: unknown;
+}) {
+  const needsPowerAdapter = value.needsPowerAdapter === true;
+  return {
+    needsPowerSource: value.needsPowerSource === true || needsPowerAdapter,
+    needsPowerAdapter,
+  };
+}
+
+export function resolvePowerDependencies(
+  value: { needsPowerSource?: unknown; needsPowerAdapter?: unknown },
+  fallback?: { needsPowerSource?: unknown; needsPowerAdapter?: unknown },
+) {
+  return normalizePowerDependencies({
+    needsPowerSource: typeof value.needsPowerSource === "boolean"
+      ? value.needsPowerSource
+      : fallback?.needsPowerSource,
+    needsPowerAdapter: typeof value.needsPowerAdapter === "boolean"
+      ? value.needsPowerAdapter
+      : fallback?.needsPowerAdapter,
+  });
+}
+
+export function powerDependencyLabel(value: {
+  needsPowerSource?: unknown;
+  needsPowerAdapter?: unknown;
+}) {
+  const dependency = normalizePowerDependencies(value);
+  if (dependency.needsPowerAdapter) return "Power + adapter";
+  if (dependency.needsPowerSource) return "Power";
+  return undefined;
+}
+
+export function powerCheckInTag(assetTag: string, needsPowerAdapter?: unknown) {
+  return needsPowerAdapter === true ? `${assetTag} + adapter` : assetTag;
 }
 
 export function createSetupId(prefix: string) {

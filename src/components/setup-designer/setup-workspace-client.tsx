@@ -48,10 +48,20 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/u
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAdmin } from "@/hooks/use-admin";
-import type { GearLocation, GearParty, InventoryAsset } from "@/lib/gear/domain";
-import { listGearLocations, listGearParties, listInventoryAssets } from "@/lib/gear/repository";
+import type { GearLocation, GearParty, InventoryAsset, InventoryConnectionSet } from "@/lib/gear/domain";
+import { connectedInventoryTemplate } from "@/lib/gear/connections";
+import { listGearLocations, listGearParties, listInventoryAssets, listInventoryConnectionSets } from "@/lib/gear/repository";
 import { cableInventoryAssignmentLabel } from "@/lib/setup-designer/cable-matching";
 import { findAssetAssignment } from "@/lib/setup-designer/asset-assignments";
+import {
+  cableAssemblyLegForNode,
+  cableAssemblyLegsForEdge,
+  cableAssemblyRequirementEdgeId,
+  edgeHasCableAssemblyLeg,
+  edgeIsCableAssemblyPrimary,
+  primaryCableAssemblyLeg,
+  primaryCableAssemblyEdge,
+} from "@/lib/setup-designer/breakout-cables";
 import { CABLE_COLORS } from "@/lib/setup-designer/catalog";
 import { cableEndMatesPort, matingCableEnd, validateConnection } from "@/lib/setup-designer/compatibility";
 import {
@@ -74,6 +84,8 @@ import { graphByteSize, normalizeSetupGraph, setupGraphFromData } from "@/lib/se
 import { externalCableCount, placementFromTemplate, withTransportChannelLabels } from "@/lib/setup-designer/snake-topology";
 import {
   STAGE_PIXELS_PER_FOOT,
+  STAGE_POSITION_INCREMENT_FEET,
+  STAGE_WAYPOINT_HIT_SIZE_PIXELS,
   constrainStageArea,
   ensureStagePositions,
   stageNodeGeometry,
@@ -97,6 +109,12 @@ const stageNodeTypes = { stageArea: StageAreaNode, stageEquipment: StageEquipmen
 const stageEdgeTypes = { stageCable: StageCableEdge };
 const GRAPH_WARNING_BYTES = 750 * 1024;
 const GRAPH_MAX_BYTES = 1024 * 1024;
+const SETUP_GRAPH_MAX_ZOOM = 4;
+const SIGNAL_SNAP_GRID: [number, number] = [4, 4];
+const STAGE_SNAP_GRID: [number, number] = [
+  STAGE_PIXELS_PER_FOOT * STAGE_POSITION_INCREMENT_FEET,
+  STAGE_PIXELS_PER_FOOT * STAGE_POSITION_INCREMENT_FEET,
+];
 
 export function SetupWorkspaceClient({ setupId }: { setupId: string }) {
   return <SetupWorkspace setupId={setupId} />;
@@ -113,6 +131,7 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
   const [metadata, setMetadata] = useState<SetupMetadata | null>(null);
   const [templates, setTemplates] = useState<EquipmentTemplate[]>([]);
   const [assets, setAssets] = useState<InventoryAsset[]>([]);
+  const [connectionSets, setConnectionSets] = useState<InventoryConnectionSet[]>([]);
   const [parties, setParties] = useState<GearParty[]>([]);
   const [locations, setLocations] = useState<GearLocation[]>([]);
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 });
@@ -126,6 +145,7 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
+  const [hoveredEquipmentNodeId, setHoveredEquipmentNodeId] = useState<string | null>(null);
   const [selectedWaypointId, setSelectedWaypointId] = useState<string | null>(null);
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
   const [selectedStageNodeIds, setSelectedStageNodeIdsState] = useState<string[]>([]);
@@ -156,8 +176,8 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
   useEffect(() => {
     if (!admin.isAdmin) return;
     let active = true;
-    Promise.all([getSetupWorkspace(setupId), listEquipmentTemplates(), listInventoryAssets(), listGearParties(), listGearLocations()])
-      .then(([workspace, equipmentTemplates, inventoryAssets, gearParties, gearLocations]) => {
+    Promise.all([getSetupWorkspace(setupId), listEquipmentTemplates(), listInventoryAssets(), listInventoryConnectionSets(), listGearParties(), listGearLocations()])
+      .then(([workspace, equipmentTemplates, inventoryAssets, inventoryConnectionSets, gearParties, gearLocations]) => {
         if (!active) return;
         if (!workspace) {
           setError("This setup does not exist or was archived.");
@@ -185,6 +205,7 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
         setStagePlan(graph.stage);
         setTemplates(equipmentTemplates);
         setAssets(inventoryAssets);
+        setConnectionSets(inventoryConnectionSets);
         setParties(gearParties);
         setLocations(gearLocations);
         loadedRef.current = true;
@@ -193,6 +214,14 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
       .finally(() => active && setLoading(false));
     return () => { active = false; };
   }, [admin.isAdmin, recoveryKey, setEdges, setNodes, setupId]);
+
+  const libraryTemplates = useMemo(() => [
+    ...templates,
+    ...connectionSets.flatMap((connectionSet) => {
+      const template = connectedInventoryTemplate(connectionSet, assets, templates);
+      return template ? [template] : [];
+    }),
+  ], [assets, connectionSets, templates]);
 
   useEffect(() => {
     if (!loadedRef.current || !dirty) return;
@@ -360,7 +389,18 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
       toast.error(validation.errors[0] ?? "Those ports cannot be connected.");
       return;
     }
+    const assemblyConnection = cableAssemblyConnectionDetails(connection, nodes);
+    if (assemblyConnection && !assemblyConnection.ok) {
+      toast.error(assemblyConnection.error);
+      return;
+    }
     const edgeId = createSetupId("cable");
+    const assemblyConnections = assemblyConnection?.ok ? assemblyConnection.connections : [];
+    const primaryAssemblyConnection = assemblyConnections.find((item) => item.primary);
+    const displayAssemblyConnection = primaryAssemblyConnection ?? assemblyConnections[0];
+    const assembly = displayAssemblyConnection?.assemblyNode.data.cableAssembly;
+    const primaryAssembly = primaryAssemblyConnection?.assemblyNode.data.cableAssembly;
+    const primaryAssemblyLeg = Boolean(primaryAssemblyConnection && primaryAssembly);
     const edge: CableEdge = {
       id: edgeId,
       type: "signalCable",
@@ -368,21 +408,44 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
       sourceHandle: connection.sourceHandle!,
       target: connection.target!,
       targetHandle: connection.targetHandle!,
-      animated: true,
+      animated: false,
+      ...(assemblyConnections.length > 1 ? { reconnectable: false } : {}),
       data: {
-        color: CABLE_COLORS[edges.length % CABLE_COLORS.length],
-        endA: matingCableEnd(validation.sourcePort, validation.targetPort.connector.typeId),
-        endB: matingCableEnd(validation.targetPort, validation.sourcePort.connector.typeId),
+        color: assembly?.color ?? CABLE_COLORS[edges.length % CABLE_COLORS.length],
+        endA: assembly
+          ? structuredClone(assembly.ends[assembly.inputEnd][0])
+          : matingCableEnd(validation.sourcePort, validation.targetPort.connector.typeId),
+        endB: assembly
+          ? structuredClone(assembly.ends[assembly.outputEnd][0])
+          : matingCableEnd(validation.targetPort, validation.sourcePort.connector.typeId),
         signalType: validation.sourcePort.signalType,
-        channelCapacity: validation.sourcePort.channelCapacity,
+        channelCapacity: assembly ? assembly.ends[assembly.inputEnd].length : validation.sourcePort.channelCapacity,
         lengthUnit: "ft",
-        fulfillment: "unplanned",
+        fulfillment: primaryAssembly?.connectedInventory ? "owned" : "unplanned",
+        ...(assemblyConnections.length ? {
+          cableAssemblyLegs: assemblyConnections.map((item) => ({
+            nodeId: item.assemblyNode.id,
+            portId: item.assemblyPort.id,
+            primary: item.primary,
+          })),
+        } : {}),
+        ...(primaryAssemblyLeg && primaryAssembly && primaryAssemblyConnection ? {
+          name: primaryAssemblyConnection.assemblyNode.data.name,
+          cableDefinitionId: primaryAssembly.definitionId,
+          cableDefinitionVersion: primaryAssembly.definitionVersion,
+          cableEnds: structuredClone(primaryAssembly.ends),
+          ...(primaryAssembly.connectedInventory ? {
+            assignedInventoryAssetId: primaryAssembly.connectedInventory.memberAssetIds[0],
+            assignedInventoryAssetIds: [...primaryAssembly.connectedInventory.memberAssetIds],
+            assignedInventoryLabel: primaryAssembly.connectedInventory.memberAssetTags.join(" + "),
+          } : {}),
+        } : {}),
         ...(validation.warnings.length ? { exception: { reason: validation.warnings.join(" ") } } : {}),
       },
     };
     setEdges((current) => [...current, edge]);
-    setSelectedEdgeId(edgeId);
-    setSelectedNodeId(null);
+    setSelectedEdgeId(primaryAssemblyLeg || !assemblyConnection ? edgeId : null);
+    setSelectedNodeId(primaryAssemblyLeg || !assemblyConnection ? null : assemblyConnections[0]?.assemblyNode.id ?? null);
     setSelectedAreaId(null);
     setSelectedStageNodeIds([]);
     setStageLayoutOpen(false);
@@ -397,9 +460,17 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
       return false;
     }
 
+    const assemblyConnection = cableAssemblyConnectionDetails(connection, nodes);
+    if (assemblyConnection && !assemblyConnection.ok) {
+      if (reconnectingEdgeId) reconnectValidationErrorRef.current = assemblyConnection.error;
+      return false;
+    }
+
     if (reconnectingEdgeId) {
       const edge = edges.find((item) => item.id === reconnectingEdgeId);
-      const cableError = edge ? reconnectCableEndError(edge, connection, validation.sourcePort, validation.targetPort) : undefined;
+      const cableError = edge && edgeHasCableAssemblyLeg(edge)
+        ? reconnectCableAssemblyError(edge, connection, nodes)
+        : edge ? reconnectCableEndError(edge, connection, validation.sourcePort, validation.targetPort) : undefined;
       reconnectValidationErrorRef.current = cableError ?? null;
       if (cableError) return false;
     }
@@ -408,7 +479,12 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
 
   const onReconnect = useCallback((edge: CableEdge, connection: Connection) => {
     const validation = validateConnection(connection, nodes, edges, edge.id);
-    const cableError = reconnectCableEndError(edge, connection, validation.sourcePort, validation.targetPort);
+    const assemblyConnection = cableAssemblyConnectionDetails(connection, nodes);
+    const cableError = assemblyConnection && !assemblyConnection.ok
+      ? assemblyConnection.error
+      : edgeHasCableAssemblyLeg(edge)
+        ? reconnectCableAssemblyError(edge, connection, nodes)
+        : reconnectCableEndError(edge, connection, validation.sourcePort, validation.targetPort);
     if (!validation.valid || cableError) {
       toast.error(validation.errors[0] ?? cableError ?? "That port cannot accept this cable.");
       return;
@@ -420,7 +496,7 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
     setEdges((current) => reconnectEdge(edge, connection, current, { shouldReplaceId: false }).map((item) => (
       item.id === edge.id ? { ...item, data: nextData } : item
     )));
-    setSelectedEdgeId(edge.id);
+    setSelectedEdgeId(cableAssemblyRequirementEdgeId(edge, edges));
     setSelectedNodeId(null);
     setSelectedAreaId(null);
     setSelectedStageNodeIds([]);
@@ -481,7 +557,7 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
   const dropTemplate = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     const templateId = event.dataTransfer.getData(EQUIPMENT_TEMPLATE_DRAG_MIME) || event.dataTransfer.getData("text/plain");
-    const template = templates.find((item) => item.id === templateId);
+    const template = libraryTemplates.find((item) => item.id === templateId);
     setDraggedTemplate(null);
     if (!template) return;
 
@@ -499,7 +575,7 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
       yFeet: Math.max(0, pointerPosition.y / STAGE_PIXELS_PER_FOOT),
     } : undefined;
     placeTemplate(template, signalPosition, false, stageAnchor);
-  }, [activeView, nodes, placeTemplate, templates]);
+  }, [activeView, libraryTemplates, nodes, placeTemplate]);
 
   const allowTemplateDrop = useCallback((event: DragEvent<HTMLDivElement>) => {
     if (!draggedTemplate && !event.dataTransfer.types.includes(EQUIPMENT_TEMPLATE_DRAG_MIME)) return;
@@ -581,8 +657,15 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
       : [nodeId]);
     const connected = edges.filter((edge) => assemblyNodeIds.has(edge.source) || assemblyNodeIds.has(edge.target));
     const externalConnected = connected.filter((edge) => !edge.data.internalTransport);
-    const subject = assemblyNodeIds.size > 1 ? `this snake and its ${assemblyNodeIds.size} endpoints` : "this node";
-    if (connected.length && !window.confirm(`Remove ${subject}${externalConnected.length ? ` and ${externalConnected.length} connected cable${externalConnected.length === 1 ? "" : "s"}` : ""}?`)) return;
+    const placedCable = Boolean(selected?.data.cableAssembly);
+    const placedCableIsBreakout = Boolean(selected?.data.cableAssembly && selected.data.ports.length > 2);
+    const subject = placedCable ? `this ${placedCableIsBreakout ? "breakout " : ""}cable` : assemblyNodeIds.size > 1 ? `this snake and its ${assemblyNodeIds.size} endpoints` : "this node";
+    const connectedLabel = externalConnected.length
+      ? placedCable
+        ? ` and its ${externalConnected.length} connector join${externalConnected.length === 1 ? "" : "s"}`
+        : ` and ${externalConnected.length} connected cable${externalConnected.length === 1 ? "" : "s"}`
+      : "";
+    if (connected.length && !window.confirm(`Remove ${subject}${connectedLabel}?`)) return;
     setNodes((current) => current.filter((node) => !assemblyNodeIds.has(node.id)));
     setEdges((current) => current.filter((edge) => !assemblyNodeIds.has(edge.source) && !assemblyNodeIds.has(edge.target)));
     setSelectedNodeId(null);
@@ -592,9 +675,12 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
 
   const beforeKeyboardDelete = useCallback<OnBeforeDelete<SetupNode, CableEdge>>(async ({ nodes: nodesToDelete, edges: edgesToDelete }) => {
     const assemblyIds = new Set(nodesToDelete.flatMap((node) => node.data.assemblyId ? [node.data.assemblyId] : []));
-    if (!assemblyIds.size) return true;
+    const placedCableNodeIds = new Set(nodesToDelete.filter((node) => node.data.cableAssembly).map((node) => node.id));
+    if (!assemblyIds.size && !placedCableNodeIds.size) return true;
 
-    const expandedNodes = nodes.filter((node) => nodesToDelete.some((candidate) => candidate.id === node.id) || (node.data.assemblyId && assemblyIds.has(node.data.assemblyId)));
+    const expandedNodes = nodes.filter((node) => nodesToDelete.some((candidate) => candidate.id === node.id)
+      || placedCableNodeIds.has(node.id)
+      || (node.data.assemblyId && assemblyIds.has(node.data.assemblyId)));
     const expandedNodeIds = new Set(expandedNodes.map((node) => node.id));
     const expandedEdges = edges.filter((edge) => (
       edgesToDelete.some((candidate) => candidate.id === edge.id)
@@ -602,9 +688,15 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
       || expandedNodeIds.has(edge.target)
     ));
     const externalCableTotal = expandedEdges.filter((edge) => !edge.data.internalTransport).length;
-    const snakeLabel = assemblyIds.size === 1 ? "this snake" : `these ${assemblyIds.size} snakes`;
-    const cableLabel = externalCableTotal ? ` and ${externalCableTotal} connected cable${externalCableTotal === 1 ? "" : "s"}` : "";
-    if (!window.confirm(`Remove ${snakeLabel}${cableLabel}?`)) return false;
+    const subject = placedCableNodeIds.size && !assemblyIds.size
+      ? placedCableNodeIds.size === 1 ? "this placed cable" : `these ${placedCableNodeIds.size} placed cables`
+      : assemblyIds.size === 1 ? "this snake" : `these ${assemblyIds.size} snakes`;
+    const cableLabel = externalCableTotal
+      ? placedCableNodeIds.size && !assemblyIds.size
+        ? ` and ${externalCableTotal} connector join${externalCableTotal === 1 ? "" : "s"}`
+        : ` and ${externalCableTotal} connected cable${externalCableTotal === 1 ? "" : "s"}`
+      : "";
+    if (!window.confirm(`Remove ${subject}${cableLabel}?`)) return false;
     return { nodes: expandedNodes, edges: expandedEdges };
   }, [edges, nodes]);
 
@@ -770,7 +862,20 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
   const displayNodes = useMemo(() => withTransportChannelLabels(nodes, edges), [edges, nodes]);
   const signalDisplayNodes = useMemo(() => displayNodes.filter((node) => node.data.showInSignalView !== false), [displayNodes]);
   const signalNodeIds = useMemo(() => new Set(signalDisplayNodes.map((node) => node.id)), [signalDisplayNodes]);
-  const signalDisplayEdges = useMemo(() => measuredEdges.filter((edge) => signalNodeIds.has(edge.source) && signalNodeIds.has(edge.target)), [measuredEdges, signalNodeIds]);
+  const signalDisplayEdges = useMemo(() => measuredEdges
+    .filter((edge) => signalNodeIds.has(edge.source) && signalNodeIds.has(edge.target))
+    .map((edge): CableEdge => {
+      const requirementId = cableAssemblyRequirementEdgeId(edge, measuredEdges);
+      const selected = requirementId === selectedEdgeId;
+      const hovered = requirementId === hoveredEdgeId;
+      return {
+        ...edge,
+        animated: false,
+        selected,
+        data: { ...edge.data, signalHovered: hovered },
+        zIndex: selected ? 21 : hovered ? 20 : edge.zIndex,
+      };
+    }), [hoveredEdgeId, measuredEdges, selectedEdgeId, signalNodeIds]);
   const selectedEdge = measuredEdges.find((edge) => edge.id === selectedEdgeId) ?? null;
   const stageCanvasNodes = useMemo<StageCanvasNode[]>(() => {
     const selectedRouteWaypointIds = selectedEdge?.data.stageRoute?.waypointIds ?? [];
@@ -799,6 +904,7 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
           height: geometry.boundingHeightPixels,
         },
         selected: selectedStageNodeIds.includes(node.id),
+        zIndex: 30,
       };
     });
     const areas = stagePlan.areas.map((area): StageAreaCanvasNode => ({
@@ -824,8 +930,8 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
       id: waypoint.id,
       type: "stageWaypoint",
       position: {
-        x: waypoint.position.xFeet * STAGE_PIXELS_PER_FOOT - 20,
-        y: waypoint.position.yFeet * STAGE_PIXELS_PER_FOOT - 20,
+        x: waypoint.position.xFeet * STAGE_PIXELS_PER_FOOT - STAGE_WAYPOINT_HIT_SIZE_PIXELS / 2,
+        y: waypoint.position.yFeet * STAGE_PIXELS_PER_FOOT - STAGE_WAYPOINT_HIT_SIZE_PIXELS / 2,
       },
       data: {
         label: waypoint.label,
@@ -834,21 +940,39 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
       },
       selected: waypoint.id === selectedWaypointId,
       selectable: false,
-      zIndex: 4,
+      zIndex: -4,
     }));
     return [floor, ...areas, ...equipment, ...(stageWaypointsVisible ? waypoints : [])];
   }, [displayNodes, measuredEdges, selectedEdge, selectedStageNodeIds, selectedWaypointId, stagePlan, stageWaypointsVisible]);
-  const stageCanvasEdges = useMemo<StageCanvasCableEdge[]>(() => stageCablesVisible ? measuredEdges.map((edge) => ({
-    ...edge,
-    type: "stageCable",
-    animated: false,
-    selected: edge.id === selectedEdgeId,
-    data: { ...edge.data, stageHovered: edge.id === hoveredEdgeId },
-    zIndex: edge.id === selectedEdgeId ? 21 : edge.id === hoveredEdgeId ? 20 : edge.zIndex,
-  })) : [], [hoveredEdgeId, measuredEdges, selectedEdgeId, stageCablesVisible]);
+  const stageCanvasEdges = useMemo<StageCanvasCableEdge[]>(() => stageCablesVisible ? measuredEdges.map((edge) => {
+    const requirementId = cableAssemblyRequirementEdgeId(edge, measuredEdges);
+    const selected = requirementId === selectedEdgeId;
+    const hovered = requirementId === hoveredEdgeId;
+    return {
+      ...edge,
+      type: "stageCable",
+      animated: false,
+      selected,
+      data: { ...edge.data, stageHovered: hovered },
+      zIndex: selected ? 21 : hovered ? 20 : edge.zIndex,
+    };
+  }) : [], [hoveredEdgeId, measuredEdges, selectedEdgeId, stageCablesVisible]);
   const cableRows = useMemo(() => deriveCableRuns(displayNodes, measuredEdges), [displayNodes, measuredEdges]);
   const cableGroups = useMemo(() => groupCableRuns(cableRows), [cableRows]);
   const equipmentRows = useMemo(() => deriveEquipmentUsage(displayNodes), [displayNodes]);
+  const equipmentRowNodeIds = useMemo(() => {
+    const primaryNodeIdByAssembly = new Map<string, string>();
+    for (const node of displayNodes) {
+      if (node.data.cableAssembly) continue;
+      if (!node.data.assemblyId) continue;
+      const currentPrimaryId = primaryNodeIdByAssembly.get(node.data.assemblyId);
+      if (!currentPrimaryId || node.data.transportPrimary) primaryNodeIdByAssembly.set(node.data.assemblyId, node.id);
+    }
+    return new Map(displayNodes.map((node) => [
+      node.id,
+      node.data.assemblyId ? primaryNodeIdByAssembly.get(node.data.assemblyId) ?? node.id : node.id,
+    ]));
+  }, [displayNodes]);
   const selectedNode = nodes.find((node) => node.id === selectedNodeId) ?? null;
   const selectedWaypoint = stagePlan.waypoints.find((waypoint) => waypoint.id === selectedWaypointId) ?? null;
   const selectedArea = stagePlan.areas.find((area) => area.id === selectedAreaId) ?? null;
@@ -870,16 +994,55 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
   }
 
   function selectEdge(edgeId: string) {
-    if (edges.find((edge) => edge.id === edgeId)?.data.internalTransport) return;
+    const requestedEdge = edges.find((edge) => edge.id === edgeId);
+    if (!requestedEdge || requestedEdge.data.internalTransport) return;
+    const requirementEdgeId = cableAssemblyRequirementEdgeId(requestedEdge, edges);
+    const requestedAssemblyLegs = cableAssemblyLegsForEdge(requestedEdge);
+    if (requestedAssemblyLegs.length && !edgeIsCableAssemblyPrimary(requestedEdge)) {
+      selectNode(requestedAssemblyLegs[0].nodeId);
+      return;
+    }
     setHoveredEdgeId(null);
-    setSelectedEdgeId(edgeId);
+    setHoveredEquipmentNodeId(null);
+    setSelectedEdgeId(requirementEdgeId);
     setSelectedNodeId(null);
     setSelectedWaypointId(null);
     setSelectedAreaId(null);
     setSelectedStageNodeIds([]);
     setStageLayoutOpen(false);
-    setEdges((current) => current.map((edge) => ({ ...edge, selected: edge.id === edgeId })));
+    setEdges((current) => current.map((edge) => ({ ...edge, selected: cableAssemblyRequirementEdgeId(edge, current) === requirementEdgeId })));
     setNodes((current) => current.map((node) => ({ ...node, selected: false })));
+  }
+
+  function updateCableRequirement(nextEdge: CableEdge) {
+    const assemblyNodeId = primaryCableAssemblyLeg(nextEdge)?.nodeId;
+    setEdges((current) => current.map((edge) => {
+      if (edge.id === nextEdge.id) return nextEdge;
+      const edgePrimaryAssemblyNodeId = primaryCableAssemblyLeg(edge)?.nodeId;
+      if (assemblyNodeId && cableAssemblyLegForNode(edge, assemblyNodeId) && (!edgePrimaryAssemblyNodeId || edgePrimaryAssemblyNodeId === assemblyNodeId)) {
+        return { ...edge, data: { ...edge.data, color: nextEdge.data.color } };
+      }
+      return edge;
+    }));
+    if (assemblyNodeId) {
+      setNodes((current) => current.map((node) => node.id === assemblyNodeId && node.data.cableAssembly ? {
+        ...node,
+        data: { ...node.data, cableAssembly: { ...node.data.cableAssembly, color: nextEdge.data.color } },
+      } : node));
+    }
+    setDirty(true);
+  }
+
+  function deleteCableRequirement(edgeId: string) {
+    const edge = edges.find((item) => item.id === edgeId);
+    const assemblyNodeId = edge ? primaryCableAssemblyLeg(edge)?.nodeId : undefined;
+    if (assemblyNodeId) {
+      deleteNode(assemblyNodeId);
+      return;
+    }
+    setEdges((current) => current.filter((item) => item.id !== edgeId));
+    setSelectedEdgeId(null);
+    setDirty(true);
   }
 
   function selectStageArea(areaId: string) {
@@ -887,6 +1050,7 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
     setSelectedStageNodeIds([areaId]);
     setStageLayoutOpen(false);
     setHoveredEdgeId(null);
+    setHoveredEquipmentNodeId(null);
     setSelectedNodeId(null);
     setSelectedEdgeId(null);
     setSelectedWaypointId(null);
@@ -899,6 +1063,7 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
     setSelectedAreaId(null);
     setSelectedStageNodeIds([]);
     setHoveredEdgeId(null);
+    setHoveredEquipmentNodeId(null);
     setSelectedNodeId(null);
     setSelectedEdgeId(null);
     setSelectedWaypointId(null);
@@ -926,6 +1091,7 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
     const sharedNodeId = selectedNode && (nextView === "stage" || selectedNode.data.showInSignalView !== false) ? selectedNode.id : null;
     setActiveView(nextView);
     setHoveredEdgeId(null);
+    setHoveredEquipmentNodeId(null);
     setSelectedNodeId(sharedNodeId);
     setSelectedEdgeId(null);
     setSelectedWaypointId(null);
@@ -941,6 +1107,7 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
       ...edge,
       data: {
         ...edge.data,
+        assignedInventoryAssetIds: undefined,
         assignedInventoryAssetId: asset?.id,
         assignedInventoryLabel: asset ? cableInventoryAssignmentLabel(asset) : undefined,
         fulfillment: asset ? "owned" : edge.data.fulfillment === "owned" ? "unplanned" : edge.data.fulfillment,
@@ -951,12 +1118,13 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
 
   function autoAssignCableInventory(assignments: ReadonlyMap<string, InventoryAsset>) {
     setEdges((current) => current.map((edge) => {
-      if (edge.data.internalTransport) return edge;
+      if (edge.data.internalTransport || (edge.data.assignedInventoryAssetIds?.length ?? 0) > 1) return edge;
       const asset = assignments.get(edge.id);
       return {
         ...edge,
         data: {
           ...edge.data,
+          assignedInventoryAssetIds: undefined,
           assignedInventoryAssetId: asset?.id,
           assignedInventoryLabel: asset ? cableInventoryAssignmentLabel(asset) : undefined,
           fulfillment: asset ? "owned" : edge.data.fulfillment === "owned" ? "unplanned" : edge.data.fulfillment,
@@ -1053,7 +1221,7 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
 
       <div className="setup-workspace-grid min-h-[calc(100dvh-12.5rem)] overflow-hidden rounded-lg border bg-card shadow-sm">
         <EquipmentLibrary
-          templates={templates}
+          templates={libraryTemplates}
           onTemplateCreated={(template) => setTemplates((current) => [...current, template].sort((left, right) => left.name.localeCompare(right.name)))}
           onTemplateUpdated={(template) => {
             setTemplates((current) => current.map((item) => item.id === template.id ? template : item).sort((left, right) => left.name.localeCompare(right.name)));
@@ -1074,14 +1242,34 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
             additiveStageSelectionRef.current = event.shiftKey ? [...selectedStageNodeIdsRef.current] : null;
           }}
           onFocusCapture={(event) => {
-            if (activeView !== "stage") return;
             const edgeId = (event.target as Element).closest<SVGGElement>(".react-flow__edge")?.dataset.id;
-            if (edgeId && !edges.find((edge) => edge.id === edgeId)?.data.internalTransport) setHoveredEdgeId(edgeId);
+            if (edgeId && !edges.find((edge) => edge.id === edgeId)?.data.internalTransport) {
+              setHoveredEquipmentNodeId(null);
+              const edge = edges.find((item) => item.id === edgeId);
+              setHoveredEdgeId(edge ? cableAssemblyRequirementEdgeId(edge, edges) : edgeId);
+              return;
+            }
+            const nodeId = (event.target as Element).closest<HTMLDivElement>(".react-flow__node")?.dataset.id;
+            const equipmentRowNodeId = nodeId ? equipmentRowNodeIds.get(nodeId) : undefined;
+            if (!equipmentRowNodeId) return;
+            setHoveredEdgeId(null);
+            setHoveredEquipmentNodeId(equipmentRowNodeId);
           }}
           onBlurCapture={(event) => {
-            if (activeView !== "stage") return;
-            const edgeId = (event.target as Element).closest<SVGGElement>(".react-flow__edge")?.dataset.id;
-            if (edgeId) setHoveredEdgeId((current) => current === edgeId ? null : current);
+            const target = event.target as Element;
+            const relatedTarget = event.relatedTarget as Element | null;
+            const edge = target.closest<SVGGElement>(".react-flow__edge");
+            if (edge && !edge.contains(relatedTarget)) {
+              const edgeId = edge.dataset.id;
+              const matchedEdge = edgeId ? edges.find((item) => item.id === edgeId) : undefined;
+              const requirementId = matchedEdge ? cableAssemblyRequirementEdgeId(matchedEdge, edges) : edgeId;
+              if (requirementId) setHoveredEdgeId((current) => current === requirementId ? null : current);
+            }
+            const node = target.closest<HTMLDivElement>(".react-flow__node");
+            if (!node || node.contains(relatedTarget)) return;
+            const nodeId = node.dataset.id;
+            const equipmentRowNodeId = nodeId ? equipmentRowNodeIds.get(nodeId) : undefined;
+            if (equipmentRowNodeId) setHoveredEquipmentNodeId((current) => current === equipmentRowNodeId ? null : current);
           }}
         >
           {activeView === "stage" ? (
@@ -1124,20 +1312,43 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
                 isValidConnection={connectionIsValid}
                 onNodeClick={(_, node) => { setSelectedNodeId(node.id); setSelectedEdgeId(null); setSelectedWaypointId(null); setSelectedAreaId(null); setSelectedStageNodeIds([]); setStageLayoutOpen(false); }}
                 onNodeDoubleClick={(_, node) => { setSelectedNodeId(node.id); setSelectedEdgeId(null); setSelectedWaypointId(null); setSelectedAreaId(null); setSelectedStageNodeIds([]); setStageLayoutOpen(false); setNodeDialogOpen(true); }}
+                onNodeMouseEnter={(_, node) => {
+                  const breakoutEdge = node.data.cableAssembly ? primaryCableAssemblyEdge(edges, node.id) : undefined;
+                  setHoveredEdgeId(breakoutEdge?.id ?? null);
+                  setHoveredEquipmentNodeId(breakoutEdge ? null : equipmentRowNodeIds.get(node.id) ?? node.id);
+                }}
+                onNodeMouseLeave={(_, node) => {
+                  const breakoutEdge = node.data.cableAssembly ? primaryCableAssemblyEdge(edges, node.id) : undefined;
+                  if (breakoutEdge) {
+                    setHoveredEdgeId((current) => current === breakoutEdge.id ? null : current);
+                    return;
+                  }
+                  const equipmentRowNodeId = equipmentRowNodeIds.get(node.id) ?? node.id;
+                  setHoveredEquipmentNodeId((current) => current === equipmentRowNodeId ? null : current);
+                }}
                 onEdgeClick={(_, edge) => { if (!edge.data.internalTransport) selectEdge(edge.id); }}
-                onPaneClick={() => { setSelectedNodeId(null); setSelectedEdgeId(null); setSelectedWaypointId(null); setSelectedAreaId(null); setSelectedStageNodeIds([]); setStageLayoutOpen(false); }}
+                onEdgeMouseEnter={(_, edge) => {
+                  if (edge.data.internalTransport) return;
+                  setHoveredEquipmentNodeId(null);
+                  setHoveredEdgeId(cableAssemblyRequirementEdgeId(edge, edges));
+                }}
+                onEdgeMouseLeave={(_, edge) => {
+                  const requirementId = cableAssemblyRequirementEdgeId(edge, edges);
+                  setHoveredEdgeId((current) => current === requirementId ? null : current);
+                }}
+                onPaneClick={() => { setHoveredEdgeId(null); setHoveredEquipmentNodeId(null); setSelectedNodeId(null); setSelectedEdgeId(null); setSelectedWaypointId(null); setSelectedAreaId(null); setSelectedStageNodeIds([]); setStageLayoutOpen(false); }}
                 onDragOver={allowTemplateDrop}
                 onDrop={dropTemplate}
                 onMoveEnd={(_, nextViewport) => { setViewport(nextViewport); if (loadedRef.current) setDirty(true); }}
                 defaultViewport={viewport}
                 minZoom={0.15}
-                maxZoom={2}
+                maxZoom={SETUP_GRAPH_MAX_ZOOM}
                 snapToGrid
-                snapGrid={[16, 16]}
+                snapGrid={SIGNAL_SNAP_GRID}
                 fitView={!signalDisplayNodes.length}
                 colorMode="light"
                 deleteKeyCode={["Backspace", "Delete"]}
-                defaultEdgeOptions={{ type: "signalCable", animated: true }}
+                defaultEdgeOptions={{ type: "signalCable", animated: false }}
                 edgesReconnectable
                 reconnectRadius={14}
                 proOptions={{ hideAttribution: false }}
@@ -1202,10 +1413,29 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
                 setStageLayoutOpen(false);
                 setNodeDialogOpen(true);
               }}
+              onNodeMouseEnter={(_, node) => {
+                if (node.type !== "stageEquipment") return;
+                const breakoutEdge = node.data.cableAssembly ? primaryCableAssemblyEdge(edges, node.id) : undefined;
+                setHoveredEdgeId(breakoutEdge?.id ?? null);
+                setHoveredEquipmentNodeId(breakoutEdge ? null : equipmentRowNodeIds.get(node.id) ?? node.id);
+              }}
+              onNodeMouseLeave={(_, node) => {
+                if (node.type !== "stageEquipment") return;
+                const breakoutEdge = node.data.cableAssembly ? primaryCableAssemblyEdge(edges, node.id) : undefined;
+                if (breakoutEdge) {
+                  setHoveredEdgeId((current) => current === breakoutEdge.id ? null : current);
+                  return;
+                }
+                const equipmentRowNodeId = equipmentRowNodeIds.get(node.id) ?? node.id;
+                setHoveredEquipmentNodeId((current) => current === equipmentRowNodeId ? null : current);
+              }}
               onEdgeClick={(_, edge) => { if (!edge.data.internalTransport) selectEdge(edge.id); }}
-              onEdgeMouseEnter={(_, edge) => { if (!edge.data.internalTransport) setHoveredEdgeId(edge.id); }}
-              onEdgeMouseLeave={(_, edge) => setHoveredEdgeId((current) => current === edge.id ? null : current)}
-              onPaneClick={() => { setHoveredEdgeId(null); setSelectedNodeId(null); setSelectedEdgeId(null); setSelectedWaypointId(null); setSelectedAreaId(null); setSelectedStageNodeIds([]); setStageLayoutOpen(false); }}
+              onEdgeMouseEnter={(_, edge) => { if (!edge.data.internalTransport) { setHoveredEquipmentNodeId(null); setHoveredEdgeId(cableAssemblyRequirementEdgeId(edge as CableEdge, edges)); } }}
+              onEdgeMouseLeave={(_, edge) => {
+                const requirementId = cableAssemblyRequirementEdgeId(edge as CableEdge, edges);
+                setHoveredEdgeId((current) => current === requirementId ? null : current);
+              }}
+              onPaneClick={() => { setHoveredEdgeId(null); setHoveredEquipmentNodeId(null); setSelectedNodeId(null); setSelectedEdgeId(null); setSelectedWaypointId(null); setSelectedAreaId(null); setSelectedStageNodeIds([]); setStageLayoutOpen(false); }}
               onDragOver={allowTemplateDrop}
               onDrop={dropTemplate}
               onMoveEnd={(_, nextViewport) => {
@@ -1214,9 +1444,9 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
               }}
               defaultViewport={stagePlan.viewport}
               minZoom={0.2}
-              maxZoom={2}
+              maxZoom={SETUP_GRAPH_MAX_ZOOM}
               snapToGrid
-              snapGrid={[STAGE_PIXELS_PER_FOOT / 2, STAGE_PIXELS_PER_FOOT / 2]}
+              snapGrid={STAGE_SNAP_GRID}
               colorMode="light"
               nodesConnectable={false}
               edgesReconnectable={false}
@@ -1251,8 +1481,8 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
             <StageCableInspector
               edge={selectedEdge}
               waypoints={stagePlan.waypoints}
-              onChange={(nextEdge) => { setEdges((current) => current.map((edge) => edge.id === nextEdge.id ? nextEdge : edge)); setDirty(true); }}
-              onDelete={(edgeId) => { setEdges((current) => current.filter((edge) => edge.id !== edgeId)); setSelectedEdgeId(null); setDirty(true); }}
+              onChange={updateCableRequirement}
+              onDelete={deleteCableRequirement}
               onAddWaypoint={addStageWaypoint}
               onRemoveWaypoint={toggleWaypointOnCable}
             />
@@ -1293,13 +1523,17 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
               cableGroups={cableGroups}
               equipmentRows={equipmentRows}
               edges={measuredEdges}
-              templates={templates}
+              templates={libraryTemplates}
               assets={assets}
-              onCableChange={(nextEdge) => { setEdges((current) => current.map((edge) => edge.id === nextEdge.id ? nextEdge : edge)); setDirty(true); }}
-              onCableDelete={(edgeId) => { setEdges((current) => current.filter((edge) => edge.id !== edgeId)); setSelectedEdgeId(null); setDirty(true); }}
+              onCableChange={updateCableRequirement}
+              onCableDelete={deleteCableRequirement}
               onCableSelect={selectEdge}
-              hoveredEdgeId={activeView === "stage" ? hoveredEdgeId : null}
-              onCableHoverChange={(edgeId) => { if (activeView === "stage") setHoveredEdgeId(edgeId); }}
+              hoveredEdgeId={hoveredEdgeId}
+              onCableHoverChange={(edgeId) => {
+                if (edgeId) setHoveredEquipmentNodeId(null);
+                setHoveredEdgeId(edgeId);
+              }}
+              hoveredEquipmentNodeId={hoveredEquipmentNodeId}
               onEquipmentSelect={(nodeId) => selectNode(nodeId, true)}
               onCableInventoryAssign={assignCableInventory}
               onCableInventoryAutoAssign={autoAssignCableInventory}
@@ -1346,6 +1580,66 @@ function imageSnapshot(image: NonNullable<EquipmentTemplate["image"]>) {
     downloadUrl: image.downloadUrl,
     contentType: image.contentType,
   };
+}
+
+type CableAssemblyConnection = {
+  assemblyNode: SetupNode;
+  assemblyPort: SetupNode["data"]["ports"][number];
+  otherNode: SetupNode;
+  otherPort: SetupNode["data"]["ports"][number];
+  primary: boolean;
+};
+
+type CableAssemblyConnectionDetails = {
+  ok: false;
+  error: string;
+} | {
+  ok: true;
+  connections: CableAssemblyConnection[];
+};
+
+function cableAssemblyConnectionDetails(connection: Connection, nodes: readonly SetupNode[]): CableAssemblyConnectionDetails | undefined {
+  const sourceNode = nodes.find((node) => node.id === connection.source);
+  const targetNode = nodes.find((node) => node.id === connection.target);
+  const sourceAssembly = sourceNode?.data.cableAssembly;
+  const targetAssembly = targetNode?.data.cableAssembly;
+  if (!sourceAssembly && !targetAssembly) return undefined;
+  if (!sourceNode || !targetNode || sourceNode.id === targetNode.id) return { ok: false, error: "A placed cable cannot connect back to itself." };
+
+  const sourcePort = sourceNode.data.ports.find((port) => port.id === connection.sourceHandle);
+  const targetPort = targetNode.data.ports.find((port) => port.id === connection.targetHandle);
+  if (!sourcePort || !targetPort) return { ok: false, error: "Choose specific cable connectors on both sides of the join." };
+
+  const connections: CableAssemblyConnection[] = [];
+  if (sourceAssembly) connections.push({ assemblyNode: sourceNode, assemblyPort: sourcePort, otherNode: targetNode, otherPort: targetPort, primary: isPrimaryAssemblyPort(sourceNode, sourcePort.id) });
+  if (targetAssembly) connections.push({ assemblyNode: targetNode, assemblyPort: targetPort, otherNode: sourceNode, otherPort: sourcePort, primary: isPrimaryAssemblyPort(targetNode, targetPort.id) });
+
+  for (const item of connections) {
+    const mating = cableEndMatesPort(item.assemblyPort.connector, item.otherPort);
+    if (!mating.valid) {
+      return { ok: false, error: `${connectorDescription(item.assemblyPort.connector)} does not fit ${connectorDescription(item.otherPort.connector)}.` };
+    }
+  }
+  return { ok: true, connections };
+}
+
+function isPrimaryAssemblyPort(node: SetupNode, portId: string) {
+  const port = node.data.ports.find((item) => item.id === portId);
+  if (port?.direction !== "output") return false;
+  if (!node.data.cableAssembly?.connectedInventory) return true;
+  return node.data.ports.find((item) => item.direction === "output")?.id === portId;
+}
+
+function reconnectCableAssemblyError(edge: CableEdge, connection: Connection, nodes: readonly SetupNode[]) {
+  const legs = cableAssemblyLegsForEdge(edge);
+  if (!legs.length) return undefined;
+  const assembliesStillAttached = legs.every((leg) => (
+    (connection.source === leg.nodeId && connection.sourceHandle === leg.portId)
+    || (connection.target === leg.nodeId && connection.targetHandle === leg.portId)
+  ));
+  if (!assembliesStillAttached) return "Move only the equipment end. Placed cable plugs stay attached to their cable nodes.";
+  const details = cableAssemblyConnectionDetails(connection, nodes);
+  return details && !details.ok ? details.error : undefined;
 }
 
 function reconnectCableEndError(

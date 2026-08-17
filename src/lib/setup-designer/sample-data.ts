@@ -30,7 +30,7 @@ function samplePorts(
   }));
 }
 
-function template(input: Omit<EquipmentTemplate, "version" | "status" | "showInSignalView" | "showPortNumbers" | "showPortLabels" | "referenceImages" | "equipmentKind" | "definitionKind"> & Partial<Pick<EquipmentTemplate, "showInSignalView" | "showPortNumbers" | "showPortLabels" | "referenceImages" | "equipmentKind" | "definitionKind">>): EquipmentTemplate {
+function template(input: Omit<EquipmentTemplate, "version" | "status" | "showInSignalView" | "showPortNumbers" | "showPortLabels" | "referenceImages" | "equipmentKind" | "definitionKind" | "needsPowerSource" | "needsPowerAdapter"> & Partial<Pick<EquipmentTemplate, "showInSignalView" | "showPortNumbers" | "showPortLabels" | "referenceImages" | "equipmentKind" | "definitionKind" | "needsPowerSource" | "needsPowerAdapter">>): EquipmentTemplate {
   return {
     ...input,
     definitionKind: input.definitionKind ?? "equipment",
@@ -39,6 +39,8 @@ function template(input: Omit<EquipmentTemplate, "version" | "status" | "showInS
     showPortLabels: input.showPortLabels ?? true,
     referenceImages: input.referenceImages ?? [],
     equipmentKind: input.equipmentKind ?? "device",
+    needsPowerSource: input.needsPowerSource === true || input.needsPowerAdapter === true,
+    needsPowerAdapter: input.needsPowerAdapter ?? false,
     version: 1,
     status: "active",
   };
@@ -154,6 +156,14 @@ export const SAMPLE_EQUIPMENT_TEMPLATES: EquipmentTemplate[] = [
     ports: [],
     showInSignalView: false,
   }),
+  template({
+    id: "template-power-drop",
+    name: "Power drop",
+    category: "Power",
+    description: "A stage power source used to place and measure power runs.",
+    physicalDimensions: { widthInches: 4, depthInches: 4, heightInches: 2 },
+    ports: samplePorts("power-drop", "output", 4, "edison", "female", "power", "Power outlet"),
+  }),
 ];
 
 export function nodeFromTemplate(templateValue: EquipmentTemplate, id: string, x: number, y: number, name = templateValue.name): SetupNode {
@@ -173,6 +183,8 @@ export function nodeFromTemplate(templateValue: EquipmentTemplate, id: string, x
       image: templateValue.image,
       stageImage: templateValue.stageImage,
       ports: structuredClone(templateValue.ports),
+      needsPowerSource: templateValue.needsPowerSource,
+      needsPowerAdapter: templateValue.needsPowerAdapter,
       showInSignalView: templateValue.showInSignalView,
       showPortNumbers: templateValue.showPortNumbers,
       showPortLabels: templateValue.showPortLabels,

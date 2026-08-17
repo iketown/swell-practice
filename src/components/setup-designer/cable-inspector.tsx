@@ -3,29 +3,35 @@
 import { Trash2Icon, UnplugIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { primaryCableAssemblyLeg } from "@/lib/setup-designer/breakout-cables";
 import { CABLE_CONNECTOR_TYPES, connectorSnapshot } from "@/lib/setup-designer/catalog";
+import { formatCableDefinitionEnd } from "@/lib/setup-designer/cable-definitions";
 import type { CableEdge, ConnectorSnapshot, FulfillmentStatus } from "@/lib/setup-designer/domain";
 
 export function CableInspector({ edge, onChange, onDelete }: { edge: CableEdge; onChange: (edge: CableEdge) => void; onDelete: (edgeId: string) => void }) {
   const data = edge.data;
   const measuredOnStage = Boolean(data.stageRoute);
+  const placedCable = Boolean(primaryCableAssemblyLeg(edge) && data.cableEnds);
+  const breakout = Boolean(placedCable && data.cableEnds && (data.cableEnds.end1.length > 1 || data.cableEnds.end2.length > 1));
+  const connectedAssembly = (data.assignedInventoryAssetIds?.length ?? 0) > 1;
   const updateData = (patch: Partial<CableEdge["data"]>) => onChange({ ...edge, data: { ...data, ...patch } });
 
   return (
     <div className="flex flex-col gap-4 p-3">
       <div>
-        <h3 className="text-sm font-semibold">Cable run</h3>
-        <p className="text-xs text-muted-foreground">Physical cable from source to destination.</p>
+        <h3 className="text-sm font-semibold">{connectedAssembly ? "Connected assembly" : breakout ? "Breakout cable" : placedCable ? "Placed cable" : "Cable run"}</h3>
+        <p className="text-xs text-muted-foreground">{connectedAssembly ? "Several inventory items that stay physically attached and are supplied together." : breakout ? "One physical cable with multiple connector legs." : placedCable ? "One specific cable in a longer signal chain." : "Physical cable from source to destination."}</p>
       </div>
       <div className="flex gap-2 rounded-md border bg-muted/30 p-2.5">
         <UnplugIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-primary" />
         <div>
           <p className="text-xs font-semibold">Repatch on the canvas</p>
-          <p className="mt-0.5 text-xs leading-5 text-muted-foreground">Drag either highlighted cable endpoint to another compatible port. Cable details stay with the run.</p>
+          <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{connectedAssembly ? "Drag a free equipment endpoint to repatch it. The inventory items and their internal joins remain together." : breakout ? "Drag any free leg to another compatible port. Every leg stays together as this one cable." : placedCable ? "Drag a free equipment endpoint to repatch it. Joins between two placed cables stay attached to both cable nodes." : "Drag either highlighted cable endpoint to another compatible port. Cable details stay with the run."}</p>
         </div>
       </div>
       <FieldGroup>
@@ -33,10 +39,21 @@ export function CableInspector({ edge, onChange, onDelete }: { edge: CableEdge; 
           <FieldLabel htmlFor="cable-name">Name</FieldLabel>
           <Input id="cable-name" value={data.name ?? ""} onChange={(event) => updateData({ name: event.target.value })} placeholder="Vocal 3 to stage box" />
         </Field>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-          <CableEndFields label="Source end" value={data.endA} onChange={(endA) => updateData({ endA })} />
-          <CableEndFields label="Destination end" value={data.endB} onChange={(endB) => updateData({ endB })} />
-        </div>
+        {data.cableEnds ? (
+          <div className="grid gap-2 rounded-lg border bg-muted/25 p-3">
+            <span className="text-xs font-semibold">Definition connectors</span>
+            <div className="flex flex-wrap gap-1.5">
+              <Badge variant="secondary">End 1: {formatCableDefinitionEnd(data.cableEnds.end1)}</Badge>
+              <Badge variant="secondary">End 2: {formatCableDefinitionEnd(data.cableEnds.end2)}</Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">Edit the reusable connector layout from Gear → Definitions.</p>
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+            <CableEndFields label="Source end" value={data.endA} onChange={(endA) => updateData({ endA })} />
+            <CableEndFields label="Destination end" value={data.endB} onChange={(endB) => updateData({ endB })} />
+          </div>
+        )}
         <div className="grid grid-cols-[1fr_5.5rem] gap-2">
           <Field>
             <FieldLabel htmlFor="cable-length">{measuredOnStage ? "Required length" : "Estimated length"}</FieldLabel>
@@ -53,7 +70,7 @@ export function CableInspector({ edge, onChange, onDelete }: { edge: CableEdge; 
         </div>
         <Field>
           <FieldLabel htmlFor="cable-status">How will you supply it?</FieldLabel>
-          <Select value={data.fulfillment} onValueChange={(value) => value && updateData({ fulfillment: value as FulfillmentStatus })}>
+          <Select value={data.fulfillment} onValueChange={(value) => value && updateData({ fulfillment: value as FulfillmentStatus })} disabled={connectedAssembly}>
             <SelectTrigger id="cable-status" className="w-full"><SelectValue /></SelectTrigger>
             <SelectContent><SelectGroup>
               <SelectItem value="unplanned">Unplanned</SelectItem>
@@ -64,9 +81,9 @@ export function CableInspector({ edge, onChange, onDelete }: { edge: CableEdge; 
           </Select>
         </Field>
         <Field>
-          <FieldLabel htmlFor="cable-inventory">Inventory cable</FieldLabel>
+          <FieldLabel htmlFor="cable-inventory">{connectedAssembly ? "Inventory items" : "Inventory cable"}</FieldLabel>
           <Input id="cable-inventory" value={data.assignedInventoryLabel ?? ""} placeholder="Not assigned" readOnly />
-          <FieldDescription>Use the Match tab to assign a tagged cable from inventory.</FieldDescription>
+          <FieldDescription>{connectedAssembly ? "These IDs stay assigned together. Edit their physical connections from Gear." : "Use the Match tab to assign a tagged cable from inventory."}</FieldDescription>
         </Field>
         <Field>
           <FieldLabel htmlFor="cable-color">Cable color</FieldLabel>
@@ -86,7 +103,7 @@ export function CableInspector({ edge, onChange, onDelete }: { edge: CableEdge; 
       </FieldGroup>
       <Button variant="destructive" onClick={() => onDelete(edge.id)}>
         <Trash2Icon data-icon="inline-start" />
-        Remove cable
+        Remove {connectedAssembly ? "connected assembly" : breakout ? "breakout cable" : placedCable ? "placed cable" : "cable"}
       </Button>
     </div>
   );

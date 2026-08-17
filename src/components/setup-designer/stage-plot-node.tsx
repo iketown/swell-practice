@@ -6,9 +6,9 @@ import Image from "next/image";
 import { useEffect } from "react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { EquipmentNodeData, StageConnectionSide, StagePosition } from "@/lib/setup-designer/domain";
+import { powerDependencyLabel, type EquipmentNodeData, type StageConnectionSide, type StagePosition } from "@/lib/setup-designer/domain";
 import { portsByDirection } from "@/lib/setup-designer/ports";
-import { stageAnchorCanvasPlacement, stageNodeGeometry } from "@/lib/setup-designer/stage-plot";
+import { STAGE_WAYPOINT_HIT_SIZE_PIXELS, STAGE_WAYPOINT_MARKER_SIZE_PIXELS, stageAnchorArrowRotation, stageAnchorCanvasPlacement, stageNodeGeometry } from "@/lib/setup-designer/stage-plot";
 import { cn } from "@/lib/utils";
 
 export interface StageEquipmentCanvasData extends EquipmentNodeData {
@@ -60,6 +60,7 @@ export function StageEquipmentNode({ id, data, selected }: NodeProps<StageEquipm
   const stageImageUrl = data.stageImage?.downloadUrl;
   const visibleImageUrl = stageImageUrl ?? data.image?.downloadUrl;
   const hasVisibleImage = Boolean(visibleImageUrl);
+  const powerLabel = powerDependencyLabel(data);
 
   useEffect(() => {
     updateNodeInternals(id);
@@ -72,7 +73,7 @@ export function StageEquipmentNode({ id, data, selected }: NodeProps<StageEquipm
           <article
             className="setup-stage-equipment-node group relative size-full overflow-visible outline-none"
             tabIndex={0}
-            aria-label={`${data.name}, ${formatStageSize(footprint)}. Rotated ${formatDegrees(footprint.rotationDegrees)}. Double-click to configure.`}
+            aria-label={`${data.name}, ${formatStageSize(footprint)}. Rotated ${formatDegrees(footprint.rotationDegrees)}.${powerLabel ? ` ${powerLabel}.` : ""} Double-click to configure.`}
           />
         )}
       >
@@ -101,7 +102,7 @@ export function StageEquipmentNode({ id, data, selected }: NodeProps<StageEquipm
               unoptimized
               className={stageImageUrl ? "object-cover" : "object-contain p-[8%]"}
             />
-          ) : data.equipmentKind === "snake" || data.equipmentKind === "split-snake" ? (
+          ) : data.cableAssembly || data.equipmentKind === "snake" || data.equipmentKind === "split-snake" ? (
             <CableIcon aria-hidden className="absolute left-1/2 top-1/2 size-1/2 -translate-x-1/2 -translate-y-1/2 text-muted-foreground" />
           ) : (
             <AudioLinesIcon aria-hidden className="absolute left-1/2 top-1/2 size-1/2 -translate-x-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -126,7 +127,7 @@ export function StageEquipmentNode({ id, data, selected }: NodeProps<StageEquipm
       </TooltipTrigger>
       <TooltipContent side="top" sideOffset={10} className="flex max-w-64 flex-col items-start gap-1 px-3 py-2">
         <span className="font-semibold">{data.name}</span>
-        <span className="text-background/75">{data.category} · {formatStageSize(footprint)} · {formatDegrees(footprint.rotationDegrees)}</span>
+        <span className="text-background/75">{data.cableAssembly ? data.ports.length > 2 ? "One physical breakout cable" : "One physical cable" : data.category} · {formatStageSize(footprint)} · {formatDegrees(footprint.rotationDegrees)}</span>
         {inputs.length || outputs.length ? (
           <span className="text-background/75">
             {inputs.length ? `IN ${anchorDescription(footprint.inputAnchor)}` : "No inputs"}
@@ -135,6 +136,7 @@ export function StageEquipmentNode({ id, data, selected }: NodeProps<StageEquipm
           </span>
         ) : null}
         {data.showInSignalView === false ? <span className="text-background/75">STAGE only</span> : null}
+        {powerLabel ? <span className="text-background/75">{powerLabel}</span> : null}
       </TooltipContent>
     </Tooltip>
   );
@@ -186,14 +188,14 @@ function StageAnchorMarker({
   return (
     <span
       className={cn(
-        "pointer-events-none absolute z-10 flex size-4 items-center justify-center rounded-full border border-background shadow-sm transition-opacity duration-150",
+        "pointer-events-none absolute z-10 flex size-2 items-center justify-center rounded-full border border-background shadow-sm transition-opacity duration-150",
         direction === "input" ? "bg-secondary text-secondary-foreground" : "bg-primary text-primary-foreground",
         selected ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100",
       )}
       style={{ left: placement.x, top: placement.y, transform: "translate(-50%, -50%)" }}
       aria-hidden
     >
-      <Icon className="size-2.5" />
+      <Icon className="size-1" style={{ transform: `rotate(${stageAnchorArrowRotation(placement.side)}deg)` }} />
     </span>
   );
 }
@@ -217,19 +219,26 @@ function anchorDescription(anchor: Required<StagePosition>["inputAnchor"]) {
 export function StageWaypointNode({ data, selected }: NodeProps<StageWaypointCanvasNode>) {
   return (
     <div
-      className={cn(
-        "setup-stage-waypoint relative flex size-10 items-center justify-center rounded-full border-2 bg-card text-primary shadow-sm transition-[border-color,box-shadow,transform] duration-200",
-        selected || data.routeIndex ? "border-primary ring-4 ring-primary/20" : "border-primary/55 hover:scale-105 hover:border-primary",
-      )}
+      className="setup-stage-waypoint group relative flex items-center justify-center"
+      style={{ width: STAGE_WAYPOINT_HIT_SIZE_PIXELS, height: STAGE_WAYPOINT_HIT_SIZE_PIXELS }}
       aria-label={`${data.label}. Used by ${data.cableCount} cord${data.cableCount === 1 ? "" : "s"}.`}
       title={`${data.label} · ${data.cableCount} cord${data.cableCount === 1 ? "" : "s"}`}
     >
-      <MapPinIcon aria-hidden className="size-4" />
-      {data.routeIndex ? (
-        <span className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-sm">
-          {data.routeIndex}
-        </span>
-      ) : null}
+      <span
+        className={cn(
+          "relative flex items-center justify-center rounded-full border bg-card text-primary shadow-sm transition-[border-color,box-shadow,transform] duration-200 group-hover:scale-105",
+          selected || data.routeIndex ? "border-primary ring-2 ring-primary/20" : "border-primary/55 group-hover:border-primary",
+        )}
+        style={{ width: STAGE_WAYPOINT_MARKER_SIZE_PIXELS, height: STAGE_WAYPOINT_MARKER_SIZE_PIXELS }}
+        aria-hidden
+      >
+        <MapPinIcon className="size-3" />
+        {data.routeIndex ? (
+          <span className="absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full bg-primary text-[8px] font-bold text-primary-foreground shadow-sm">
+            {data.routeIndex}
+          </span>
+        ) : null}
+      </span>
     </div>
   );
 }

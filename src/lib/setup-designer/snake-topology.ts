@@ -1,5 +1,6 @@
 import type { CableEdge, EquipmentKind, EquipmentPort, EquipmentTemplate, EquipmentTransportTopology, SetupNode } from "@/lib/setup-designer/domain";
 import { createSetupId } from "@/lib/setup-designer/domain";
+import { cableAssemblyRequirementEdges, isPlaceableCableDefinition, placementFromCableDefinition } from "@/lib/setup-designer/breakout-cables";
 import { portDisplayName } from "@/lib/setup-designer/ports";
 import { nodeFromTemplate } from "@/lib/setup-designer/sample-data";
 
@@ -28,6 +29,7 @@ export function placementFromTemplate(
   x: number,
   y: number,
 ): { nodes: SetupNode[]; edges: CableEdge[]; primaryNodeId: string } {
+  if (isPlaceableCableDefinition(template)) return placementFromCableDefinition(template, x, y);
   if (template.equipmentKind === "device" || !template.transport) {
     const node = nodeFromTemplate(template, createSetupId("node"), x, y);
     return { nodes: [node], edges: [], primaryNodeId: node.id };
@@ -94,48 +96,116 @@ export function placementFromTemplate(
 
 export function withTransportChannelLabels(nodes: readonly SetupNode[], edges: readonly CableEdge[]): SetupNode[] {
   const nodeMap = new Map(nodes.map((node) => [node.id, node]));
-  const labelsByAssembly = new Map<string, Map<string, string>>();
+  const externalEdges = edges.filter((edge) => !edge.data.internalTransport);
+  const incomingEdgeByAssemblyChannel = new Map<string, CableEdge>();
+  const incomingEdgeByTargetPort = new Map<string, CableEdge>();
 
-  for (let pass = 0; pass < Math.max(1, nodes.length); pass += 1) {
-    let changed = false;
-    for (const edge of edges) {
-      if (edge.data.internalTransport) continue;
-      const target = nodeMap.get(edge.target);
-      const targetPort = target?.data.ports.find((port) => port.id === edge.targetHandle);
-      if (!target?.data.assemblyId || !targetPort?.channelKey) continue;
-      const source = nodeMap.get(edge.source);
-      const sourcePort = source?.data.ports.find((port) => port.id === edge.sourceHandle);
-      if (!source) continue;
-      const inherited = source.data.assemblyId && sourcePort?.channelKey
-        ? labelsByAssembly.get(source.data.assemblyId)?.get(sourcePort.channelKey)
-        : undefined;
-      const label = inherited || source.data.name;
-      const assemblyLabels = labelsByAssembly.get(target.data.assemblyId) ?? new Map<string, string>();
-      if (assemblyLabels.get(targetPort.channelKey) !== label) {
-        assemblyLabels.set(targetPort.channelKey, label);
-        labelsByAssembly.set(target.data.assemblyId, assemblyLabels);
-        changed = true;
-      }
+  for (const edge of externalEdges) {
+    incomingEdgeByTargetPort.set(`${edge.target}:${edge.targetHandle}`, edge);
+    const target = nodeMap.get(edge.target);
+    const targetPort = target?.data.ports.find((port) => port.id === edge.targetHandle);
+    if (!target?.data.assemblyId || !targetPort?.channelKey) continue;
+    incomingEdgeByAssemblyChannel.set(assemblyChannelKey(target.data.assemblyId, targetPort.channelKey), edge);
+  }
+
+  function upstreamPathFromSource(source: SetupNode, sourcePort: EquipmentPort | undefined, visited: ReadonlySet<string>): string[] {
+    if (source.data.cableAssembly) {
+      const routeKey = `cable:${source.id}`;
+      if (visited.has(routeKey)) return [];
+      const nextVisited = new Set([...visited, routeKey]);
+      const paths = source.data.ports
+        .filter((port) => port.direction === "input")
+        .flatMap((port) => {
+          const incomingEdge = incomingEdgeByTargetPort.get(`${source.id}:${port.id}`);
+          const upstreamNode = incomingEdge ? nodeMap.get(incomingEdge.source) : undefined;
+          const upstreamPort = upstreamNode?.data.ports.find((candidate) => candidate.id === incomingEdge?.sourceHandle);
+          return upstreamNode ? upstreamPathFromSource(upstreamNode, upstreamPort, nextVisited) : [];
+        });
+      return [...new Set(paths)];
     }
-    if (!changed) break;
+    if (!source.data.assemblyId || !sourcePort?.channelKey) return [source.data.name];
+
+    const routeKey = assemblyChannelKey(source.data.assemblyId, sourcePort.channelKey);
+    // Name the endpoint that directly feeds the downstream input (for example,
+    // BOX_A 2), rather than the assembly's primary stage-box endpoint.
+    const transportHop = `${conciseTransportName(source)} ${channelNumber(sourcePort)}`;
+    if (visited.has(routeKey)) return [];
+
+    const incomingEdge = incomingEdgeByAssemblyChannel.get(routeKey);
+    if (!incomingEdge) return [transportHop];
+
+    const upstreamNode = nodeMap.get(incomingEdge.source);
+    const upstreamPort = upstreamNode?.data.ports.find((port) => port.id === incomingEdge.sourceHandle);
+    if (!upstreamNode) return [transportHop];
+
+    return [
+      ...upstreamPathFromSource(upstreamNode, upstreamPort, new Set([...visited, routeKey])),
+      transportHop,
+    ];
+  }
+
+  const labelsByAssembly = new Map<string, Map<string, string>>();
+  const pathsByNode = new Map<string, Map<string, string[]>>();
+
+  for (const edge of externalEdges) {
+    const source = nodeMap.get(edge.source);
+    const target = nodeMap.get(edge.target);
+    const sourcePort = source?.data.ports.find((port) => port.id === edge.sourceHandle);
+    const targetPort = target?.data.ports.find((port) => port.id === edge.targetHandle);
+    if (!source || !target || !targetPort) continue;
+
+    const signalPath = upstreamPathFromSource(source, sourcePort, new Set());
+    if (signalPath.length) {
+      const nodePaths = pathsByNode.get(target.id) ?? new Map<string, string[]>();
+      nodePaths.set(targetPort.id, signalPath);
+      pathsByNode.set(target.id, nodePaths);
+    }
+
+    if (!target.data.assemblyId || !targetPort.channelKey || !signalPath.length) continue;
+    const assemblyLabels = labelsByAssembly.get(target.data.assemblyId) ?? new Map<string, string>();
+    assemblyLabels.set(targetPort.channelKey, signalPath[0]);
+    labelsByAssembly.set(target.data.assemblyId, assemblyLabels);
   }
 
   return nodes.map((node) => {
     const labels = node.data.assemblyId ? labelsByAssembly.get(node.data.assemblyId) : undefined;
-    return labels?.size ? {
+    const paths = pathsByNode.get(node.id);
+    const data = { ...node.data };
+    delete data.transportChannelLabels;
+    delete data.signalPathLabels;
+    return {
       ...node,
-      data: { ...node.data, transportChannelLabels: Object.fromEntries(labels) },
-    } : node;
+      data: {
+        ...data,
+        ...(labels?.size ? { transportChannelLabels: Object.fromEntries(labels) } : {}),
+        ...(paths?.size ? { signalPathLabels: Object.fromEntries(paths) } : {}),
+      },
+    };
   });
+}
+
+function assemblyChannelKey(assemblyId: string, channelKey: string) {
+  return `${assemblyId}:${channelKey}`;
+}
+
+function channelNumber(port: EquipmentPort) {
+  return port.channelKey?.match(/(\d+)$/)?.[1] ?? String(port.number);
+}
+
+function conciseTransportName(node: SetupNode) {
+  const endpointSuffix = node.data.transportEndpointLabel ? ` · ${node.data.transportEndpointLabel}` : "";
+  const baseName = endpointSuffix && node.data.name.endsWith(endpointSuffix)
+    ? node.data.name.slice(0, -endpointSuffix.length)
+    : node.data.name;
+  return baseName.replace(/\s+snake$/i, "").trim() || node.data.name;
 }
 
 export function portDisplayNameForNode(node: Pick<SetupNode, "data">, port: EquipmentPort, showNumber = true, showLabel = true) {
   const carriedLabel = port.channelKey ? node.data.transportChannelLabels?.[port.channelKey] : undefined;
   if (!carriedLabel) return portDisplayName(port, showNumber, showLabel);
-  const channelNumber = port.channelKey?.match(/(\d+)$/)?.[1] ?? String(port.number);
-  return `Snake ch ${channelNumber} (${carriedLabel})`;
+  return `Snake ch ${channelNumber(port)} (${carriedLabel})`;
 }
 
 export function externalCableCount(edges: readonly CableEdge[]) {
-  return edges.filter((edge) => !edge.data.internalTransport).length;
+  return cableAssemblyRequirementEdges(edges).length;
 }

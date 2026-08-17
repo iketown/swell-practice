@@ -27,6 +27,7 @@ import {
 import {
   createSetupId,
   emptySetupGraph,
+  normalizePowerDependencies,
   type ConnectorSnapshot,
   type EquipmentImage,
   type EquipmentAiImport,
@@ -94,6 +95,7 @@ function readDemoStore(): DemoStore {
         physicalDimensions: physicalDimensionsFromData(template.physicalDimensions),
         ...(definitionKind === "cable" && cableEnds ? { cableEnds } : { cableEnds: undefined }),
         ports: definitionKind === "cable" ? [] : ports,
+        ...normalizePowerDependencies(definitionKind === "cable" ? {} : template),
         showInSignalView: definitionKind === "cable" ? false : typeof template.showInSignalView === "boolean" ? template.showInSignalView : ports.length > 0,
         referenceImages: Array.isArray(template.referenceImages) ? template.referenceImages : [],
       } satisfies EquipmentTemplate;
@@ -273,6 +275,7 @@ function templateFromData(id: string, value: Record<string, unknown>): Equipment
     detailImages: imagesFromData(value.detailImages),
     ...(definitionKind === "cable" && cableEnds ? { cableEnds } : {}),
     ports: definitionKind === "cable" ? [] : equipmentPortsFromData(value.ports),
+    ...normalizePowerDependencies(definitionKind === "cable" ? {} : value),
     showInSignalView: definitionKind === "cable" ? false : typeof value.showInSignalView === "boolean" ? value.showInSignalView : equipmentPortsFromData(value.ports).length > 0,
     showPortNumbers: value.showPortNumbers !== false,
     showPortLabels: value.showPortLabels !== false,
@@ -484,33 +487,45 @@ export async function unassignInventoryAssetsFromSetups(assetIds: Iterable<strin
     const workspace = await getSetupWorkspace(setup.id);
     if (!workspace) continue;
     let changed = false;
-    const nodes = workspace.graph.nodes.map((node) => {
+    const removedConnectedNodeIds = new Set(workspace.graph.nodes.flatMap((node) => (
+      node.data.cableAssembly?.connectedInventory?.memberAssetIds.some((assetId) => deletedAssetIds.has(assetId))
+        ? [node.id]
+        : []
+    )));
+    if (removedConnectedNodeIds.size) changed = true;
+    const nodes = workspace.graph.nodes.flatMap((node) => {
+      if (removedConnectedNodeIds.has(node.id)) return [];
       if (!node.data.assignedAssetId || !deletedAssetIds.has(node.data.assignedAssetId)) return node;
       changed = true;
       const data = { ...node.data };
       delete data.assignedAssetId;
       delete data.assignedAssetLabel;
-      return {
+      return [{
         ...node,
         data: {
           ...data,
           fulfillment: "unplanned" as const,
         },
-      };
+      }];
     });
-    const edges = workspace.graph.edges.map((edge) => {
-      if (!edge.data.assignedInventoryAssetId || !deletedAssetIds.has(edge.data.assignedInventoryAssetId)) return edge;
+    const edges = workspace.graph.edges.flatMap((edge) => {
+      if (removedConnectedNodeIds.has(edge.source) || removedConnectedNodeIds.has(edge.target)) return [];
+      const assignedAssetIds = edge.data.assignedInventoryAssetIds?.length
+        ? edge.data.assignedInventoryAssetIds
+        : edge.data.assignedInventoryAssetId ? [edge.data.assignedInventoryAssetId] : [];
+      if (!assignedAssetIds.some((assetId) => deletedAssetIds.has(assetId))) return edge;
       changed = true;
       const data = { ...edge.data };
       delete data.assignedInventoryAssetId;
+      delete data.assignedInventoryAssetIds;
       delete data.assignedInventoryLabel;
-      return {
+      return [{
         ...edge,
         data: {
           ...data,
           fulfillment: "unplanned" as const,
         },
-      };
+      }];
     });
     if (!changed) continue;
     await saveSetupWorkspace(
@@ -644,6 +659,8 @@ function equipmentTemplateDocumentValue(template: EquipmentTemplate) {
       endpointId: port.endpointId ?? "",
       channelKey: port.channelKey ?? "",
     })),
+    needsPowerSource: template.definitionKind === "equipment" && template.needsPowerSource,
+    needsPowerAdapter: template.definitionKind === "equipment" && template.needsPowerAdapter,
     showPortNumbers: template.showPortNumbers,
     showPortLabels: template.showPortLabels,
     showInSignalView: template.showInSignalView,
@@ -736,6 +753,7 @@ export async function createEquipmentTemplate(
     ...(image ? { image } : {}),
     cableEnds,
     ports: input.definitionKind === "cable" ? [] : structuredClone(input.ports),
+    ...normalizePowerDependencies(input.definitionKind === "cable" ? {} : input),
     showInSignalView: input.definitionKind === "cable" ? false : input.showInSignalView,
     version: 1,
     status: "active",
@@ -769,6 +787,7 @@ export async function updateEquipmentTemplate(
     ...(image ? { image } : {}),
     cableEnds,
     ports: template.definitionKind === "cable" ? [] : structuredClone(template.ports),
+    ...normalizePowerDependencies(template.definitionKind === "cable" ? {} : template),
     showInSignalView: template.definitionKind === "cable" ? false : template.showInSignalView,
     version: template.version + 1,
     status: "active",

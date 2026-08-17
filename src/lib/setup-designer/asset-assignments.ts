@@ -34,7 +34,10 @@ export function findAssetAssignment(
     item.id !== excludedNodeId
     && (!excludedAssemblyId || item.data.assemblyId !== excludedAssemblyId)
     && item.data.fulfillment === "owned"
-    && item.data.assignedAssetId === assetId
+    && (
+      item.data.assignedAssetId === assetId
+      || item.data.cableAssembly?.connectedInventory?.memberAssetIds.includes(assetId)
+    )
   ));
   if (!node) return undefined;
   return {
@@ -49,20 +52,24 @@ export function findAssetAssignment(
 export function findDuplicateAssetAssignment(nodes: readonly SetupNode[]): DuplicateAssetAssignment | undefined {
   const assignments = new Map<string, AssetAssignment>();
   for (const node of nodes) {
-    const assetId = node.data.fulfillment === "owned" ? node.data.assignedAssetId : undefined;
-    if (!assetId) continue;
-    const assignment: AssetAssignment = {
-      assetId,
-      assetLabel: node.data.assignedAssetLabel,
-      nodeId: node.id,
-      nodeName: node.data.name,
-      assemblyId: node.data.assemblyId,
-    };
-    const first = assignments.get(assetId);
-    if (first && (!first.assemblyId || first.assemblyId !== assignment.assemblyId)) {
-      return { assetId, assetLabel: assignment.assetLabel ?? first.assetLabel, first, second: assignment };
+    const assetIds = node.data.fulfillment === "owned"
+      ? node.data.cableAssembly?.connectedInventory?.memberAssetIds
+        ?? (node.data.assignedAssetId ? [node.data.assignedAssetId] : [])
+      : [];
+    for (const assetId of assetIds) {
+      const assignment: AssetAssignment = {
+        assetId,
+        assetLabel: node.data.assignedAssetLabel ?? node.data.cableAssembly?.connectedInventory?.memberAssetTags.join(" + "),
+        nodeId: node.id,
+        nodeName: node.data.name,
+        assemblyId: node.data.assemblyId,
+      };
+      const first = assignments.get(assetId);
+      if (first && (!first.assemblyId || first.assemblyId !== assignment.assemblyId)) {
+        return { assetId, assetLabel: assignment.assetLabel ?? first.assetLabel, first, second: assignment };
+      }
+      assignments.set(assetId, assignment);
     }
-    assignments.set(assetId, assignment);
   }
   return undefined;
 }
@@ -75,18 +82,23 @@ export function duplicateAssetAssignmentMessage(conflict: DuplicateAssetAssignme
 export function findDuplicateCableAssetAssignment(edges: readonly CableEdge[]): DuplicateCableAssetAssignment | undefined {
   const assignments = new Map<string, { edgeId: string; assetLabel?: string }>();
   for (const edge of edges) {
-    const assetId = edge.data.fulfillment === "owned" ? edge.data.assignedInventoryAssetId : undefined;
-    if (!assetId) continue;
-    const first = assignments.get(assetId);
-    if (first) {
-      return {
-        assetId,
-        assetLabel: edge.data.assignedInventoryLabel ?? first.assetLabel,
-        firstEdgeId: first.edgeId,
-        secondEdgeId: edge.id,
-      };
+    const assetIds = edge.data.fulfillment === "owned"
+      ? edge.data.assignedInventoryAssetIds?.length
+        ? edge.data.assignedInventoryAssetIds
+        : edge.data.assignedInventoryAssetId ? [edge.data.assignedInventoryAssetId] : []
+      : [];
+    for (const assetId of assetIds) {
+      const first = assignments.get(assetId);
+      if (first) {
+        return {
+          assetId,
+          assetLabel: edge.data.assignedInventoryLabel ?? first.assetLabel,
+          firstEdgeId: first.edgeId,
+          secondEdgeId: edge.id,
+        };
+      }
+      assignments.set(assetId, { edgeId: edge.id, assetLabel: edge.data.assignedInventoryLabel });
     }
-    assignments.set(assetId, { edgeId: edge.id, assetLabel: edge.data.assignedInventoryLabel });
   }
   return undefined;
 }

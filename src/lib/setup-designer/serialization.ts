@@ -2,6 +2,7 @@ import type { Viewport } from "@xyflow/react";
 
 import {
   emptySetupGraph,
+  normalizePowerDependencies,
   type CableEdge,
   type SetupGraph,
   type SetupNode,
@@ -126,6 +127,8 @@ export function normalizeSetupGraph(input: SetupGraphInput): SetupGraph {
     const data = jsonClone(node.data);
     delete data["assignedUnitId"];
     delete data["assignedUnitLabel"];
+    delete data["transportChannelLabels"];
+    delete data["signalPathLabels"];
     return {
       id: String(node.id),
       type: "equipment",
@@ -138,6 +141,7 @@ export function normalizeSetupGraph(input: SetupGraphInput): SetupGraph {
       data: {
         ...data,
         ports: equipmentPortsFromData(data.ports),
+        ...normalizePowerDependencies(data),
       },
     };
   });
@@ -152,7 +156,7 @@ export function normalizeSetupGraph(input: SetupGraphInput): SetupGraph {
       sourceHandle: String(edge.sourceHandle),
       target: String(edge.target),
       targetHandle: String(edge.targetHandle),
-      animated: !internalTransport,
+      animated: false,
       ...(internalTransport ? { selectable: false, deletable: false, reconnectable: false } : {}),
       data: {
         ...data,

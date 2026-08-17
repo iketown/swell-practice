@@ -43,7 +43,10 @@ export function CableInventoryPanel({
   const edgeById = useMemo(() => new Map(edges.map((edge) => [edge.id, edge])), [edges]);
   const assetById = useMemo(() => new Map(assets.map((asset) => [asset.id, asset])), [assets]);
   const assignedEdgeByAssetId = useMemo(() => new Map(
-    edges.flatMap((edge) => edge.data.assignedInventoryAssetId ? [[edge.data.assignedInventoryAssetId, edge.id] as const] : []),
+    edges.flatMap((edge) => (edge.data.assignedInventoryAssetIds?.length
+      ? edge.data.assignedInventoryAssetIds
+      : edge.data.assignedInventoryAssetId ? [edge.data.assignedInventoryAssetId] : [])
+      .map((assetId) => [assetId, edge.id] as const)),
   ), [edges]);
   const suggestedAssignments = useMemo(() => new Map(
     matches.flatMap((match) => match.suggestedAsset ? [[match.edgeId, match.suggestedAsset] as const] : []),
@@ -51,6 +54,8 @@ export function CableInventoryPanel({
   const availableCableCount = assets.filter((asset) => isCableInventoryAsset(asset) && asset.lifecycleStatus === "active").length;
   const measuredCount = matches.filter((match) => match.requiredInches).length;
   const matchedCount = suggestedAssignments.size;
+  const connectedCount = cableRows.filter((row) => (edgeById.get(row.edgeId)?.data.assignedInventoryAssetIds?.length ?? 0) > 1).length;
+  const suppliedCount = Math.min(cableRows.length, matchedCount + connectedCount);
 
   if (!cableRows.length) return (
     <Empty className="border-0 py-12">
@@ -66,7 +71,7 @@ export function CableInventoryPanel({
     <div className="flex min-h-0 flex-col gap-3 py-2">
       <div className="flex flex-col gap-2 rounded-lg border bg-muted/25 p-3">
         <div className="flex flex-wrap items-center gap-1.5">
-          <Badge variant={matchedCount === cableRows.length ? "secondary" : "outline"}>{matchedCount}/{cableRows.length} matched</Badge>
+          <Badge variant={suppliedCount === cableRows.length ? "secondary" : "outline"}>{suppliedCount}/{cableRows.length} supplied</Badge>
           <Badge variant="outline">{availableCableCount} on hand</Badge>
           {measuredCount < cableRows.length ? <Badge variant="destructive">{cableRows.length - measuredCount} need length</Badge> : null}
         </div>
@@ -81,23 +86,32 @@ export function CableInventoryPanel({
         {cableRows.map((row) => {
           const edge = edgeById.get(row.edgeId);
           const match = matchByEdgeId.get(row.edgeId);
-          if (!edge || !match) return null;
+          if (!edge) return null;
+          const connectedAssetIds = edge.data.assignedInventoryAssetIds ?? [];
+          const connectedAssets = connectedAssetIds.flatMap((assetId) => {
+            const connectedAsset = assetById.get(assetId);
+            return connectedAsset ? [connectedAsset] : [];
+          });
+          const fixedConnectedAssembly = connectedAssetIds.length > 1;
+          if (!match && !fixedConnectedAssembly) return null;
           const assignedAsset = edge.data.assignedInventoryAssetId ? assetById.get(edge.data.assignedInventoryAssetId) : undefined;
-          const recommendedAsset = match.suggestedAsset;
-          const statusText = assignedAsset
+          const recommendedAsset = match?.suggestedAsset;
+          const statusText = fixedConnectedAssembly
+            ? `Kept connected: ${edge.data.assignedInventoryLabel ?? connectedAssets.map((asset) => asset.assetTag).join(" + ")}`
+            : assignedAsset
             ? cableInventoryAssignmentLabel(assignedAsset)
             : recommendedAsset
               ? `Recommended: ${cableInventoryAssignmentLabel(recommendedAsset)}`
-              : shortageReason(match.requiredInches, match.compatibleAssets);
+              : shortageReason(match?.requiredInches, match?.compatibleAssets ?? []);
 
           return (
             <article key={row.edgeId} className="flex flex-col gap-2 rounded-lg border bg-background p-2.5">
               <button type="button" onClick={() => onCableSelect(row.edgeId)} className="flex min-w-0 flex-col gap-0.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <span className="flex items-center justify-between gap-2">
                   <span className="truncate text-xs font-semibold">{row.cable}</span>
-                  <Badge variant={assignedAsset ? "secondary" : recommendedAsset ? "outline" : "destructive"}>
-                    {assignedAsset ? <CheckIcon data-icon="inline-start" /> : null}
-                    {match.requiredInches ? formatCableLength(match.requiredInches) : "Unmeasured"}
+                  <Badge variant={fixedConnectedAssembly || assignedAsset ? "secondary" : recommendedAsset ? "outline" : "destructive"}>
+                    {fixedConnectedAssembly || assignedAsset ? <CheckIcon data-icon="inline-start" /> : null}
+                    {fixedConnectedAssembly ? "Connected gear" : match?.requiredInches ? formatCableLength(match.requiredInches) : "Unmeasured"}
                   </Badge>
                 </span>
                 <span className="truncate text-xs text-muted-foreground">{row.from} → {row.to}</span>
@@ -108,7 +122,15 @@ export function CableInventoryPanel({
                 <span>{statusText}</span>
               </p>
 
-              <Field>
+              {fixedConnectedAssembly ? (
+                <Field>
+                  <FieldLabel>Inventory items</FieldLabel>
+                  <div className="flex flex-wrap gap-1.5 rounded-md border bg-muted/25 p-2.5">
+                    {connectedAssets.map((asset) => <Badge key={asset.id} variant="secondary">{asset.assetTag}</Badge>)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">These items are supplied together and cannot be reassigned as a single cable.</p>
+                </Field>
+              ) : match ? <Field>
                 <FieldLabel htmlFor={`cable-match-${row.edgeId}`}>Inventory cable</FieldLabel>
                 <Select
                   value={assignedAsset?.id ?? "unassigned"}
@@ -131,7 +153,7 @@ export function CableInventoryPanel({
                     })}
                   </SelectGroup></SelectContent>
                 </Select>
-              </Field>
+              </Field> : null}
             </article>
           );
         })}

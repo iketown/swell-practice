@@ -2,8 +2,10 @@
 
 import { BaseEdge, EdgeLabelRenderer, type Edge, type EdgeProps, useReactFlow } from "@xyflow/react";
 
+import { edgeHasCableAssemblyLeg, edgeIsCableAssemblyPrimary } from "@/lib/setup-designer/breakout-cables";
 import type { CableEdgeData } from "@/lib/setup-designer/domain";
 import type { StageCanvasNode } from "@/components/setup-designer/stage-plot-node";
+import { STAGE_PIXELS_PER_FOOT, STAGE_WAYPOINT_HIT_SIZE_PIXELS } from "@/lib/setup-designer/stage-plot";
 
 interface StageCableEdgeData extends CableEdgeData {
   stageHovered?: boolean;
@@ -50,10 +52,74 @@ function orthogonalPath(points: readonly Point[]) {
   return { path, label };
 }
 
+function equipmentCenter(node: StageCanvasNode | undefined): Point | undefined {
+  if (node?.type !== "stageEquipment") return undefined;
+  const position = node.data.stagePosition;
+  return {
+    x: (position.xFeet + position.widthFeet / 2) * STAGE_PIXELS_PER_FOOT,
+    y: (position.yFeet + position.depthFeet / 2) * STAGE_PIXELS_PER_FOOT,
+  };
+}
+
+function StageCableEndpoint({
+  edgeId,
+  endpoint,
+  from,
+  to,
+  color,
+  routeWidth,
+  casingWidth,
+  hovered,
+}: {
+  edgeId: string;
+  endpoint: "source" | "target";
+  from: Point;
+  to: Point;
+  color: string;
+  routeWidth: number;
+  casingWidth: number;
+  hovered: boolean;
+}) {
+  const deltaX = to.x - from.x;
+  const deltaY = to.y - from.y;
+  const length = Math.hypot(deltaX, deltaY);
+  if (length < 0.5) return null;
+  const path = `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
+
+  return (
+    <>
+      <BaseEdge
+        id={`${edgeId}-stage-${endpoint}-casing`}
+        path={path}
+        interactionWidth={0}
+        style={{ stroke: "var(--background)", strokeWidth: casingWidth, strokeLinecap: "round" }}
+      />
+      <BaseEdge
+        id={`${edgeId}-stage-${endpoint}`}
+        path={path}
+        interactionWidth={0}
+        className="setup-stage-cable"
+        style={{ stroke: color, strokeWidth: routeWidth, strokeLinecap: "round" }}
+      />
+      {hovered ? (
+        <BaseEdge
+          id={`${edgeId}-stage-${endpoint}-trace`}
+          path={path}
+          interactionWidth={0}
+          className="setup-stage-cable-trace"
+          style={{ stroke: "var(--background)", strokeWidth: Math.max(1.25, routeWidth * 0.38), strokeLinecap: "round", pointerEvents: "none" }}
+        />
+      ) : null}
+    </>
+  );
+}
+
 export function StageCableEdge({
   id,
   data,
   selected,
+  source,
+  target,
   sourceX,
   sourceY,
   targetX,
@@ -65,8 +131,8 @@ export function StageCableEdge({
     if (!waypoint) return [];
     const position = waypoint.position;
     return [{
-      x: position.x + (waypoint.measured?.width ?? 40) / 2,
-      y: position.y + (waypoint.measured?.height ?? 40) / 2,
+      x: position.x + (waypoint.measured?.width ?? STAGE_WAYPOINT_HIT_SIZE_PIXELS) / 2,
+      y: position.y + (waypoint.measured?.height ?? STAGE_WAYPOINT_HIT_SIZE_PIXELS) / 2,
     }];
   });
   const { path, label } = orthogonalPath([
@@ -81,6 +147,8 @@ export function StageCableEdge({
   const microphoneRoute = data?.signalType === "microphone";
   const routeWidth = data?.internalTransport ? (emphasized ? 8 : 7) : emphasized ? (microphoneRoute ? 4 : 5) : microphoneRoute ? 2 : 3.5;
   const casingWidth = data?.internalTransport ? routeWidth + 3 : routeWidth + (emphasized ? 4 : 3);
+  const sourceCenter = equipmentCenter(reactFlow.getNode(source));
+  const targetCenter = equipmentCenter(reactFlow.getNode(target));
 
   return (
     <>
@@ -101,7 +169,31 @@ export function StageCableEdge({
           style={{ stroke: "var(--background)", strokeWidth: Math.max(1.25, routeWidth * 0.38), strokeLinecap: "round", pointerEvents: "none" }}
         />
       ) : null}
-      {selected ? (
+      {sourceCenter ? (
+        <StageCableEndpoint
+          edgeId={id}
+          endpoint="source"
+          from={sourceCenter}
+          to={{ x: sourceX, y: sourceY }}
+          color={color}
+          routeWidth={routeWidth}
+          casingWidth={casingWidth}
+          hovered={hovered}
+        />
+      ) : null}
+      {targetCenter ? (
+        <StageCableEndpoint
+          edgeId={id}
+          endpoint="target"
+          from={{ x: targetX, y: targetY }}
+          to={targetCenter}
+          color={color}
+          routeWidth={routeWidth}
+          casingWidth={casingWidth}
+          hovered={hovered}
+        />
+      ) : null}
+      {selected && data && (!edgeHasCableAssemblyLeg({ data }) || edgeIsCableAssemblyPrimary({ data })) ? (
         <EdgeLabelRenderer>
           <div
             className="pointer-events-none absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-md border bg-card px-1.5 py-0.5 text-[10px] font-semibold text-card-foreground shadow-sm"

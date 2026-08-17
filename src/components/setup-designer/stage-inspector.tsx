@@ -28,8 +28,8 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import type { CableEdge, SetupNode, StageArea, StageConnectionAnchor, StageConnectionSide, StagePlan, StagePosition, StageWaypoint } from "@/lib/setup-designer/domain";
-import { constrainStageArea, stagePositionForNode, stageRouteFor } from "@/lib/setup-designer/stage-plot";
+import { powerDependencyLabel, type CableEdge, type SetupNode, type StageArea, type StageConnectionAnchor, type StageConnectionSide, type StagePlan, type StagePosition, type StageWaypoint } from "@/lib/setup-designer/domain";
+import { STAGE_POSITION_INCREMENT_FEET, constrainStageArea, stageAnchorArrowRotation, stagePositionForNode, stageRouteFor } from "@/lib/setup-designer/stage-plot";
 
 export function StageCableInspector({
   edge,
@@ -139,6 +139,7 @@ export function StageItemInspector({
 }) {
   const position = stagePositionForNode(node, stage);
   const update = (patch: Partial<Required<StagePosition>>) => onPositionChange({ ...position, ...patch });
+  const powerLabel = powerDependencyLabel(node.data);
 
   return (
     <div className="flex flex-col gap-4 overflow-y-auto p-3">
@@ -147,16 +148,19 @@ export function StageItemInspector({
           <h3 className="truncate text-sm font-semibold">{node.data.name}</h3>
           <p className="truncate text-xs text-muted-foreground">{node.data.category}</p>
         </div>
-        {node.data.showInSignalView === false ? <Badge variant="secondary">STAGE only</Badge> : null}
+        <div className="flex flex-wrap justify-end gap-1">
+          {powerLabel ? <Badge variant="outline">{powerLabel}</Badge> : null}
+          {node.data.showInSignalView === false ? <Badge variant="secondary">STAGE only</Badge> : null}
+        </div>
       </div>
       <FieldGroup className="grid grid-cols-2 gap-3">
         <Field>
           <FieldLabel htmlFor="stage-item-x">From stage left</FieldLabel>
-          <Input id="stage-item-x" type="number" min={0} max={stage.widthFeet} step="0.5" value={position.xFeet} onChange={(event) => update({ xFeet: Math.max(0, Number(event.target.value) || 0) })} />
+          <Input id="stage-item-x" type="number" min={0} max={stage.widthFeet} step={STAGE_POSITION_INCREMENT_FEET} value={position.xFeet} onChange={(event) => update({ xFeet: Math.max(0, Number(event.target.value) || 0) })} />
         </Field>
         <Field>
           <FieldLabel htmlFor="stage-item-y">From backstage</FieldLabel>
-          <Input id="stage-item-y" type="number" min={0} max={stage.depthFeet} step="0.5" value={position.yFeet} onChange={(event) => update({ yFeet: Math.max(0, Number(event.target.value) || 0) })} />
+          <Input id="stage-item-y" type="number" min={0} max={stage.depthFeet} step={STAGE_POSITION_INCREMENT_FEET} value={position.yFeet} onChange={(event) => update({ yFeet: Math.max(0, Number(event.target.value) || 0) })} />
         </Field>
         <Field>
           <FieldLabel htmlFor="stage-item-width">Width (in)</FieldLabel>
@@ -166,7 +170,7 @@ export function StageItemInspector({
           <FieldLabel htmlFor="stage-item-depth">Depth (in)</FieldLabel>
           <Input id="stage-item-depth" type="number" min={1} step="0.25" value={rounded(position.depthFeet * 12)} onChange={(event) => update({ depthFeet: Math.max(1, Number(event.target.value) || 1) / 12 })} />
         </Field>
-        <FieldDescription className="col-span-2">Placement is measured in feet; the physical footprint is measured in inches. The resting plot renders only this exact footprint.</FieldDescription>
+        <FieldDescription className="col-span-2">Placement snaps to quarter-foot increments; the physical footprint is measured in inches. The resting plot renders only this exact footprint.</FieldDescription>
       </FieldGroup>
 
       <FieldGroup className="gap-3 rounded-lg border bg-muted/30 p-3">
@@ -454,12 +458,12 @@ function AnchorPreviewMarker({ anchor, type }: { anchor: StageConnectionAnchor; 
   return (
     <span
       className={type === "input"
-        ? "absolute flex size-7 items-center justify-center rounded-full border-2 border-background bg-secondary text-secondary-foreground shadow-sm"
-        : "absolute flex size-7 items-center justify-center rounded-full border-2 border-background bg-primary text-primary-foreground shadow-sm"}
+        ? "absolute flex size-3 items-center justify-center rounded-full border border-background bg-secondary text-secondary-foreground shadow-sm"
+        : "absolute flex size-3 items-center justify-center rounded-full border border-background bg-primary text-primary-foreground shadow-sm"}
       style={style}
       title={type === "input" ? "Input anchor" : "Output anchor"}
     >
-      <Icon className="size-3.5" />
+      <Icon className="size-1.5" style={{ transform: `rotate(${stageAnchorArrowRotation(anchor.side)}deg)` }} />
       <span className="sr-only">{type === "input" ? "Input" : "Output"}</span>
     </span>
   );

@@ -2,7 +2,9 @@
 
 import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, type EdgeProps } from "@xyflow/react";
 
+import { edgeHasCableAssemblyLeg, edgeIsCableAssemblyPrimary } from "@/lib/setup-designer/breakout-cables";
 import type { CableEdge } from "@/lib/setup-designer/domain";
+import { cn } from "@/lib/utils";
 
 export function SignalCableEdge({
   id,
@@ -18,6 +20,8 @@ export function SignalCableEdge({
   const [path, labelX, labelY] = getSmoothStepPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, borderRadius: 10 });
   const markerId = `setup-arrow-${id.replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const color = data?.color ?? "var(--primary)";
+  const hovered = data?.signalHovered === true;
+  const emphasized = selected || hovered;
 
   if (data?.internalTransport) {
     const transport = data.internalTransport;
@@ -46,16 +50,16 @@ export function SignalCableEdge({
           <path d="M 0 0 L 5 2.5 L 0 5 z" fill={color} />
         </marker>
       </defs>
-      <BaseEdge id={`${id}-casing`} path={path} interactionWidth={0} style={{ stroke: "var(--background)", strokeWidth: selected ? 8 : 6 }} />
+      <BaseEdge id={`${id}-casing`} path={path} interactionWidth={0} style={{ stroke: "var(--background)", strokeWidth: emphasized ? 8 : 6 }} />
       <BaseEdge
         id={id}
         path={path}
         markerEnd={`url(#${markerId})`}
         interactionWidth={24}
-        className="setup-signal-cable"
-        style={{ stroke: color, strokeWidth: selected ? 4 : 3, strokeDasharray: "7 6" }}
+        className={cn("setup-signal-cable", hovered && "setup-signal-cable-hovered")}
+        style={{ stroke: color, strokeWidth: emphasized ? 4 : 3, strokeDasharray: "7 6" }}
       />
-      {(data?.estimatedLength || data?.exception) ? (
+      {(data?.estimatedLength || data?.exception) && (!edgeHasCableAssemblyLeg({ data }) || edgeIsCableAssemblyPrimary({ data })) ? (
         <EdgeLabelRenderer>
           <div
             className="pointer-events-none absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-md border bg-card px-1.5 py-0.5 text-[10px] font-semibold shadow-sm"

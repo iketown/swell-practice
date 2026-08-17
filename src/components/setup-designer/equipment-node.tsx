@@ -2,6 +2,7 @@
 
 import {
   AudioLinesIcon,
+  ArrowRightLeftIcon,
   CableIcon,
   CheckIcon,
   ChevronDownIcon,
@@ -14,6 +15,7 @@ import {
   ShoppingCartIcon,
   SlidersHorizontalIcon,
   TruckIcon,
+  ZapIcon,
 } from "lucide-react";
 import Image from "next/image";
 import { Handle, Position, type NodeProps, useUpdateNodeInternals } from "@xyflow/react";
@@ -22,7 +24,7 @@ import { createContext, useContext, useEffect, type CSSProperties } from "react"
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SIGNAL_TYPES } from "@/lib/setup-designer/catalog";
-import type { EquipmentPort, FulfillmentStatus, SetupNode } from "@/lib/setup-designer/domain";
+import { powerDependencyLabel, type EquipmentPort, type FulfillmentStatus, type SetupNode } from "@/lib/setup-designer/domain";
 import { portsByDirection } from "@/lib/setup-designer/ports";
 import { portDisplayNameForNode } from "@/lib/setup-designer/snake-topology";
 import { cn } from "@/lib/utils";
@@ -35,6 +37,7 @@ const categoryIcons = {
   "stage box": CircleDotIcon,
   mixer: SlidersHorizontalIcon,
   snake: CableIcon,
+  power: ZapIcon,
 } as const;
 
 const fulfillmentDisplay = {
@@ -56,16 +59,29 @@ export function EquipmentNode({ id, data, selected, isConnectable }: NodeProps<S
   const inputs = portsByDirection(data.ports, "input");
   const outputs = portsByDirection(data.ports, "output");
   const Icon = categoryIcons[data.category.toLowerCase() as keyof typeof categoryIcons] ?? AudioLinesIcon;
+  const powerLabel = powerDependencyLabel(data);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => updateNodeInternals(id));
     return () => cancelAnimationFrame(frame);
   }, [data.isExpanded, data.ports, id, updateNodeInternals]);
 
+  if (data.cableAssembly) {
+    return (
+      <CableAssemblyNode
+        data={data}
+        selected={selected}
+        isConnectable={isConnectable}
+        inputs={inputs}
+        outputs={outputs}
+      />
+    );
+  }
+
   if (!data.isExpanded) {
     const status = fulfillmentDisplay[data.fulfillment];
     const StatusIcon = status.icon;
-    const accessibleLabel = `${data.name}, ${inputs.length} inputs and ${outputs.length} outputs. ${status.label}. Double-click to configure.`;
+    const accessibleLabel = `${data.name}, ${inputs.length} inputs and ${outputs.length} outputs. ${status.label}.${powerLabel ? ` ${powerLabel}.` : ""} Double-click to configure.`;
 
     return (
       <article
@@ -111,7 +127,7 @@ export function EquipmentNode({ id, data, selected, isConnectable }: NodeProps<S
         </div>
         <footer className="border-t px-2 py-1.5">
           <h2 className="truncate text-xs font-semibold leading-4">{data.name}</h2>
-          <p className="truncate text-[10px] leading-3.5 text-muted-foreground">{inputs.length} in · {outputs.length} out</p>
+          <p className="truncate text-[10px] leading-3.5 text-muted-foreground">{inputs.length} in · {outputs.length} out{powerLabel ? ` · ${powerLabel.toLowerCase()}` : ""}</p>
         </footer>
         <CompactPortHandles nodeName={data.name} ports={inputs} position={Position.Left} type="target" isConnectable={isConnectable} channelLabels={data.transportChannelLabels} />
         <CompactPortHandles nodeName={data.name} ports={outputs} position={Position.Right} type="source" isConnectable={isConnectable} channelLabels={data.transportChannelLabels} />
@@ -126,7 +142,7 @@ export function EquipmentNode({ id, data, selected, isConnectable }: NodeProps<S
         "setup-equipment-node w-[360px] overflow-visible rounded-xl border bg-card text-card-foreground shadow-md transition-[box-shadow,border-color] duration-200",
         selected ? "border-primary shadow-lg ring-2 ring-primary/20" : "hover:border-primary/60",
       )}
-      aria-label={`${data.name}, ${inputs.length} inputs and ${outputs.length} outputs`}
+      aria-label={`${data.name}, ${inputs.length} inputs and ${outputs.length} outputs${powerLabel ? `, ${powerLabel}` : ""}`}
     >
       <header className="nodrag flex min-h-20 items-center gap-3 rounded-t-[calc(var(--radius-xl)-1px)] border-b bg-muted/35 p-3">
         <div className="relative flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-background text-muted-foreground">
@@ -141,6 +157,7 @@ export function EquipmentNode({ id, data, selected, isConnectable }: NodeProps<S
           <p className="truncate text-xs text-muted-foreground">{data.transportEndpointLabel || data.assignedAssetLabel || data.providerPartyName || data.category}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          {powerLabel ? <Badge variant="outline">{powerLabel}</Badge> : null}
           <Badge variant={data.fulfillment === "owned" ? "default" : "secondary"} className="capitalize">
             {data.fulfillment}
           </Badge>
@@ -174,6 +191,95 @@ export function EquipmentNode({ id, data, selected, isConnectable }: NodeProps<S
   );
 }
 
+function CableAssemblyNode({
+  data,
+  selected,
+  isConnectable,
+  inputs,
+  outputs,
+}: {
+  data: SetupNode["data"];
+  selected: boolean;
+  isConnectable: boolean;
+  inputs: EquipmentPort[];
+  outputs: EquipmentPort[];
+}) {
+  const breakout = inputs.length > 1 || outputs.length > 1;
+  const kindLabel = breakout ? "Breakout cable" : "Cable";
+  return (
+    <article
+      className={cn(
+        "setup-equipment-node relative w-[216px] overflow-visible rounded-xl border bg-card text-card-foreground shadow-md transition-[box-shadow,border-color,transform] duration-200",
+        selected ? "border-primary shadow-lg ring-2 ring-primary/25" : "hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-lg",
+      )}
+      aria-label={`${data.name}, ${kindLabel.toLowerCase()} with ${inputs.length} input${inputs.length === 1 ? "" : "s"} and ${outputs.length} output${outputs.length === 1 ? "" : "s"}. Double-click to configure.`}
+      title={`${data.name} · One physical ${kindLabel.toLowerCase()}`}
+    >
+      <header className="flex min-h-11 items-center gap-2 rounded-t-[calc(var(--radius-xl)-1px)] border-b bg-muted/35 px-2.5 py-2">
+        <span
+          className="flex size-7 shrink-0 items-center justify-center rounded-md border bg-background text-muted-foreground"
+          style={{ color: data.cableAssembly?.color }}
+        >
+          <CableIcon aria-hidden className="size-4" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-xs font-semibold">{data.name}</span>
+          <span className="block text-[9px] uppercase tracking-wide text-muted-foreground">{kindLabel}</span>
+        </span>
+        <Badge variant="secondary" className="shrink-0 font-mono text-[10px]">{inputs.length}→{outputs.length}</Badge>
+      </header>
+      <div className="grid grid-cols-[minmax(0,1fr)_2rem_minmax(0,1fr)] items-stretch bg-border">
+        <BreakoutPortColumn ports={inputs} type="target" position={Position.Left} isConnectable={isConnectable} />
+        <span className="flex items-center justify-center bg-muted/45 text-muted-foreground" aria-hidden>
+          <ArrowRightLeftIcon className="size-3.5" />
+        </span>
+        <BreakoutPortColumn ports={outputs} type="source" position={Position.Right} isConnectable={isConnectable} align="right" />
+      </div>
+      <footer className="rounded-b-[calc(var(--radius-xl)-1px)] border-t px-2.5 py-1.5 text-[9px] font-medium text-muted-foreground">
+        {breakout ? "All legs count as one cable" : "One specific cable in this chain"}
+      </footer>
+    </article>
+  );
+}
+
+function BreakoutPortColumn({
+  ports,
+  type,
+  position,
+  isConnectable,
+  align = "left",
+}: {
+  ports: EquipmentPort[];
+  type: "source" | "target";
+  position: Position;
+  isConnectable: boolean;
+  align?: "left" | "right";
+}) {
+  return (
+    <div className="flex min-h-14 flex-col justify-center gap-px bg-card py-1">
+      {ports.map((port) => {
+        const connector = `${port.connector.label}${port.connector.gender === "none" ? "" : ` ${port.connector.gender}`}`;
+        const accessibleLabel = `${port.label ?? `Connector ${port.number}`}, ${connector}`;
+        return (
+          <div key={port.id} className={cn("relative flex min-h-10 flex-col justify-center px-2 py-1", align === "right" && "items-end text-right")}>
+            <Handle
+              id={port.id}
+              type={type}
+              position={position}
+              isConnectable={isConnectable}
+              aria-label={accessibleLabel}
+              title={accessibleLabel}
+              className="setup-port-handle"
+            />
+            <span className="max-w-full truncate text-[10px] font-semibold">{port.label}</span>
+            <span className="max-w-full truncate text-[8px] text-muted-foreground">{connector}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function PortColumn({
   nodeName,
   nodeData,
@@ -197,8 +303,11 @@ function PortColumn({
     <div className="flex min-h-9 flex-col bg-card">
       {ports.length ? ports.map((port) => {
         const label = portDisplayNameForNode({ data: nodeData }, port, showNumber, showLabel);
-        const accessibleLabel = portAccessibleLabel(nodeName, port, nodeData.transportChannelLabels?.[port.channelKey ?? ""]);
+        const signalPath = nodeData.signalPathLabels?.[port.id];
+        const accessibleLabel = portAccessibleLabel(nodeName, port, nodeData.transportChannelLabels?.[port.channelKey ?? ""], signalPath);
         const signalLabel = SIGNAL_TYPES.find((signal) => signal.id === port.signalType)?.label ?? port.signalType;
+        const technicalSubtitle = [port.connector.label, port.connector.gender === "none" ? null : port.connector.gender, port.connector.specification, signalLabel].filter(Boolean).join(" · ");
+        const subtitle = signalPath?.length ? `${signalPath.join(" → ")} →` : technicalSubtitle;
         return (
           <div key={port.id} className={cn("relative flex min-h-11 flex-col justify-center px-3 py-1.5 text-[11px]", type === "source" && "items-end text-right")} title={accessibleLabel}>
             <Handle
@@ -210,9 +319,7 @@ function PortColumn({
               className="setup-port-handle"
             />
             <span className="max-w-full truncate font-medium">{label}</span>
-            <span className="max-w-full truncate text-[9px] text-muted-foreground">
-              {[port.connector.label, port.connector.gender === "none" ? null : port.connector.gender, port.connector.specification, signalLabel].filter(Boolean).join(" · ")}
-            </span>
+            <span className="max-w-full truncate text-[9px] text-muted-foreground">{subtitle}</span>
           </div>
         );
       }) : <span className="px-3 py-2 text-[11px] text-muted-foreground">None</span>}
@@ -291,6 +398,6 @@ function TransportTrunkHandle({ data }: { data: SetupNode["data"] }) {
   );
 }
 
-function portAccessibleLabel(nodeName: string, port: EquipmentPort, carriedLabel?: string) {
-  return `${nodeName}, ${port.direction} ${port.number}${carriedLabel ? `, Snake channel ${port.number}, ${carriedLabel}` : port.label ? `, ${port.label}` : ""}, ${port.connector.label} ${port.connector.gender}`;
+function portAccessibleLabel(nodeName: string, port: EquipmentPort, carriedLabel?: string, signalPath?: string[]) {
+  return `${nodeName}, ${port.direction} ${port.number}${carriedLabel ? `, Snake channel ${port.number}, ${carriedLabel}` : port.label ? `, ${port.label}` : ""}${signalPath?.length ? `, signal from ${signalPath.join(" through ")}` : ""}, ${port.connector.label} ${port.connector.gender}`;
 }

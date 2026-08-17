@@ -85,6 +85,12 @@ export interface InventoryAsset {
   cableColor?: CableColor;
   lifecycleStatus: InventoryAssetLifecycle;
   stageOnly: boolean;
+  /** Per-item override. When omitted, the reusable definition provides the default. */
+  needsPowerSource?: boolean;
+  /** Per-item override for a separately labeled adapter. Implies needsPowerSource. */
+  needsPowerAdapter?: boolean;
+  /** Hidden membership pointer for items that travel and check in while connected. */
+  connectionSetId?: string;
   tags: string[];
   ownerPartyId?: string;
   currentLocationId?: string;
@@ -97,6 +103,46 @@ export interface InventoryAsset {
   purchaseOrderLineId?: string;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface InventoryConnectorReference {
+  assetId: string;
+  /** Stable connector ID derived from the reusable definition. */
+  connectorId: string;
+}
+
+export interface InventoryConnectionLink {
+  id: string;
+  a: InventoryConnectorReference;
+  b: InventoryConnectorReference;
+}
+
+export interface InventorySignalConnector {
+  endpoint: InventoryConnectorReference;
+  direction: "input" | "output";
+}
+
+export interface InventoryConnectionNodePosition {
+  x: number;
+  y: number;
+}
+
+/** Persisted internally; the product UI describes only the item-to-item connections. */
+export interface InventoryConnectionSet {
+  id: string;
+  memberAssetIds: string[];
+  links: InventoryConnectionLink[];
+  signalConnectors: InventorySignalConnector[];
+  nodePositions?: Record<string, InventoryConnectionNodePosition>;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface InventoryCheckInOutcome {
+  operationId: string;
+  checkIns: InventoryCheckIn[];
+  assets: InventoryAsset[];
+  propagatedAssets?: InventoryAsset[];
 }
 
 export interface PurchaseOrderLine {

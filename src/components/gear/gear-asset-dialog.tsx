@@ -391,6 +391,8 @@ export function GearAssetDialog({
           referenceImages: structuredClone(selectedReferenceImages),
           aiImport: researchResult.aiImport,
           ports: structuredClone(researchResult.ports),
+          needsPowerSource: false,
+          needsPowerAdapter: false,
           showInSignalView: !stageOnly,
           showPortNumbers: true,
           showPortLabels: true,

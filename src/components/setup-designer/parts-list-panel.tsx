@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangleIcon, CableIcon, PackageCheckIcon } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { CableInspector } from "@/components/setup-designer/cable-inspector";
 import { CableInventoryPanel } from "@/components/setup-designer/cable-inventory-panel";
@@ -9,8 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { InventoryAsset } from "@/lib/gear/domain";
-import type { CableEdge, CableRunGroup, CableRunRow, EquipmentTemplate, EquipmentUsageRow } from "@/lib/setup-designer/domain";
+import { powerDependencyLabel, type CableEdge, type CableRunGroup, type CableRunRow, type EquipmentTemplate, type EquipmentUsageRow } from "@/lib/setup-designer/domain";
 import { cn } from "@/lib/utils";
+
+type PartsPanelTab = "runs" | "inventory" | "summary" | "equipment";
 
 export function PartsListPanel({
   selectedEdge,
@@ -25,6 +27,7 @@ export function PartsListPanel({
   onCableSelect,
   hoveredEdgeId,
   onCableHoverChange,
+  hoveredEquipmentNodeId,
   onEquipmentSelect,
   onCableInventoryAssign,
   onCableInventoryAutoAssign,
@@ -41,24 +44,40 @@ export function PartsListPanel({
   onCableSelect: (edgeId: string) => void;
   hoveredEdgeId?: string | null;
   onCableHoverChange?: (edgeId: string | null) => void;
+  hoveredEquipmentNodeId?: string | null;
   onEquipmentSelect: (nodeId: string) => void;
   onCableInventoryAssign: (edgeId: string, asset?: InventoryAsset) => void;
   onCableInventoryAutoAssign: (assignments: ReadonlyMap<string, InventoryAsset>) => void;
 }) {
+  const [activeTab, setActiveTab] = useState<PartsPanelTab>("runs");
   const cableButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+  const equipmentButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+  const visibleTab: PartsPanelTab = hoveredEdgeId ? "runs" : hoveredEquipmentNodeId ? "equipment" : activeTab;
 
   useEffect(() => {
-    if (!hoveredEdgeId) return;
+    if (visibleTab !== "runs" || !hoveredEdgeId) return;
     const button = cableButtonRefs.current.get(hoveredEdgeId);
     if (!button) return;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     button.scrollIntoView({ block: "nearest", behavior: reducedMotion ? "auto" : "smooth" });
-  }, [hoveredEdgeId]);
+  }, [hoveredEdgeId, visibleTab]);
+
+  useEffect(() => {
+    if (visibleTab !== "equipment" || !hoveredEquipmentNodeId) return;
+    const button = equipmentButtonRefs.current.get(hoveredEquipmentNodeId);
+    if (!button) return;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    button.scrollIntoView({ block: "nearest", behavior: reducedMotion ? "auto" : "smooth" });
+  }, [hoveredEquipmentNodeId, visibleTab]);
 
   if (selectedEdge) return <CableInspector edge={selectedEdge} onChange={onCableChange} onDelete={onCableDelete} />;
 
   return (
-    <Tabs defaultValue="runs" className="min-h-0 flex-1 overflow-hidden p-3 min-[901px]:max-h-[calc(100dvh-15rem)]">
+    <Tabs
+      value={visibleTab}
+      onValueChange={(value) => setActiveTab(String(value) as PartsPanelTab)}
+      className="min-h-0 flex-1 overflow-hidden p-3 min-[901px]:max-h-[calc(100dvh-15rem)]"
+    >
       <TabsList className="w-full">
         <TabsTrigger value="runs">Runs ({cableRows.length})</TabsTrigger>
         <TabsTrigger value="inventory">Match</TabsTrigger>
@@ -112,8 +131,21 @@ export function PartsListPanel({
       </TabsContent>
       <TabsContent value="equipment" className="min-h-0 overflow-y-auto">
         {equipmentRows.length ? <div className="flex flex-col gap-2 py-2">{equipmentRows.map((row) => (
-          <button key={row.nodeId} type="button" onClick={() => onEquipmentSelect(row.nodeId)} className="flex items-center justify-between gap-3 rounded-lg border bg-background p-2 text-left hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-primary">
-            <span className="min-w-0"><span className="block truncate text-xs font-semibold">{row.name}</span><span className="block truncate text-xs text-muted-foreground">{row.detail ?? row.assignmentLabel ?? `${row.category} · not mapped`}</span>{row.detail && row.assignmentLabel ? <span className="block truncate text-[10px] text-muted-foreground">{row.assignmentLabel}</span> : null}</span>
+          <button
+            key={row.nodeId}
+            ref={(element) => {
+              if (element) equipmentButtonRefs.current.set(row.nodeId, element);
+              else equipmentButtonRefs.current.delete(row.nodeId);
+            }}
+            type="button"
+            onClick={() => onEquipmentSelect(row.nodeId)}
+            data-highlighted={hoveredEquipmentNodeId === row.nodeId ? "true" : undefined}
+            className={cn(
+              "flex items-center justify-between gap-3 rounded-lg border bg-background p-2 text-left transition-[background-color,border-color,box-shadow] duration-150 hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-primary",
+              hoveredEquipmentNodeId === row.nodeId && "border-primary bg-primary/10 shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_18%,transparent)]",
+            )}
+          >
+            <span className="min-w-0"><span className="block truncate text-xs font-semibold">{row.name}</span><span className="block truncate text-xs text-muted-foreground">{row.detail ?? row.assignmentLabel ?? `${row.category} · not mapped`}</span>{row.detail && row.assignmentLabel ? <span className="block truncate text-[10px] text-muted-foreground">{row.assignmentLabel}</span> : null}{powerDependencyLabel(row) ? <span className="block truncate text-[10px] font-medium text-foreground">{powerDependencyLabel(row)}</span> : null}</span>
             <Badge variant="secondary" className="shrink-0 capitalize">{row.fulfillment}</Badge>
           </button>
         ))}</div> : <Empty className="border-0 py-12"><EmptyHeader><PackageCheckIcon /><EmptyTitle>No equipment used</EmptyTitle><EmptyDescription>Add nodes from the equipment library.</EmptyDescription></EmptyHeader></Empty>}

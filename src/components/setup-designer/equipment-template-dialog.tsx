@@ -28,10 +28,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { createDefaultCableDefinitionEnds, formatCableDefinitionName } from "@/lib/setup-designer/cable-definitions";
 import type { CableDefinitionEnds, EquipmentKind, EquipmentPort, EquipmentTemplate, EquipmentTransportTopology, GearDefinitionKind, ImportedEquipmentDraft } from "@/lib/setup-designer/domain";
@@ -55,15 +56,32 @@ interface EquipmentTemplateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   template?: EquipmentTemplate;
+  initialDefinitionKind?: GearDefinitionKind;
+  initialName?: string;
+  lockDefinitionKind?: boolean;
+  creationContext?: "catalog" | "asset";
   onCreated?: (template: EquipmentTemplate) => void;
   onSaved?: (template: EquipmentTemplate) => void;
   onArchived?: (template: EquipmentTemplate) => void;
   showArchiveAction?: boolean;
 }
 
-export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreated, onSaved, onArchived, showArchiveAction = true }: EquipmentTemplateDialogProps) {
-  const [name, setName] = useState(template?.name ?? "");
-  const [definitionKind, setDefinitionKind] = useState<GearDefinitionKind>(template?.definitionKind ?? "equipment");
+export function EquipmentTemplateDialog({
+  open,
+  onOpenChange,
+  template,
+  initialDefinitionKind = "equipment",
+  initialName = "",
+  lockDefinitionKind = false,
+  creationContext = "catalog",
+  onCreated,
+  onSaved,
+  onArchived,
+  showArchiveAction = true,
+}: EquipmentTemplateDialogProps) {
+  const startingDefinitionKind = template?.definitionKind ?? initialDefinitionKind;
+  const [name, setName] = useState(template?.name ?? initialName);
+  const [definitionKind, setDefinitionKind] = useState<GearDefinitionKind>(startingDefinitionKind);
   const [manufacturer, setManufacturer] = useState(template?.manufacturer ?? "");
   const [model, setModel] = useState(template?.model ?? "");
   const [category, setCategory] = useState(template?.category ?? "Other");
@@ -83,7 +101,9 @@ export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreate
   const [priceVendor, setPriceVendor] = useState(template?.purchaseSource?.vendor ?? "");
   const [ports, setPorts] = useState<EquipmentPort[]>(() => template ? structuredClone(template.ports) : initialPorts());
   const [cableEnds, setCableEnds] = useState<CableDefinitionEnds>(() => template?.cableEnds ? structuredClone(template.cableEnds) : createDefaultCableDefinitionEnds());
-  const [showInSignalView, setShowInSignalView] = useState(template?.showInSignalView ?? true);
+  const [needsPowerSource, setNeedsPowerSource] = useState(template?.needsPowerSource ?? false);
+  const [needsPowerAdapter, setNeedsPowerAdapter] = useState(template?.needsPowerAdapter ?? false);
+  const [showInSignalView, setShowInSignalView] = useState(template?.showInSignalView ?? startingDefinitionKind === "equipment");
   const [imageFile, setImageFile] = useState<File | undefined>();
   const [researchResult, setResearchResult] = useState<ImportedEquipmentDraft | null>(null);
   const [selectedReferenceUrls, setSelectedReferenceUrls] = useState<Set<string>>(() => new Set(template?.referenceImages.map((image) => image.url) ?? []));
@@ -100,8 +120,8 @@ export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreate
   }, [researching]);
 
   function resetForm() {
-    setName(template?.name ?? "");
-    setDefinitionKind(template?.definitionKind ?? "equipment");
+    setName(template?.name ?? initialName);
+    setDefinitionKind(template?.definitionKind ?? initialDefinitionKind);
     setManufacturer(template?.manufacturer ?? "");
     setModel(template?.model ?? "");
     setCategory(template?.category ?? "Other");
@@ -121,7 +141,9 @@ export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreate
     setPriceVendor(template?.purchaseSource?.vendor ?? "");
     setPorts(template ? structuredClone(template.ports) : initialPorts());
     setCableEnds(template?.cableEnds ? structuredClone(template.cableEnds) : createDefaultCableDefinitionEnds());
-    setShowInSignalView(template?.showInSignalView ?? true);
+    setNeedsPowerSource(template?.needsPowerSource ?? false);
+    setNeedsPowerAdapter(template?.needsPowerAdapter ?? false);
+    setShowInSignalView(template?.showInSignalView ?? initialDefinitionKind === "equipment");
     setImageFile(undefined);
     setResearchResult(null);
     setSelectedReferenceUrls(new Set(template?.referenceImages.map((image) => image.url) ?? []));
@@ -234,6 +256,8 @@ export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreate
         aiImport: definitionKind === "equipment" ? researchResult?.aiImport ?? template?.aiImport : undefined,
         cableEnds: definitionKind === "cable" ? structuredClone(cableEnds) : undefined,
         ports: definitionKind === "cable" ? [] : structuredClone(ports),
+        needsPowerSource: definitionKind === "equipment" && (needsPowerSource || needsPowerAdapter),
+        needsPowerAdapter: definitionKind === "equipment" && needsPowerAdapter,
         showInSignalView: definitionKind === "cable" ? false : showInSignalView,
         showPortNumbers: template?.showPortNumbers ?? true,
         showPortLabels: template?.showPortLabels ?? true,
@@ -284,8 +308,14 @@ export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreate
     <Dialog open={open} onOpenChange={changeOpen}>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>{template ? `Edit ${template.name}` : "New gear definition"}</DialogTitle>
-          <DialogDescription>{template ? "Update this reusable definition. Equipment uses directional ports; cables use two interchangeable connector ends." : "Create reusable equipment with directional ports or a cable type with two interchangeable ends. Physical and planned assets are created separately."}</DialogDescription>
+          <DialogTitle>{template ? `Edit ${template.name}` : definitionKind === "cable" ? "New cable definition" : "New gear definition"}</DialogTitle>
+          <DialogDescription>{template
+            ? "Update this reusable definition. Equipment uses directional ports; cables use two interchangeable connector ends."
+            : creationContext === "asset"
+              ? definitionKind === "cable"
+                ? "Define the two reusable cable ends. Save to return to this item with the new definition selected."
+                : "Define the reusable gear type and its physical ports. Save to return to this item with the new definition selected."
+              : "Create reusable equipment with directional ports or a cable type with two interchangeable ends. Physical and planned assets are created separately."}</DialogDescription>
         </DialogHeader>
         <form id="equipment-template-form" onSubmit={submit} className="flex flex-col gap-5" aria-busy={researching}>
           {definitionKind === "equipment" ? <FieldGroup className="rounded-lg border bg-muted/30 p-3">
@@ -347,7 +377,7 @@ export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreate
               )}
             >
           <FieldGroup className="gap-4">
-            <Field className="sm:max-w-sm">
+            {!lockDefinitionKind ? <Field className="sm:max-w-sm">
               <FieldLabel htmlFor="equipment-definition-kind">Definition type</FieldLabel>
               <Select value={definitionKind} onValueChange={(value) => {
                 if (!value) return;
@@ -369,7 +399,7 @@ export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreate
                 </SelectGroup></SelectContent>
               </Select>
               <FieldDescription>Cables are bidirectional and use End 1 and End 2 instead of inputs and outputs.</FieldDescription>
-            </Field>
+            </Field> : null}
             {definitionKind === "equipment" ? (
               <FieldGroup className="grid gap-4 sm:grid-cols-2">
                 <Field data-invalid={Boolean(error && !name.trim())}>
@@ -440,6 +470,41 @@ export function EquipmentTemplateDialog({ open, onOpenChange, template, onCreate
               </Field>
             ) : null}
           </FieldGroup> : null}
+
+          {definitionKind === "equipment" ? <FieldSet className="rounded-lg border bg-muted/30 p-3">
+            <FieldLegend>Power dependencies</FieldLegend>
+            <FieldDescription>These defaults follow every new setup instance and every inventory item using this definition.</FieldDescription>
+            <FieldGroup className="gap-3">
+              <Field orientation="horizontal">
+                <div className="flex flex-1 flex-col gap-1">
+                  <FieldLabel htmlFor="equipment-needs-power-source">Needs power source</FieldLabel>
+                  <FieldDescription>Place this gear within reach of a stage power drop or other power source.</FieldDescription>
+                </div>
+                <Switch
+                  id="equipment-needs-power-source"
+                  checked={needsPowerSource || needsPowerAdapter}
+                  onCheckedChange={(checked) => {
+                    setNeedsPowerSource(checked);
+                    if (!checked) setNeedsPowerAdapter(false);
+                  }}
+                />
+              </Field>
+              <Field orientation="horizontal">
+                <div className="flex flex-1 flex-col gap-1">
+                  <FieldLabel htmlFor="equipment-needs-power-adapter">Needs power adapter</FieldLabel>
+                  <FieldDescription>The separately labeled adapter travels with the same four-digit ID as this item.</FieldDescription>
+                </div>
+                <Switch
+                  id="equipment-needs-power-adapter"
+                  checked={needsPowerAdapter}
+                  onCheckedChange={(checked) => {
+                    setNeedsPowerAdapter(checked);
+                    if (checked) setNeedsPowerSource(true);
+                  }}
+                />
+              </Field>
+            </FieldGroup>
+          </FieldSet> : null}
 
           {definitionKind === "equipment" ? <Field orientation="horizontal" className="rounded-lg border bg-muted/30 p-3">
             <Checkbox

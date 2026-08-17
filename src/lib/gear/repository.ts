@@ -7,6 +7,7 @@ import {
   getDocs,
   limit,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   where,
@@ -40,13 +41,16 @@ import {
   type InventoryAssetCodeGroup,
   type InventoryAssetLifecycle,
   type InventoryCheckIn,
+  type InventoryConnectionLink,
+  type InventoryConnectionSet,
+  type InventorySignalConnector,
   type PaymentStatus,
   type PublicGearAsset,
   type PurchaseOrder,
   type PurchaseOrderLine,
   type PurchaseOrderStatus,
 } from "@/lib/gear/domain";
-import type { EquipmentImage, EquipmentTemplate } from "@/lib/setup-designer/domain";
+import { normalizePowerDependencies, type EquipmentImage, type EquipmentTemplate } from "@/lib/setup-designer/domain";
 import { listEquipmentTemplates } from "@/lib/setup-designer/repository";
 
 const DEMO_STORE_KEY = "swell-parts:gear:v1";
@@ -66,6 +70,17 @@ interface GearDemoStore {
   assets: InventoryAsset[];
   orders: PurchaseOrder[];
   checkIns: InventoryCheckIn[];
+  connectionSets: InventoryConnectionSet[];
+}
+
+export interface InventoryConnectionSetInput {
+  id?: string;
+  sourceAssetId: string;
+  memberAssetIds: string[];
+  links: InventoryConnectionLink[];
+  signalConnectors: InventorySignalConnector[];
+  nodePositions?: InventoryConnectionSet["nodePositions"];
+  createdAt?: number;
 }
 
 export interface InventoryAssetInput {
@@ -166,6 +181,7 @@ function seedDemoStore(): GearDemoStore {
     ],
     orders: [],
     checkIns: [],
+    connectionSets: [],
   };
 }
 
@@ -197,6 +213,12 @@ function readDemoStore() {
       })) : [],
       orders: Array.isArray(value.orders) ? value.orders : [],
       checkIns: Array.isArray(value.checkIns) ? value.checkIns : [],
+      connectionSets: Array.isArray(value.connectionSets)
+        ? value.connectionSets.flatMap((item) => {
+            const normalized = connectionSetFromData(item.id, item as unknown as Record<string, unknown>);
+            return normalized.memberAssetIds.length > 1 ? [normalized] : [];
+          })
+        : [],
     };
   } catch {
     return seedDemoStore();
@@ -214,6 +236,74 @@ function timestampMillis(value: unknown, fallback = Date.now()) {
 
 function stringValue(value: unknown) {
   return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function powerDependencyOverridesFromData(value: {
+  needsPowerSource?: unknown;
+  needsPowerAdapter?: unknown;
+}): Partial<Pick<InventoryAsset, "needsPowerSource" | "needsPowerAdapter">> {
+  if (typeof value.needsPowerSource !== "boolean" && typeof value.needsPowerAdapter !== "boolean") return {};
+  return normalizePowerDependencies(value);
+}
+
+function connectorReferenceFromData(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const data = value as Record<string, unknown>;
+  if (typeof data.assetId !== "string" || typeof data.connectorId !== "string") return undefined;
+  return { assetId: data.assetId, connectorId: data.connectorId };
+}
+
+function connectionSetFromData(id: string, value: Record<string, unknown>): InventoryConnectionSet {
+  const memberAssetIds = Array.isArray(value.memberAssetIds)
+    ? [...new Set(value.memberAssetIds.filter((item): item is string => typeof item === "string" && Boolean(item)))]
+    : [];
+  const memberIds = new Set(memberAssetIds);
+  const links = Array.isArray(value.links) ? value.links.flatMap((item, index): InventoryConnectionLink[] => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+    const data = item as Record<string, unknown>;
+    const a = connectorReferenceFromData(data.a);
+    const b = connectorReferenceFromData(data.b);
+    if (!a || !b || !memberIds.has(a.assetId) || !memberIds.has(b.assetId) || a.assetId === b.assetId) return [];
+    return [{ id: typeof data.id === "string" && data.id ? data.id : `${id}-link-${index + 1}`, a, b }];
+  }) : [];
+  const internalConnectorKeys = new Set(links.flatMap((link) => [
+    `${link.a.assetId}:${link.a.connectorId}`,
+    `${link.b.assetId}:${link.b.connectorId}`,
+  ]));
+  const signalConnectors = Array.isArray(value.signalConnectors) ? value.signalConnectors.flatMap((item): InventorySignalConnector[] => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+    const data = item as Record<string, unknown>;
+    const endpoint = connectorReferenceFromData(data.endpoint);
+    if (!endpoint || !memberIds.has(endpoint.assetId) || internalConnectorKeys.has(`${endpoint.assetId}:${endpoint.connectorId}`)) return [];
+    if (data.direction !== "input" && data.direction !== "output") return [];
+    return [{ endpoint, direction: data.direction }];
+  }) : [];
+  const nodePositions = value.nodePositions && typeof value.nodePositions === "object" && !Array.isArray(value.nodePositions)
+    ? Object.fromEntries(Object.entries(value.nodePositions).flatMap(([assetId, position]) => {
+      if (!memberIds.has(assetId) || !position || typeof position !== "object" || Array.isArray(position)) return [];
+      const data = position as Record<string, unknown>;
+      if (typeof data.x !== "number" || !Number.isFinite(data.x) || typeof data.y !== "number" || !Number.isFinite(data.y)) return [];
+      return [[assetId, { x: data.x, y: data.y }]];
+    }))
+    : {};
+  return {
+    id,
+    memberAssetIds,
+    links,
+    signalConnectors,
+    nodePositions,
+    createdAt: timestampMillis(value.createdAt),
+    updatedAt: timestampMillis(value.updatedAt),
+  };
+}
+
+function connectionSetDocumentValue(value: InventoryConnectionSet) {
+  return {
+    memberAssetIds: value.memberAssetIds,
+    links: value.links,
+    signalConnectors: value.signalConnectors,
+    nodePositions: value.nodePositions ?? {},
+  };
 }
 
 function imageFromData(value: unknown): EquipmentImage | undefined {
@@ -292,6 +382,8 @@ function assetFromData(id: string, value: Record<string, unknown>): InventoryAss
     cableColor: normalizeCableColor(value.cableColor),
     lifecycleStatus: lifecycleValues.includes(value.lifecycleStatus as InventoryAssetLifecycle) ? value.lifecycleStatus as InventoryAssetLifecycle : "planned",
     stageOnly: value.stageOnly === true,
+    ...powerDependencyOverridesFromData(value),
+    connectionSetId: stringValue(value.connectionSetId),
     tags: Array.isArray(value.tags)
       ? normalizeInventoryTags(value.tags.filter((tag): tag is string => typeof tag === "string")).slice(0, MAX_INVENTORY_TAGS)
       : [],
@@ -612,6 +704,9 @@ function assetDocumentValue(asset: InventoryAsset) {
     cableColor: asset.cableColor ?? "",
     lifecycleStatus: asset.lifecycleStatus,
     stageOnly: asset.stageOnly,
+    needsPowerSource: asset.needsPowerSource ?? false,
+    needsPowerAdapter: asset.needsPowerAdapter ?? false,
+    connectionSetId: asset.connectionSetId ?? "",
     tags: asset.tags,
     ownerPartyId: asset.ownerPartyId ?? "",
     currentLocationId: asset.currentLocationId ?? "",
@@ -713,6 +808,146 @@ export async function saveInventoryAsset(
     console.warn("Could not update the public QR label record.", syncError);
   });
   return storedAsset;
+}
+
+export async function listInventoryConnectionSets() {
+  if (isDemoMode() || !db) return readDemoStore().connectionSets.sort((left, right) => right.updatedAt - left.updatedAt);
+  const snapshots = await getDocs(collection(db, "inventoryConnectionSets"));
+  return snapshots.docs
+    .map((item) => connectionSetFromData(item.id, item.data()))
+    .filter((item) => item.memberAssetIds.length > 1)
+    .sort((left, right) => right.updatedAt - left.updatedAt);
+}
+
+export async function saveInventoryConnectionSet(input: InventoryConnectionSetInput) {
+  const now = Date.now();
+  const originalId = input.id ?? createGearId("connection-set");
+  const desiredSets = partitionConnectionSetInput({ ...input, id: originalId }, now);
+
+  if (isDemoMode() || !db) {
+    const store = readDemoStore();
+    const previousSet = store.connectionSets.find((item) => item.id === originalId);
+    const affectedAssetIds = new Set([
+      ...(previousSet?.memberAssetIds ?? []),
+      ...desiredSets.flatMap((item) => item.memberAssetIds),
+    ]);
+    const desiredSetIdByAssetId = new Map(desiredSets.flatMap((item) => item.memberAssetIds.map((assetId) => [assetId, item.id] as const)));
+    for (const assetId of desiredSetIdByAssetId.keys()) {
+      const asset = store.assets.find((item) => item.id === assetId);
+      if (!asset) throw new Error("One of the connected items no longer exists.");
+      if (asset.connectionSetId && asset.connectionSetId !== originalId) {
+        throw new Error(`${asset.assetTag} is already connected to other gear. Disconnect it there first.`);
+      }
+    }
+    store.connectionSets = [
+      ...store.connectionSets.filter((item) => item.id !== originalId && !desiredSets.some((desired) => desired.id === item.id)),
+      ...desiredSets,
+    ];
+    store.assets = store.assets.map((asset) => affectedAssetIds.has(asset.id) ? {
+      ...asset,
+      connectionSetId: desiredSetIdByAssetId.get(asset.id),
+      updatedAt: now,
+    } : asset);
+    writeDemoStore(store);
+    return desiredSets;
+  }
+
+  const firestore = firestoreOrThrow();
+  await runTransaction(firestore, async (transaction) => {
+    const previousReference = doc(firestore, "inventoryConnectionSets", originalId);
+    const previousSnapshot = await transaction.get(previousReference);
+    const previousSet = previousSnapshot.exists() ? connectionSetFromData(previousSnapshot.id, previousSnapshot.data()) : undefined;
+    const affectedAssetIds = [...new Set([
+      ...(previousSet?.memberAssetIds ?? []),
+      ...desiredSets.flatMap((item) => item.memberAssetIds),
+    ])];
+    const assetReferences = affectedAssetIds.map((assetId) => doc(firestore, "inventoryAssets", assetId));
+    const assetSnapshots = await Promise.all(assetReferences.map((reference) => transaction.get(reference)));
+    const desiredSetIdByAssetId = new Map(desiredSets.flatMap((item) => item.memberAssetIds.map((assetId) => [assetId, item.id] as const)));
+
+    for (const snapshot of assetSnapshots) {
+      if (!snapshot.exists()) throw new Error("One of the connected items no longer exists.");
+      const asset = assetFromData(snapshot.id, snapshot.data());
+      if (desiredSetIdByAssetId.has(asset.id) && asset.connectionSetId && asset.connectionSetId !== originalId) {
+        throw new Error(`${asset.assetTag} is already connected to other gear. Disconnect it there first.`);
+      }
+    }
+
+    const desiredIds = new Set(desiredSets.map((item) => item.id));
+    if (!desiredIds.has(originalId) && previousSnapshot.exists()) transaction.delete(previousReference);
+    for (const connectionSet of desiredSets) {
+      const reference = doc(firestore, "inventoryConnectionSets", connectionSet.id);
+      transaction.set(reference, {
+        ...connectionSetDocumentValue(connectionSet),
+        createdAt: connectionSet.id === originalId && previousSnapshot.exists()
+          ? previousSnapshot.data().createdAt ?? serverTimestamp()
+          : serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+    }
+    for (const reference of assetReferences) {
+      transaction.update(reference, {
+        connectionSetId: desiredSetIdByAssetId.get(reference.id) ?? "",
+        updatedAt: serverTimestamp(),
+      });
+    }
+  });
+  return desiredSets;
+}
+
+function partitionConnectionSetInput(input: InventoryConnectionSetInput & { id: string }, now: number) {
+  const memberAssetIds = [...new Set([input.sourceAssetId, ...input.memberAssetIds].filter(Boolean))];
+  const memberIds = new Set(memberAssetIds);
+  const connectorKeys = new Set<string>();
+  const links = input.links.flatMap((link): InventoryConnectionLink[] => {
+    if (!memberIds.has(link.a.assetId) || !memberIds.has(link.b.assetId) || link.a.assetId === link.b.assetId) return [];
+    const aKey = `${link.a.assetId}:${link.a.connectorId}`;
+    const bKey = `${link.b.assetId}:${link.b.connectorId}`;
+    if (connectorKeys.has(aKey) || connectorKeys.has(bKey)) throw new Error("Each physical connector can be used by only one kept connection.");
+    connectorKeys.add(aKey);
+    connectorKeys.add(bKey);
+    return [{ ...structuredClone(link), id: link.id || createGearId("connection-link") }];
+  });
+  const adjacency = new Map(memberAssetIds.map((assetId) => [assetId, new Set<string>()]));
+  for (const link of links) {
+    adjacency.get(link.a.assetId)?.add(link.b.assetId);
+    adjacency.get(link.b.assetId)?.add(link.a.assetId);
+  }
+  const components: string[][] = [];
+  const visited = new Set<string>();
+  for (const assetId of memberAssetIds) {
+    if (visited.has(assetId)) continue;
+    const component: string[] = [];
+    const pending = [assetId];
+    while (pending.length) {
+      const current = pending.pop()!;
+      if (visited.has(current)) continue;
+      visited.add(current);
+      component.push(current);
+      pending.push(...(adjacency.get(current) ?? []));
+    }
+    components.push(component);
+  }
+  const connectedComponents = components.filter((component) => component.length > 1);
+  return connectedComponents.map((component) => {
+    const componentIds = new Set(component);
+    const id = componentIds.has(input.sourceAssetId) ? input.id : createGearId("connection-set");
+    return {
+      id,
+      memberAssetIds: component,
+      links: links.filter((link) => componentIds.has(link.a.assetId) && componentIds.has(link.b.assetId)),
+      signalConnectors: input.signalConnectors.filter((item) => (
+        componentIds.has(item.endpoint.assetId)
+        && !connectorKeys.has(`${item.endpoint.assetId}:${item.endpoint.connectorId}`)
+      )),
+      nodePositions: Object.fromEntries(component.flatMap((assetId) => {
+        const position = input.nodePositions?.[assetId];
+        return position ? [[assetId, structuredClone(position)]] : [];
+      })),
+      createdAt: id === input.id ? input.createdAt ?? now : now,
+      updatedAt: now,
+    } satisfies InventoryConnectionSet;
+  });
 }
 
 export async function deleteInventoryAssets(assets: readonly InventoryAsset[]) {

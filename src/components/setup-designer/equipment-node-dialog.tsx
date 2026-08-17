@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRightLeftIcon, ExternalLinkIcon, PackagePlusIcon, SaveIcon, Trash2Icon } from "lucide-react";
+import { ArrowRightLeftIcon, CableIcon, ExternalLinkIcon, PackagePlusIcon, SaveIcon, Trash2Icon } from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
 
 import { GearAssetDialog } from "@/components/gear/gear-asset-dialog";
@@ -46,7 +46,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -54,6 +54,8 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { lifecycleLabel, type GearLocation, type GearParty, type InventoryAsset } from "@/lib/gear/domain";
 import { findAssetAssignment, type AssetAssignment } from "@/lib/setup-designer/asset-assignments";
+import { cableAssemblyPortDescription } from "@/lib/setup-designer/breakout-cables";
+import { formatCableDefinitionEnd } from "@/lib/setup-designer/cable-definitions";
 import type { EquipmentNodeData, EquipmentTemplate, FulfillmentStatus, SetupNode } from "@/lib/setup-designer/domain";
 import { updateEquipmentTemplateImages } from "@/lib/setup-designer/repository";
 
@@ -73,7 +75,91 @@ interface EquipmentNodeDialogProps {
   onAssetCreated: (asset: InventoryAsset) => void;
 }
 
-export function EquipmentNodeDialog({ node, setupId, templates, assets, parties, locations, setupNodes, open, onOpenChange, onSave, onDelete, onTemplateUpdated, onAssetCreated }: EquipmentNodeDialogProps) {
+export function EquipmentNodeDialog(props: EquipmentNodeDialogProps) {
+  if (props.node?.data.cableAssembly) return <CableAssemblyNodeDialog {...props} />;
+  return <StandardEquipmentNodeDialog {...props} />;
+}
+
+function CableAssemblyNodeDialog({ node, open, onOpenChange, onSave, onDelete }: EquipmentNodeDialogProps) {
+  const [name, setName] = useState(node?.data.name ?? "");
+  const [notes, setNotes] = useState(node?.data.notes ?? "");
+  if (!node?.data.cableAssembly) return null;
+  const assembly = node.data.cableAssembly;
+  const inputs = node.data.ports.filter((port) => port.direction === "input");
+  const outputs = node.data.ports.filter((port) => port.direction === "output");
+  const breakout = inputs.length > 1 || outputs.length > 1;
+  const connectedInventory = assembly.connectedInventory;
+  const cableLabel = connectedInventory ? "connected assembly" : breakout ? "breakout cable" : "cable";
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!name.trim()) return;
+    const error = onSave(node!.id, {
+      ...node!.data,
+      name: name.trim(),
+      notes: notes.trim() || undefined,
+    });
+    if (!error) onOpenChange(false);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Edit {cableLabel}</DialogTitle>
+          <DialogDescription>{connectedInventory ? "These inventory items stay physically connected, check in together, and appear here through their exposed connectors." : breakout ? "Every connector leg belongs to one physical cable in Runs, Match, SIGNAL, and STAGE." : "This node represents one specific physical cable in the signal chain."}</DialogDescription>
+        </DialogHeader>
+        <form id="breakout-cable-node-form" onSubmit={submit} className="flex flex-col gap-5">
+          <div className="grid gap-3 rounded-lg border bg-muted/25 p-3">
+            <div className="flex items-center gap-2">
+              <span className="flex size-8 items-center justify-center rounded-md border bg-background" style={{ color: assembly.color }}><CableIcon aria-hidden className="size-4" /></span>
+              <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{node.data.name}</p><p className="text-xs text-muted-foreground">{inputs.length} inputs → {outputs.length} outputs</p></div>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {connectedInventory ? connectedInventory.memberAssetTags.map((assetTag) => <Badge key={assetTag} variant="secondary">{assetTag}</Badge>) : (
+                <>
+                  <Badge variant="secondary">End 1: {formatCableDefinitionEnd(assembly.ends.end1)}</Badge>
+                  <Badge variant="secondary">End 2: {formatCableDefinitionEnd(assembly.ends.end2)}</Badge>
+                </>
+              )}
+            </div>
+          </div>
+
+          <FieldGroup className="grid gap-4 sm:grid-cols-2">
+            <Field className="sm:col-span-2">
+              <FieldLabel htmlFor="breakout-node-name">Setup label</FieldLabel>
+              <Input id="breakout-node-name" value={name} onChange={(event) => setName(event.target.value)} required />
+            </Field>
+            <Field>
+              <FieldLabel>{connectedInventory ? "Assembly inputs" : breakout ? "Input legs" : "Input connector"}</FieldLabel>
+              <div className="flex flex-col gap-1.5">{inputs.map((port) => <Badge key={port.id} variant="outline" className="justify-start">{cableAssemblyPortDescription(port)}</Badge>)}</div>
+            </Field>
+            <Field>
+              <FieldLabel>{connectedInventory ? "Assembly outputs" : breakout ? "Output legs" : "Output connector"}</FieldLabel>
+              <div className="flex flex-col gap-1.5">{outputs.map((port) => <Badge key={port.id} variant="outline" className="justify-start">{cableAssemblyPortDescription(port)}</Badge>)}</div>
+            </Field>
+            <Field className="sm:col-span-2">
+              <FieldLabel htmlFor="breakout-node-notes">Setup notes</FieldLabel>
+              <Textarea id="breakout-node-notes" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder={breakout ? "Left and right mixer returns to headphone amp." : "Extension after the 10 ft breakout."} rows={3} />
+            </Field>
+          </FieldGroup>
+        </form>
+        <DialogFooter className="sm:justify-between">
+          <Button type="button" variant="destructive" onClick={() => { onDelete(node.id); onOpenChange(false); }}>
+            <Trash2Icon data-icon="inline-start" />
+            Remove {cableLabel}
+          </Button>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" form="breakout-cable-node-form" disabled={!name.trim()}><SaveIcon data-icon="inline-start" />Apply changes</Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function StandardEquipmentNodeDialog({ node, setupId, templates, assets, parties, locations, setupNodes, open, onOpenChange, onSave, onDelete, onTemplateUpdated, onAssetCreated }: EquipmentNodeDialogProps) {
   const [draft, setDraft] = useState<EquipmentNodeData | null>(() => node ? structuredClone(node.data) : null);
   const [pendingIcon, setPendingIcon] = useState<PendingEquipmentIcon | null>(null);
   const [pendingStageImage, setPendingStageImage] = useState<PendingEquipmentStageImage | null>(null);
@@ -463,6 +549,43 @@ export function EquipmentNodeDialog({ node, setupId, templates, assets, parties,
               </Field>
             </FieldGroup>
           ) : null}
+
+          <FieldSet className="rounded-lg border bg-muted/30 p-3">
+            <FieldLegend>Power dependencies</FieldLegend>
+            <FieldDescription>Override the reusable definition for this setup instance.</FieldDescription>
+            <FieldGroup className="gap-3">
+              <Field orientation="horizontal">
+                <div className="flex flex-1 flex-col gap-1">
+                  <FieldLabel htmlFor="node-needs-power-source">Needs power source</FieldLabel>
+                  <FieldDescription>Keep this item within reach of a stage power drop or other power source.</FieldDescription>
+                </div>
+                <Switch
+                  id="node-needs-power-source"
+                  checked={draft.needsPowerSource === true || draft.needsPowerAdapter === true}
+                  onCheckedChange={(checked) => setDraft({
+                    ...draft,
+                    needsPowerSource: checked,
+                    needsPowerAdapter: checked ? draft.needsPowerAdapter : false,
+                  })}
+                />
+              </Field>
+              <Field orientation="horizontal">
+                <div className="flex flex-1 flex-col gap-1">
+                  <FieldLabel htmlFor="node-needs-power-adapter">Needs power adapter</FieldLabel>
+                  <FieldDescription>Bring the separate adapter carrying this item’s same four-digit label.</FieldDescription>
+                </div>
+                <Switch
+                  id="node-needs-power-adapter"
+                  checked={draft.needsPowerAdapter === true}
+                  onCheckedChange={(checked) => setDraft({
+                    ...draft,
+                    needsPowerSource: checked ? true : draft.needsPowerSource,
+                    needsPowerAdapter: checked,
+                  })}
+                />
+              </Field>
+            </FieldGroup>
+          </FieldSet>
 
           <FieldGroup className="grid gap-3 rounded-lg border bg-muted/30 p-3 sm:grid-cols-2">
             <Field orientation="horizontal" className="sm:col-span-2">

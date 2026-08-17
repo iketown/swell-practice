@@ -783,7 +783,7 @@ Inputs render on the left and outputs on the right by default. In compact view, 
 
 An equipment definition can declare `equipmentKind: "snake"` or `"split-snake"`. A regular or extension snake has two physical endpoints. A split snake has one Side A and two matched Side B endpoints, normally FOH and monitors. The definition stores its fixed physical length, routed channel count, endpoint labels/styles, and exact connector banks.
 
-Every snake port stores an `endpointId` and a `channelKey`. Connectors sharing one channel key are physically joined inside the snake. Connecting `Guitar A` to Side A channel 1 therefore labels every paired connector `Snake ch 1 (Guitar A)`. In a split snake, both Side B channel 1 outputs receive that carried label. Separate send and return paths use different key prefixes.
+Every snake port stores an `endpointId` and a `channelKey`. Connectors sharing one channel key are physically joined inside the snake. Connecting `Guitar A` to Side A channel 1 therefore labels every paired connector `Snake ch 1 (Guitar A)`. In a split snake, both Side B channel 1 outputs receive that carried label. Separate send and return paths use different key prefixes. Expanded SIGNAL nodes keep each input's configured number and label as its primary text, but a connected input replaces the less-useful technical subtitle with a derived upstream history such as `cron mic → BOX_A 2 →`. The history begins at the source and includes each traversed snake assembly plus channel; it never renames the input and is never stored separately from the graph. Unconnected inputs and output ports retain the connector, gender, specification, and signal-type subtitle.
 
 Adding a snake to a setup creates two or three independently movable React Flow nodes joined by one or two thick, non-editable internal trunk edges. The trunk shows channel count and fixed length, does not animate like a patch cable, and never becomes another cable requirement. External patch cables remain normal selectable edges and determine the derived parts list.
 
@@ -941,6 +941,8 @@ Firestore documents have a 1 MiB hard limit. The client should measure the encod
     end2: ConnectorSnapshot[];
   };
   ports: EquipmentPort[]; // directional equipment ports; empty for cable definitions
+  needsPowerSource: boolean;
+  needsPowerAdapter: boolean; // implies needsPowerSource
   showPortNumbers: boolean;
   showPortLabels: boolean;
   version: number;
@@ -954,7 +956,11 @@ Firestore documents have a 1 MiB hard limit. The client should measure the encod
 
 Deleting a definition removes it from the active catalog by archiving its definition record so saved setup snapshots never lose their media. The delete confirmation lists every planned or physical inventory item linked to that definition. Confirming permanently deletes those linked inventory items and their check-in history, removes them from purchase orders and public label lookup, and clears their exact-asset assignments from saved setups. Existing setup nodes retain their definition snapshots. Definitions remain editable after inventory items have been linked so shared product, port, image, and cable-end information can be corrected without recreating the items.
 
-An equipment definition uses directional `EquipmentPort` inputs and outputs and may appear as a draggable setup node. A cable definition is bidirectional and instead has exactly two logical ends, `end1` and `end2`. Each end contains one or more `ConnectorSnapshot` records. One connector per end is the default; fan-outs, insert cables, and other splits add a second, third, or later connector to either end. For example, a standard XLR cable can store End 1 `[XLR female]` and End 2 `[XLR male]`, while a split cable can store End 1 `[XLR male]` and End 2 `[TRS male, TRS male]`. Cable definitions stay out of the setup equipment-node rack because setup signal edges already represent individual cable runs.
+An equipment definition uses directional `EquipmentPort` inputs and outputs and may appear as a draggable setup node. A cable definition is bidirectional and instead has exactly two logical ends, `end1` and `end2`. Each end contains one or more `ConnectorSnapshot` records. One connector per end is the default; fan-outs, insert cables, and other splits add a second, third, or later connector to either end. For example, a standard XLR cable can store End 1 `[XLR female]` and End 2 `[XLR male]`, while a split cable can store End 1 `[XLR male]` and End 2 `[TRS male, TRS male]`.
+
+The setup library separates **Gear** from **Cables & Breakouts**. Direct signal edges remain the fastest representation for an ordinary run when only compatible connectors and required length matter. Any cable definition can also be placed as a compact cable-assembly node when its exact identity or connector sequence matters. One-to-one cable nodes make extensions and adapters explicit; multi-ended definitions appear as breakout cables. Placed cables can connect directly to compatible placed cable connectors, so a logical signal path can contain chains such as `[XLR-F + XLR-F] → TRS-M` followed by `TRS-F → TRS-M`.
+
+The larger connector bank of a breakout is oriented as the input side and receives automatic Left and Right labels when it contains exactly two legs; the single TRS side is labeled Stereo. For one-to-one cables, the female end is preferred as the input side when the definition makes that orientation unambiguous. A connector-join edge can belong to both neighboring cable nodes, but only the output-side primary membership owns each physical cable's definition, fulfillment, measured length, and inventory assignment. Runs, grouped summaries, setup cable counts, and inventory matching therefore report every placed cable exactly once. STAGE shows every placed cable as a movable physical object. An ordinary placed cable is measured from its node to its output-side connection; a breakout requirement uses its single-side path plus the longest branch path and one service-slack allowance.
 
 #### `EquipmentPort`
 
@@ -1019,6 +1025,14 @@ type SetupNode = {
     transportEndpointLabel?: string;
     transportPrimary?: boolean;
     transportChannelLabels?: Record<string, string>; // derived display cache
+    cableAssembly?: {
+      definitionId: string;
+      definitionVersion: number;
+      ends: CableDefinitionEnds;
+      inputEnd: "end1" | "end2";
+      outputEnd: "end1" | "end2";
+      color: string;
+    };
     name: string;
     notes?: string;
     image?: {
@@ -1027,6 +1041,8 @@ type SetupNode = {
       contentType: string;
     };
     ports: EquipmentPort[];
+    needsPowerSource: boolean;
+    needsPowerAdapter: boolean; // implies needsPowerSource
     showPortNumbers: boolean;
     showPortLabels: boolean;
   };
@@ -1060,6 +1076,14 @@ type CableEdge = {
     exception?: {
       reason: string;
     };
+    cableDefinitionId?: string; // primary leg of one placed physical cable
+    cableDefinitionVersion?: number;
+    cableEnds?: CableDefinitionEnds;
+    cableAssemblyLegs?: Array<{
+      nodeId: string;
+      portId: string;
+      primary: boolean;
+    }>;
   };
 };
 ```
@@ -1189,7 +1213,7 @@ Use an application-level controlled state reducer for nodes, edges, dirty state,
 - Dragging from `Vocal 3 / Output 1` to `Stage Box / Input 3` creates one directional cable and one live parts-list row.
 - A cable can have different connector types or genders on each end, its own color, an estimated length, notes, and an `Owned`, `Rent`, or `Buy` state.
 - Either end of an existing cable can be repatched to a compatible unoccupied port without losing the cable's identity or metadata.
-- Signal motion and an arrow agree on source-to-target direction; reduced-motion mode removes continuous animation without obscuring direction.
+- SIGNAL cables stay static at rest; their hover/focus motion and arrow agree on source-to-target direction, and reduced-motion mode removes the animated dashes without obscuring direction.
 - A second cable cannot silently occupy an already-used physical port.
 - Physically suspicious connections are blocked or visibly overridden with a saved reason.
 - Clicking a parts-list row selects and centers the corresponding cable, and editing the cable immediately updates that row.
@@ -1240,7 +1264,7 @@ Duplicating a setup creates new setup-item identities while preserving the refer
 
 Implementation status, 2026-08-06: setup workspaces now switch directly between `SIGNAL` and `STAGE`. Existing signal nodes migrate to independent saved stage positions and footprints on a 40 × 24 ft scaled floor, each view retains its own saved viewport, and moving an item in STAGE does not move its logical SIGNAL node. A selected equipment item that appears in both views remains selected by its shared setup-node identity when switching between SIGNAL and STAGE, while view-specific selections such as stage-only items, areas, and waypoints clear when they have no counterpart. Equipment definitions and setup-node snapshots include `showInSignalView`; definitions without ports default to STAGE-only, and administrators can override visibility from the definition or node editor. Each STAGE item persists exact width and depth, arbitrary clockwise rotation, and one shared input plus one shared output anchor with a configurable side and along-side offset. Administrators enter physical dimensions in inches and placement in feet. React Flow retains every exact logical port handle, but overlaps input handles at the physical IN anchor and output handles at the physical OUT anchor for stage routing and measurement.
 
-Equipment definitions can also own a separate cropped overhead STAGE image in addition to their square SIGNAL icon and reusable detail-photo gallery. The crop aspect ratio comes directly from the setup item's physical width and depth. Both the SIGNAL and STAGE image editors can start from either existing diagram image, any stored or newly pending detail photo, a web reference photo, a photo of the assigned inventory asset, or a newly uploaded file. Preview viewports cap both width and height while preserving the photo's aspect ratio so very tall or wide crops remain usable inside the edit modal. Transparent PNG and WebP pixels remain transparent through the STAGE crop/export path; image-backed nodes omit the rectangular backing card and use alpha-aware silhouette highlighting for hover, focus, and selection while retaining an invisible physical bounding box for dragging, scaling, and cable anchors. Opaque source photos naturally retain their own rectangular pixels. A resting STAGE plot shows only each scaled overhead object and the cord paths; names, dimensions, rotation, anchor descriptions, and STAGE-only status appear on rollover or keyboard focus. Microphone-signal routes render at 2 px at rest. Hovering or focusing a cable in either the STAGE plot or cable list highlights the matching representation, scrolls the list row into view when needed, and adds a motion-safe animated trace to the route. Cable-length labels appear only for the selected cable. Independent local STAGE viewing toggles hide or show cords and routing waypoints separately, preserving route data and measurements in all four visibility combinations. The Stage layout inspector edits the rectangular stage width and depth and manages named, dimensioned rectangular areas such as drum risers and side-stage zones. Areas persist their own position and footprint, render behind equipment, and remain draggable without affecting signal or cable topology. Left-dragging empty STAGE space draws a partial-overlap selection box around gear and areas, Shift-drag adds another boxed group, and dragging any selected item moves the full selection. Space-drag, middle-drag, and right-drag retain canvas panning. Groups, direct resize handles, arbitrary polygonal stage outlines, and PDF rider export remain later work.
+Equipment definitions can also own a separate cropped overhead STAGE image in addition to their square SIGNAL icon and reusable detail-photo gallery. The crop aspect ratio comes directly from the setup item's physical width and depth. Both the SIGNAL and STAGE image editors can start from either existing diagram image, any stored or newly pending detail photo, a web reference photo, a photo of the assigned inventory asset, or a newly uploaded file. Preview viewports cap both width and height while preserving the photo's aspect ratio so very tall or wide crops remain usable inside the edit modal. Transparent PNG and WebP pixels remain transparent through the STAGE crop/export path; image-backed nodes omit the rectangular backing card and use alpha-aware silhouette highlighting for hover, focus, and selection while retaining an invisible physical bounding box for dragging, scaling, and cable anchors. Opaque source photos naturally retain their own rectangular pixels. A resting STAGE plot shows only each scaled overhead object and the cord paths; names, dimensions, rotation, anchor descriptions, and STAGE-only status appear on rollover or keyboard focus. Microphone-signal routes render at 2 px at rest. Every route continues from its boundary anchor to the equipment center beneath the overhead image, so inputs visibly enter their destination and outputs visibly leave their source without drawing over the object. Waypoint markers use a compact 24 px visual inside a 44 px interaction target and sit below the cable layer, allowing every cord to cross visibly over its waypoint. Hovering or focusing a cable in either the STAGE plot or cable list highlights the matching representation, scrolls the list row into view when needed, and adds a motion-safe animated trace to the route. Hovering or focusing STAGE gear activates the Gear tab, scrolls its equipment row into view, and highlights the matching row. Cable-length labels appear only for the selected cable. SIGNAL connections likewise remain static at rest and animate their directional dashes only while hovered or focused. Hovering a SIGNAL connection activates the Runs tab and highlights its matching route row; hovering a SIGNAL gear node activates the Gear tab and highlights its matching equipment row, including a shared row for multi-node transport assemblies. Independent local STAGE viewing toggles hide or show cords and routing waypoints separately, preserving route data and measurements in all four visibility combinations. The Stage layout inspector edits the rectangular stage width and depth and manages named, dimensioned rectangular areas such as drum risers and side-stage zones. Areas persist their own position and footprint, render behind equipment, and remain draggable without affecting signal or cable topology. Left-dragging empty STAGE space draws a partial-overlap selection box around gear and areas, Shift-drag adds another boxed group, and dragging any selected item moves the full selection. Space-drag, middle-drag, and right-drag retain canvas panning. Both SIGNAL and STAGE zoom to 4×; SIGNAL placement uses a 4-unit subgrid and STAGE placement uses quarter-foot increments for precise dragging. Groups, direct resize handles, arbitrary polygonal stage outlines, and PDF rider export remain later work.
 
 Every setup node can store both:
 
@@ -1279,6 +1303,10 @@ The definition icon editor accepts drag-and-drop or file browsing. Clicking the 
 
 The node detail modal also provides an inline inspection gallery. Administrators can add up to twelve reusable detail photos, select thumbnails for a larger view, and retain AI-imported web references as a separately labeled source. When a node is assigned to a tagged asset, that asset's documentary photos can later appear in the same viewer as a separate source without being copied into the definition.
 
+Power requirements are lightweight dependencies on a reusable `GearDefinition`, each `InventoryAsset`, and the setup-node snapshot. **Needs power source** marks equipment that must remain within reach of a power source. **Needs power adapter** implies the first requirement and additionally means that a separate adapter travels with the item. The individual asset editor places both switches directly after **Stage only**; an asset initially inherits its definition defaults, then saves its own explicit values. A setup instance may separately override the definition defaults without changing other uses of the same definition. SIGNAL nodes, STAGE rollover details, the Gear parts list, and inventory rows expose these requirements without inventing signal ports or cables. Exact power connectors and measured extension-cord routes continue to use the ordinary physical port and cable model.
+
+Implementation status, 2026-08-15: the setup library includes a reusable **Power drop** node with four Edison outputs. It appears in both SIGNAL and STAGE, can be positioned at its real stage location, and can anchor measured power runs to equipment whose exact power input has been configured. New setup nodes snapshot the definition's two power toggles, and saved graphs normalize the rule that a power adapter always requires a power source.
+
 ### 18.5 Inventory Assets and Assignments
 
 Implementation status: the Signal Router currently supports `Owned`, `Rent`, `Buy`, and `Unplanned` fulfillment plus temporary template-level owned-unit labels. The searchable tagged-asset autocomplete, `Create asset` route, QR codes, location history, and check-in workflow begin with the Gear Tracker build phase and are not yet implemented.
@@ -1310,6 +1338,8 @@ type InventoryAsset = {
   cableLengthInches?: number; // present when tagged Cables; canonical total length for filtering and comparison
   cableColor?: "black" | "grey" | "white" | "blue" | "purple" | "red" | "green" | "orange" | "yellow";
   purchaseUrl?: string; // admin-only product page for this exact owned item, separate from reusable-definition research
+  needsPowerSource?: boolean; // per-item override; otherwise inherits the reusable definition
+  needsPowerAdapter?: boolean; // per-item override; implies needsPowerSource
   qrCode?: string;
   displayName: string;
   serialNumber?: string;
@@ -1446,6 +1476,7 @@ An item being last known in the car does not automatically mean it was verified 
 /equipmentTemplates/{definitionId}  # current reusable gear-definition catalog
 /inventoryAssets/{assetId}
 /inventoryAssets/{assetId}/checkIns/{checkInId}
+/inventoryConnectionSets/{connectionSetId}
 /gearParties/{partyId}
 /gearLocations/{locationId}
 /purchaseOrders/{orderId}
@@ -1531,7 +1562,7 @@ The route validates administrator access, permits the demo bypass only on a loca
 The first `/gear` vertical slice is implemented around the existing `equipmentTemplates` catalog rather than introducing a duplicate definition collection. The route is admin-only and provides three connected views:
 
 1. **Definitions** — reusable model data, AI research, exact ports, purchase source, icon, and reference/detail photos.
-2. **Assets** — permanent individually identifiable planned or physical gear with an optional reusable definition, reusable inventory tags, owner, lifecycle, physical photos, latest location, source setup, and purchase linkage. Non-cable gear may also have a serial number and a `stageOnly` override that keeps the assigned item out of the logical SIGNAL view. Cables instead have individual length, manufacturer, and color fields and are always eligible for signal routing. Basic inventory-only items such as stands, cases, and furniture may explicitly use no definition.
+2. **Assets** — permanent individually identifiable planned or physical gear with an optional reusable definition, reusable inventory tags, owner, lifecycle, physical photos, latest location, source setup, and purchase linkage. Non-cable gear may also have a serial number, a `stageOnly` override that keeps the assigned item out of the logical SIGNAL view, and per-item `needsPowerSource` / `needsPowerAdapter` settings. Cables instead have individual length, manufacturer, and color fields and are always eligible for signal routing. Basic inventory-only items such as stands, cases, and furniture may explicitly use no definition.
 3. **Orders** — grouped vendor purchases with reserved asset IDs, payer and account label, payment state, order number, carrier, tracking number, expected arrival, and milestone dates.
 
 Asset lifecycle values are:
@@ -1551,6 +1582,10 @@ Asset creation assigns the next available four-digit numeric ID automatically fr
 An existing asset can be duplicated into a reviewable new-asset form for repeated physical items such as microphone stands. The duplicate reuses its definition, photo references, owner, notes, stage-only setting, and lifecycle, while generating the next permanent asset ID. Serial number, current location, check-in history, purchase linkage, and setup assignment are not copied, so every resulting asset remains independently identifiable and tracked.
 
 Each inventory asset may have up to twelve short, reusable tags such as `stands`, `mics`, or `instruments`. The asset form edits tags after physical photos and before notes, offers existing tags for consistent reuse, and copies tags when an asset is duplicated. On-hand inventory lists `All` by default and exposes every currently used on-hand tag as a single-select filter beside the section heading. Text search also matches tag names.
+
+Inventory items that remain physically attached use a hidden `inventoryConnectionSet`. The product never asks an administrator to manage a named group. Instead, each existing asset editor exposes **Keep connected to** as a compact visual connection canvas. The administrator adds another inventory item by permanent ID or title, drags node headers into a useful arrangement, then draws a line directly between the exact connector dots that stay physically joined. The connected set persists those node positions so the same arrangement appears when any member is edited later. Existing joins remain visible as removable lines. A physical connector may participate in only one internal join, and an inventory item may belong to only one connected set. Adding a new item to any member extends the same set transitively, so opening any member shows every item that remains connected. Removing an internal join recomputes connected components; items that are no longer physically reachable stop checking in together, while any remaining connected component is preserved.
+
+Every free connector in a connected set can be marked **Input in SIGNAL**, **Output in SIGNAL**, or **Not shown in SIGNAL**. At least one exposed input and one exposed output are required before the assembly appears in the setup library. SIGNAL derives one synthetic, inventory-owned cable-assembly node from those roles; searching any member ID finds it, adding any member places the complete assembly, and the node exposes only the configured external connectors. Internal joins never appear as setup cable requirements. For example, a TRS-F to dual TS-F Y cable permanently joined to two TS-M to XLR-F adapters is represented as one TRS-F input and two XLR-F outputs. The primary setup edge carries every member asset ID so parts, matching, deletion cleanup, and duplicate-assignment validation treat the assembly as one indivisible owned item.
 
 Within one setup, an `inventoryAsset` may fulfill only one equipment node. The invariant applies to every individually reserved lifecycle state, including planned, cart, ordered, in transit, awaiting check-in, and active. The node editor identifies assets already assigned elsewhere and requires explicit confirmation before transferring one; graph persistence rejects any duplicate asset IDs that remain as a final integrity check. Two required units therefore require two distinct asset records, even before purchase.
 

@@ -5,6 +5,7 @@ import {
   type InventoryAsset,
 } from "@/lib/gear/domain";
 import { isCableDefinition } from "@/lib/setup-designer/cable-definitions";
+import { cableAssemblyRequirementEdges } from "@/lib/setup-designer/breakout-cables";
 import type { CableEdge, ConnectorSnapshot, EquipmentTemplate } from "@/lib/setup-designer/domain";
 
 export interface CableInventoryMatch {
@@ -36,6 +37,7 @@ export function cableAssetMatchesRun(
   if (!isCableInventoryAsset(asset) || asset.lifecycleStatus !== "active") return false;
   const definition = templatesById.get(asset.definitionId);
   const ends = definition && isCableDefinition(definition) ? definition.cableEnds : undefined;
+  if (edge.data.cableDefinitionId) return asset.definitionId === edge.data.cableDefinitionId;
   if (!ends || ends.end1.length !== 1 || ends.end2.length !== 1) return false;
   const [end1] = ends.end1;
   const [end2] = ends.end2;
@@ -52,8 +54,7 @@ export function buildCableInventoryMatches(
   assets: readonly InventoryAsset[],
 ) {
   const templatesById = new Map(templates.map((template) => [template.id, template]));
-  const requirements = edges
-    .filter((edge) => !edge.data.internalTransport)
+  const requirements = cableAssemblyRequirementEdges(edges)
     .map((edge) => {
       const requiredInches = cableRequiredInches(edge);
       const compatibleAssets = assets

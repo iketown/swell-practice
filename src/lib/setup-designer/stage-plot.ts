@@ -9,8 +9,12 @@ import type {
   StageRoute,
   StageWaypoint,
 } from "@/lib/setup-designer/domain";
+import { cableAssemblyEdges, edgeHasCableAssemblyLeg, edgeIsCableAssemblyPrimary, primaryCableAssemblyLeg } from "@/lib/setup-designer/breakout-cables";
 
 export const STAGE_PIXELS_PER_FOOT = 32;
+export const STAGE_POSITION_INCREMENT_FEET = 0.25;
+export const STAGE_WAYPOINT_HIT_SIZE_PIXELS = 44;
+export const STAGE_WAYPOINT_MARKER_SIZE_PIXELS = 24;
 export const MIN_STAGE_DIMENSION_FEET = 1 / 12;
 export const DEFAULT_STAGE_ROUTE: StageRoute = {
   waypointIds: [],
@@ -36,6 +40,10 @@ export function constrainStageArea(area: StageArea, stage: Pick<StagePlan, "widt
 }
 
 function defaultFootprint(node: SetupNode) {
+  if (node.data.cableAssembly) return {
+    widthFeet: (node.data.physicalDimensions?.widthInches ?? 4) / 12,
+    depthFeet: (node.data.physicalDimensions?.depthInches ?? 2) / 12,
+  };
   const measuredWidth = node.data.physicalDimensions?.widthInches;
   const measuredDepth = node.data.physicalDimensions?.depthInches;
   if (measuredWidth && measuredDepth) {
@@ -185,6 +193,16 @@ export function rotatedAnchorSide(anchor: StageConnectionAnchor, rotationDegrees
   return Math.abs(x) >= Math.abs(y) ? (x >= 0 ? "right" : "left") : (y >= 0 ? "bottom" : "top");
 }
 
+export function stageAnchorArrowRotation(side: StageConnectionSide) {
+  const rotations: Record<StageConnectionSide, number> = {
+    top: 0,
+    right: 90,
+    bottom: 180,
+    left: -90,
+  };
+  return rotations[side];
+}
+
 export function stageAnchorCanvasPlacement(position: Required<StagePosition>, direction: "input" | "output") {
   const geometry = stageNodeGeometry(position);
   const point = stageConnectionPoint(position, direction);
@@ -233,6 +251,50 @@ export function requiredCableLengthFeet(
   return manhattanDistance(points) + route.sourceDropFeet + route.targetDropFeet + route.serviceSlackFeet;
 }
 
+function requiredCableSegmentLengthFeet(
+  edge: CableEdge,
+  nodes: readonly SetupNode[],
+  stage: StagePlan,
+) {
+  const source = nodes.find((node) => node.id === edge.source);
+  const target = nodes.find((node) => node.id === edge.target);
+  if (!source || !target) return undefined;
+  const waypointMap = new Map(stage.waypoints.map((waypoint) => [waypoint.id, waypoint]));
+  const route = stageRouteFor(edge);
+  const points: FeetPoint[] = [
+    cableEndpoint(source, "source", stage),
+    ...route.waypointIds.flatMap((id) => {
+      const waypoint = waypointMap.get(id);
+      return waypoint ? [waypoint.position] : [];
+    }),
+    cableEndpoint(target, "target", stage),
+  ];
+  return manhattanDistance(points) + route.sourceDropFeet + route.targetDropFeet;
+}
+
+function requiredCableAssemblyLengthFeet(
+  primaryEdge: CableEdge,
+  nodes: readonly SetupNode[],
+  edges: readonly CableEdge[],
+  stage: StagePlan,
+) {
+  const nodeId = primaryCableAssemblyLeg(primaryEdge)?.nodeId;
+  if (!nodeId) return requiredCableLengthFeet(primaryEdge, nodes, stage);
+  const assemblyNode = nodes.find((node) => node.id === nodeId);
+  const legs = cableAssemblyEdges(edges, nodeId);
+  const primaryLength = requiredCableSegmentLengthFeet(primaryEdge, nodes, stage);
+  const ordinaryCable = assemblyNode?.data.cableAssembly
+    && assemblyNode.data.cableAssembly.ends.end1.length === 1
+    && assemblyNode.data.cableAssembly.ends.end2.length === 1;
+  if (ordinaryCable) return primaryLength === undefined ? undefined : primaryLength + stageRouteFor(primaryEdge).serviceSlackFeet;
+  const branchLengths = legs
+    .filter((edge) => edge.id !== primaryEdge.id)
+    .map((edge) => requiredCableSegmentLengthFeet(edge, nodes, stage))
+    .filter((length): length is number => length !== undefined);
+  if (primaryLength === undefined || !branchLengths.length) return undefined;
+  return primaryLength + Math.max(...branchLengths) + stageRouteFor(primaryEdge).serviceSlackFeet;
+}
+
 function roundedRequiredLength(length: number) {
   return Math.ceil(length * 2) / 2;
 }
@@ -244,7 +306,11 @@ export function withMeasuredStageCableLengths(
 ): CableEdge[] {
   return edges.map((edge) => {
     if (edge.data.internalTransport) return edge;
-    const requiredFeet = requiredCableLengthFeet(edge, nodes, stage);
+    const requiredFeet = edgeIsCableAssemblyPrimary(edge)
+      ? requiredCableAssemblyLengthFeet(edge, nodes, edges, stage)
+      : edgeHasCableAssemblyLeg(edge)
+        ? requiredCableSegmentLengthFeet(edge, nodes, stage)
+        : requiredCableLengthFeet(edge, nodes, stage);
     if (requiredFeet === undefined) return edge;
     const measured = edge.data.lengthUnit === "m" ? requiredFeet / 3.28084 : requiredFeet;
     return {
