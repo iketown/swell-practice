@@ -126,6 +126,7 @@ export function TrafficDashboardClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [selectedVisitorId, setSelectedVisitorId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("visitedAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
@@ -171,7 +172,7 @@ export function TrafficDashboardClient() {
     };
   }, [admin.isAdmin, admin.isDemoAdmin, admin.user]);
 
-  const filteredEvents = useMemo(() => {
+  const searchedEvents = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     if (!normalized) return events;
 
@@ -194,19 +195,25 @@ export function TrafficDashboardClient() {
     ].some((value) => value?.toLowerCase().includes(normalized)));
   }, [events, query]);
 
+  const pageViewEvents = useMemo(() => (
+    selectedVisitorId
+      ? searchedEvents.filter((event) => event.visitorId === selectedVisitorId)
+      : searchedEvents
+  ), [searchedEvents, selectedVisitorId]);
+
   const sortedEvents = useMemo(() => {
     const direction = sortDirection === "asc" ? 1 : -1;
-    return [...filteredEvents].sort((left, right) => {
+    return [...pageViewEvents].sort((left, right) => {
       if (sortKey === "visitedAt") return (timestamp(left) - timestamp(right)) * direction;
       if (sortKey === "location") return compareText(locationLabel(left), locationLabel(right)) * direction;
       if (sortKey === "page") return compareText(eventUrl(left), eventUrl(right)) * direction;
       return compareText(left[sortKey], right[sortKey]) * direction;
     });
-  }, [filteredEvents, sortDirection, sortKey]);
+  }, [pageViewEvents, sortDirection, sortKey]);
 
   const browserHistory = useMemo(() => {
     const grouped = new Map<string, TrafficEvent[]>();
-    for (const event of filteredEvents) {
+    for (const event of searchedEvents) {
       grouped.set(event.visitorId, [...(grouped.get(event.visitorId) ?? []), event]);
     }
 
@@ -227,10 +234,10 @@ export function TrafficDashboardClient() {
         visitorId,
       };
     }).sort((left, right) => right.lastSeen - left.lastSeen);
-  }, [filteredEvents]);
+  }, [searchedEvents]);
 
-  const uniqueIps = new Set(filteredEvents.map((event) => event.ip)).size;
-  const memberHints = new Set(filteredEvents.flatMap((event) => event.member ? [event.member] : [])).size;
+  const uniqueIps = new Set(searchedEvents.map((event) => event.ip)).size;
+  const memberHints = new Set(searchedEvents.flatMap((event) => event.member ? [event.member] : [])).size;
 
   function changeSort(nextKey: SortKey) {
     if (sortKey === nextKey) {
@@ -242,7 +249,7 @@ export function TrafficDashboardClient() {
   }
 
   function inspectBrowser(visitorId: string) {
-    setQuery(visitorId);
+    setSelectedVisitorId(visitorId);
     requestAnimationFrame(() => document.getElementById("page-views")?.scrollIntoView({ block: "start" }));
   }
 
@@ -292,7 +299,7 @@ export function TrafficDashboardClient() {
             </Button>
           </div>
           <p className="text-sm text-muted-foreground">
-            {filteredEvents.length.toLocaleString()} page views · {browserHistory.length.toLocaleString()} browser IDs · {uniqueIps.toLocaleString()} IPs · {memberHints.toLocaleString()} member hints
+            {searchedEvents.length.toLocaleString()} page views · {browserHistory.length.toLocaleString()} browser IDs · {uniqueIps.toLocaleString()} IPs · {memberHints.toLocaleString()} member hints
           </p>
         </CardContent>
       </Card>
@@ -337,7 +344,12 @@ export function TrafficDashboardClient() {
                   {browserHistory.map((browser) => (
                     <TableRow key={browser.visitorId}>
                       <TableCell className="font-mono">
-                        <Button variant="ghost" size="xs" onClick={() => inspectBrowser(browser.visitorId)}>
+                        <Button
+                          aria-pressed={selectedVisitorId === browser.visitorId}
+                          variant={selectedVisitorId === browser.visitorId ? "secondary" : "ghost"}
+                          size="xs"
+                          onClick={() => inspectBrowser(browser.visitorId)}
+                        >
                           {shortVisitorId(browser.visitorId)}
                         </Button>
                       </TableCell>
@@ -368,7 +380,26 @@ export function TrafficDashboardClient() {
               <CardTitle>Page views</CardTitle>
               <CardDescription>Each row is one recorded song-page visit. Repeat renders within 15 seconds are collapsed.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="grid gap-3">
+              {selectedVisitorId ? (
+                <div
+                  aria-live="polite"
+                  className="flex min-h-11 flex-wrap items-center gap-2 rounded border bg-muted/50 px-3 py-2 text-sm"
+                  role="status"
+                >
+                  <span>
+                    Showing <span className="font-mono font-semibold" title={selectedVisitorId}>{shortVisitorId(selectedVisitorId)}</span> only.
+                  </span>
+                  <Button
+                    className="ml-auto min-h-9"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedVisitorId(null)}
+                  >
+                    Show all
+                  </Button>
+                </div>
+              ) : null}
               <Table>
                 <TableHeader>
                   <TableRow>
