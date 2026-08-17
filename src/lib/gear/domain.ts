@@ -20,6 +20,12 @@ export type CheckInMethod =
   | "manual"
   | "qr";
 
+export type AssetPlacement =
+  | { kind: "location"; locationId: string }
+  | { kind: "container"; containerAssetId: string };
+
+export type CheckInDestination = AssetPlacement;
+
 export const MAX_INVENTORY_TAGS = 12;
 export const MAX_INVENTORY_TAG_LENGTH = 32;
 export const MAX_ASSET_PURCHASE_URL_LENGTH = 2048;
@@ -34,16 +40,18 @@ export const INVENTORY_ASSET_CODE_STARTS = {
   pedal: 400,
   rack: 500,
   general: 600,
+  container: 1000,
 } as const;
 export type InventoryAssetCodeGroup = keyof typeof INVENTORY_ASSET_CODE_STARTS;
-const INVENTORY_ASSET_CODE_ENDS: Record<InventoryAssetCodeGroup, number> = {
-  cable: 99,
-  microphone: 199,
-  stand: 299,
-  instrument: 399,
-  pedal: 499,
-  rack: 599,
-  general: 9999,
+const INVENTORY_ASSET_CODE_RANGES: Record<InventoryAssetCodeGroup, Array<readonly [number, number]>> = {
+  cable: [[1, 99]],
+  microphone: [[100, 199]],
+  stand: [[200, 299]],
+  instrument: [[300, 399]],
+  pedal: [[400, 499]],
+  rack: [[500, 599]],
+  general: [[600, 999], [2000, 9999]],
+  container: [[1000, 1999]],
 };
 export const CABLE_COLOR_OPTIONS = ["black", "grey", "white", "blue", "purple", "red", "green", "orange", "yellow"] as const;
 export type CableColor = (typeof CABLE_COLOR_OPTIONS)[number];
@@ -93,6 +101,15 @@ export interface InventoryAsset {
   connectionSetId?: string;
   tags: string[];
   ownerPartyId?: string;
+  canContainAssets?: boolean;
+  /** Stable asset IDs expected to be placed directly inside this container. Undefined means no manifest is configured. */
+  expectedContentAssetIds?: string[];
+  currentPlacement?: AssetPlacement;
+  effectiveLocationId?: string;
+  locationInheritedFromAssetId?: string;
+  ancestorContainerIds?: string[];
+  lastPlacedAt?: number;
+  /** Legacy effective-location snapshot retained while older screens migrate. */
   currentLocationId?: string;
   serialNumber?: string;
   purchaseUrl?: string;
@@ -181,7 +198,9 @@ export interface PurchaseOrder {
 export interface InventoryCheckIn {
   id: string;
   assetId: string;
-  locationId: string;
+  destination: CheckInDestination;
+  /** Legacy compatibility field for location check-ins created before destinations. */
+  locationId?: string;
   method: CheckInMethod;
   operationId?: string;
   latitude?: number;
@@ -351,14 +370,18 @@ export function createInventoryAssetCode(
   const used = new Set(
     Array.from(existingCodes, (value) => value.trim()).filter(isInventoryAssetCode),
   );
-  for (let value = INVENTORY_ASSET_CODE_STARTS[group]; value <= INVENTORY_ASSET_CODE_ENDS[group]; value += 1) {
-    const code = String(value).padStart(INVENTORY_ASSET_CODE_LENGTH, "0");
-    if (!used.has(code)) return code;
-  }
-  if (group !== "general") {
-    for (let value = INVENTORY_ASSET_CODE_STARTS.general; value <= INVENTORY_ASSET_CODE_ENDS.general; value += 1) {
+  for (const [start, end] of INVENTORY_ASSET_CODE_RANGES[group]) {
+    for (let value = start; value <= end; value += 1) {
       const code = String(value).padStart(INVENTORY_ASSET_CODE_LENGTH, "0");
       if (!used.has(code)) return code;
+    }
+  }
+  if (group !== "general") {
+    for (const [start, end] of INVENTORY_ASSET_CODE_RANGES.general) {
+      for (let value = start; value <= end; value += 1) {
+        const code = String(value).padStart(INVENTORY_ASSET_CODE_LENGTH, "0");
+        if (!used.has(code)) return code;
+      }
     }
   }
   throw new Error("No four-digit inventory IDs remain.");
@@ -366,11 +389,13 @@ export function createInventoryAssetCode(
 
 export function inferInventoryAssetCodeGroup(input: {
   isCable?: boolean;
+  isContainer?: boolean;
   label?: string;
   tags?: Iterable<string>;
   definitionName?: string;
   definitionCategory?: string;
 }): InventoryAssetCodeGroup {
+  if (input.isContainer) return "container";
   if (input.isCable) return "cable";
   const searchable = [
     input.label,
@@ -396,6 +421,46 @@ export function normalizeInventoryAssetCodeGroup(value: unknown): InventoryAsset
   return typeof value === "string" && value in INVENTORY_ASSET_CODE_STARTS
     ? value as InventoryAssetCodeGroup
     : undefined;
+}
+
+export function isContainerInventoryAsset(asset: Pick<InventoryAsset, "canContainAssets">) {
+  return asset.canContainAssets === true;
+}
+
+export function directAssetPlacement(asset: Pick<InventoryAsset, "currentPlacement" | "currentLocationId">): AssetPlacement | undefined {
+  if (asset.currentPlacement) return asset.currentPlacement;
+  return asset.currentLocationId ? { kind: "location", locationId: asset.currentLocationId } : undefined;
+}
+
+export function inventoryAssetLocationChain(
+  asset: InventoryAsset,
+  assets: readonly InventoryAsset[],
+  locations: readonly GearLocation[],
+) {
+  const assetById = new Map(assets.map((item) => [item.id, item]));
+  const locationById = new Map(locations.map((item) => [item.id, item]));
+  const containerLabels: string[] = [];
+  const visited = new Set([asset.id]);
+  let cursor = asset;
+  let locationId: string | undefined;
+
+  for (let depth = 0; depth < 8; depth += 1) {
+    const placement = directAssetPlacement(cursor);
+    if (!placement) break;
+    if (placement.kind === "location") {
+      locationId = placement.locationId;
+      break;
+    }
+    const container = assetById.get(placement.containerAssetId);
+    if (!container || visited.has(container.id)) break;
+    visited.add(container.id);
+    containerLabels.push(container.label);
+    cursor = container;
+  }
+
+  locationId ??= asset.effectiveLocationId ?? asset.currentLocationId;
+  const locationName = locationId ? locationById.get(locationId)?.name : undefined;
+  return [locationName ?? "Location unknown", ...containerLabels.map((label) => `in ${label}`)].join(" | ");
 }
 
 export function canonicalizeAssetTag(value: string) {

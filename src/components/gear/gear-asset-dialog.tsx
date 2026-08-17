@@ -1,11 +1,13 @@
 "use client";
 
-import { CableIcon, CameraIcon, CopyPlusIcon, ExternalLinkIcon, LoaderCircleIcon, PackageIcon, PackagePlusIcon, PlusIcon, SaveIcon, SparklesIcon, XIcon } from "lucide-react";
+import { BoxesIcon, CableIcon, CameraIcon, CopyPlusIcon, ExternalLinkIcon, LoaderCircleIcon, PackageIcon, PackagePlusIcon, PlusIcon, SaveIcon, SparklesIcon, XIcon } from "lucide-react";
 import Image from "next/image";
 import { FormEvent, useMemo, useState } from "react";
 
 import { GearLabelPrinter } from "@/components/gear/gear-label-printer";
 import { CableColorSwatch } from "@/components/gear/cable-color-swatch";
+import { GearConnectionsField } from "@/components/gear/gear-connections-field";
+import { EquipmentTemplateDialog } from "@/components/setup-designer/equipment-template-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -21,7 +23,7 @@ import {
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -44,11 +46,13 @@ import {
   type GearLocation,
   type GearParty,
   type InventoryAsset,
+  type InventoryConnectionSet,
   type InventoryAssetLifecycle,
 } from "@/lib/gear/domain";
-import { saveInventoryAsset } from "@/lib/gear/repository";
+import { connectionSetForAsset } from "@/lib/gear/connections";
+import { saveInventoryAsset, saveInventoryConnectionSet } from "@/lib/gear/repository";
 import { formatCableDefinitionEnd, isCableDefinition } from "@/lib/setup-designer/cable-definitions";
-import type { EquipmentTemplate, ImportedEquipmentDraft } from "@/lib/setup-designer/domain";
+import { resolvePowerDependencies, type EquipmentTemplate, type ImportedEquipmentDraft } from "@/lib/setup-designer/domain";
 import { downloadEquipmentReferenceImages, researchEquipmentUrl } from "@/lib/setup-designer/equipment-research-client";
 import { portGroupDisplayName, summarizePortGroups } from "@/lib/setup-designer/ports";
 import { createEquipmentTemplate, updateEquipmentTemplateImages } from "@/lib/setup-designer/repository";
@@ -56,17 +60,20 @@ import { createEquipmentTemplate, updateEquipmentTemplateImages } from "@/lib/se
 const ACCEPTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const NO_DEFINITION_VALUE = "__no_definition__";
-type RegistrationKind = "gear" | "cables";
+const CREATE_DEFINITION_VALUE = "__create_definition__";
+export type GearRegistrationKind = "gear" | "cables" | "container";
 
 export function GearAssetDialog({
   open,
   onOpenChange,
   definitions,
   assets,
+  connectionSets = [],
   parties,
   locations,
   asset,
   duplicateFrom,
+  initialRegistrationKind,
   initialDefinitionId,
   initialLifecycle = "planned",
   sourceSetupId,
@@ -77,10 +84,12 @@ export function GearAssetDialog({
   onOpenChange: (open: boolean) => void;
   definitions: EquipmentTemplate[];
   assets: InventoryAsset[];
+  connectionSets?: InventoryConnectionSet[];
   parties: GearParty[];
   locations: GearLocation[];
   asset?: InventoryAsset;
   duplicateFrom?: InventoryAsset;
+  initialRegistrationKind?: GearRegistrationKind;
   initialDefinitionId?: string;
   initialLifecycle?: InventoryAssetLifecycle;
   sourceSetupId?: string;
@@ -88,18 +97,30 @@ export function GearAssetDialog({
   onSaved: (asset: InventoryAsset) => void;
 }) {
   const firstGearDefinition = definitions.find((item) => !isCableDefinition(item));
-  const startingDefinitionId = asset?.definitionId ?? duplicateFrom?.definitionId ?? initialDefinitionId ?? firstGearDefinition?.id ?? "";
+  const shouldStartAsContainer = asset?.canContainAssets === true
+    || duplicateFrom?.canContainAssets === true
+    || (!asset && !duplicateFrom && initialRegistrationKind === "container");
+  const startingDefinitionId = asset?.definitionId
+    ?? duplicateFrom?.definitionId
+    ?? initialDefinitionId
+    ?? (shouldStartAsContainer ? "" : firstGearDefinition?.id ?? "");
   const startingDefinition = definitions.find((item) => item.id === startingDefinitionId);
+  const startingPowerDependencies = resolvePowerDependencies(asset ?? duplicateFrom ?? {}, startingDefinition);
   const existingAssetTags = assets.filter((item) => item.id !== asset?.id).map((item) => item.assetTag);
   const inheritedPhotos = asset?.photos ?? duplicateFrom?.photos ?? [];
   const startingTags = normalizeInventoryTags([
     ...(asset?.tags ?? duplicateFrom?.tags ?? []),
     ...(startingDefinition && isCableDefinition(startingDefinition) ? [CABLE_INVENTORY_TAG] : []),
   ]);
-  const startsAsCable = isCableInventoryAsset({ tags: startingTags });
+  const startsAsContainer = shouldStartAsContainer;
+  const startsAsCable = !startsAsContainer && (
+    (!asset && !duplicateFrom && initialRegistrationKind === "cables")
+    || isCableInventoryAsset({ tags: startingTags })
+  );
   const startingCableLengthInches = normalizeCableLengthInches(asset?.cableLengthInches ?? duplicateFrom?.cableLengthInches);
   const startingAssetCodeGroup = asset?.assetCodeGroup ?? duplicateFrom?.assetCodeGroup ?? inferInventoryAssetCodeGroup({
     isCable: startsAsCable,
+    isContainer: startsAsContainer,
     label: asset?.label ?? duplicateFrom?.label,
     tags: startingTags,
     definitionName: startingDefinition?.name,
@@ -109,11 +130,20 @@ export function GearAssetDialog({
     ? asset.assetTag
     : createInventoryAssetCode(existingAssetTags, startingAssetCodeGroup);
   const [definitionId, setDefinitionId] = useState(startingDefinitionId);
-  const [registrationKind, setRegistrationKind] = useState<RegistrationKind>(startsAsCable ? "cables" : "gear");
+  const [registrationKind, setRegistrationKind] = useState<GearRegistrationKind>(startsAsContainer ? "container" : startsAsCable ? "cables" : "gear");
   const [label, setLabel] = useState(asset?.label ?? duplicateFrom?.label ?? (startingDefinition ? `${startingDefinition.name}${initialLifecycle === "planned" ? " · planned" : ""}` : ""));
   const [assetTag, setAssetTag] = useState(startingAssetTag);
   const [lifecycleStatus, setLifecycleStatus] = useState<InventoryAssetLifecycle>(asset?.lifecycleStatus ?? duplicateFrom?.lifecycleStatus ?? initialLifecycle);
   const [stageOnly, setStageOnly] = useState(asset?.stageOnly ?? duplicateFrom?.stageOnly ?? startingDefinition?.showInSignalView === false);
+  const [needsPowerSource, setNeedsPowerSource] = useState(startingPowerDependencies.needsPowerSource);
+  const [needsPowerAdapter, setNeedsPowerAdapter] = useState(startingPowerDependencies.needsPowerAdapter);
+  const [expectedContentAssetIds, setExpectedContentAssetIds] = useState<string[] | undefined>(() => (
+    asset?.expectedContentAssetIds ? [...asset.expectedContentAssetIds] : undefined
+  ));
+  const [connectionDraft, setConnectionDraft] = useState<InventoryConnectionSet | null>(() => {
+    const existing = asset ? connectionSetForAsset(asset, connectionSets) : undefined;
+    return existing ? structuredClone(existing) : null;
+  });
   const [ownerPartyId, setOwnerPartyId] = useState(asset?.ownerPartyId ?? duplicateFrom?.ownerPartyId ?? "");
   const [currentLocationId, setCurrentLocationId] = useState(asset?.currentLocationId ?? "");
   const [serialNumber, setSerialNumber] = useState(asset?.serialNumber ?? "");
@@ -136,14 +166,26 @@ export function GearAssetDialog({
   const [weightPounds, setWeightPounds] = useState("");
   const [researching, setResearching] = useState(false);
   const [researchError, setResearchError] = useState<string | null>(null);
+  const [definitionCreatorOpen, setDefinitionCreatorOpen] = useState(false);
+  const [definitionCreatorSession, setDefinitionCreatorSession] = useState(0);
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const cableAssetSelected = registrationKind === "cables";
+  const containerAssetSelected = registrationKind === "container";
   const definition = useMemo(() => definitions.find((item) => item.id === definitionId), [definitionId, definitions]);
   const selectableDefinitions = useMemo(() => definitions.filter((item) => item.id === definitionId || (cableAssetSelected ? isCableDefinition(item) : !isCableDefinition(item))), [cableAssetSelected, definitionId, definitions]);
   const importedPortGroups = useMemo(() => researchResult ? summarizePortGroups(researchResult.ports) : [], [researchResult]);
+  const currentDirectContents = useMemo(() => asset
+    ? assets
+      .filter((item) => item.currentPlacement?.kind === "container" && item.currentPlacement.containerAssetId === asset.id)
+      .sort((left, right) => left.assetTag.localeCompare(right.assetTag))
+    : [], [asset, assets]);
+  const expectedContentRows = useMemo(() => expectedContentAssetIds?.map((assetId) => ({
+    assetId,
+    asset: assets.find((item) => item.id === assetId),
+  })) ?? [], [assets, expectedContentAssetIds]);
   const tagSuggestions = useMemo(() => {
     const selectedKeys = new Set(selectedTags.map((tag) => tag.toLocaleLowerCase()));
     return normalizeInventoryTags(assets.flatMap((item) => item.tags ?? []))
@@ -152,7 +194,7 @@ export function GearAssetDialog({
       .sort((left, right) => left.localeCompare(right))
       .slice(0, 8);
   }, [assets, selectedTags]);
-  const canResearchDefinition = !asset && !duplicateFrom && !initialDefinitionId && !cableAssetSelected;
+  const canResearchDefinition = !asset && !duplicateFrom && !initialDefinitionId && !cableAssetSelected && !containerAssetSelected;
   const physicalStatus = lifecycleStatus === "active" || lifecycleStatus === "awaiting_check_in";
   const normalizedCableLengthInches = normalizeCableLengthInches(Number(cableLengthInches));
   const cableLengthIssue = cableAssetSelected && !normalizedCableLengthInches
@@ -168,6 +210,7 @@ export function GearAssetDialog({
     : null;
   const selectedAssetCodeGroup = asset?.assetCodeGroup ?? inferInventoryAssetCodeGroup({
     isCable: cableAssetSelected,
+    isContainer: containerAssetSelected,
     label,
     tags: selectedTags,
     definitionName: researchResult?.name ?? definition?.name,
@@ -182,9 +225,12 @@ export function GearAssetDialog({
       : null;
 
   function changeRegistrationKind(value: string | null, tags = selectedTags) {
-    if (value !== "gear" && value !== "cables") return;
+    if (value !== "gear" && value !== "cables" && value !== "container") return;
     const nextIsCable = value === "cables";
-    const nextDefinition = definitions.find((item) => isCableDefinition(item) === nextIsCable);
+    const nextIsContainer = value === "container";
+    const nextDefinition = nextIsContainer
+      ? undefined
+      : definitions.find((item) => isCableDefinition(item) === nextIsCable);
     const previousDefault = definition ? `${definition.name}${initialLifecycle === "planned" ? " · planned" : ""}` : "";
     const nextDefault = nextDefinition ? `${nextDefinition.name}${initialLifecycle === "planned" ? " · planned" : ""}` : "";
     const nextLabel = !label || label === previousDefault ? nextDefault : label;
@@ -197,12 +243,14 @@ export function GearAssetDialog({
     setDefinitionId(nextDefinition?.id ?? "");
     setResearchResult(null);
     setResearchError(null);
+    setDefinitionCreatorOpen(false);
     setSelectedTags(nextTags);
     setTagError(null);
     setLabel(nextLabel);
     if (!asset) {
       const nextGroup = inferInventoryAssetCodeGroup({
         isCable: nextIsCable,
+        isContainer: nextIsContainer,
         label: nextLabel,
         tags: nextTags,
         definitionName: nextDefinition?.name,
@@ -210,18 +258,33 @@ export function GearAssetDialog({
       });
       setAssetTag(createInventoryAssetCode(existingAssetTags, nextGroup));
     }
-    if (!asset) setStageOnly(nextDefinition ? nextDefinition.showInSignalView === false : true);
+    if (!asset) {
+      setStageOnly(nextDefinition ? nextDefinition.showInSignalView === false : true);
+      const nextPowerDependencies = resolvePowerDependencies({}, nextDefinition);
+      setNeedsPowerSource(nextPowerDependencies.needsPowerSource);
+      setNeedsPowerAdapter(nextPowerDependencies.needsPowerAdapter);
+    }
   }
 
   function chooseDefinition(value: string | null) {
     if (!value) return;
+    if (value === CREATE_DEFINITION_VALUE) {
+      setDefinitionCreatorSession((current) => current + 1);
+      setDefinitionCreatorOpen(true);
+      return;
+    }
     const nextDefinitionId = value === NO_DEFINITION_VALUE ? "" : value;
     const next = definitions.find((item) => item.id === nextDefinitionId);
     const previousDefault = definition ? `${definition.name}${initialLifecycle === "planned" ? " · planned" : ""}` : "";
     setDefinitionId(nextDefinitionId);
     setResearchResult(null);
     setResearchError(null);
-    if (!asset) setStageOnly(next ? next.showInSignalView === false : true);
+    if (!asset) {
+      setStageOnly(next ? next.showInSignalView === false : true);
+      const nextPowerDependencies = resolvePowerDependencies({}, next);
+      setNeedsPowerSource(nextPowerDependencies.needsPowerSource);
+      setNeedsPowerAdapter(nextPowerDependencies.needsPowerAdapter);
+    }
     if (next && isCableDefinition(next) && !cableAssetSelected) {
       setSelectedTags((current) => normalizeInventoryTags([...current, CABLE_INVENTORY_TAG]));
     }
@@ -235,6 +298,41 @@ export function GearAssetDialog({
         tags: nextTags,
         definitionName: next?.name,
         definitionCategory: next?.category,
+      });
+      setAssetTag(createInventoryAssetCode(existingAssetTags, nextGroup));
+    }
+  }
+
+  function useCreatedDefinition(createdDefinition: EquipmentTemplate) {
+    const previousDefault = definition ? `${definition.name}${initialLifecycle === "planned" ? " · planned" : ""}` : "";
+    const nextIsCable = isCableDefinition(createdDefinition);
+    const nextTags = nextIsCable
+      ? normalizeInventoryTags([CABLE_INVENTORY_TAG, ...selectedTags.filter((tag) => tag.toLocaleLowerCase() !== CABLE_INVENTORY_TAG.toLocaleLowerCase())])
+      : selectedTags.filter((tag) => tag.toLocaleLowerCase() !== CABLE_INVENTORY_TAG.toLocaleLowerCase());
+    const nextLabel = !label || label === previousDefault
+      ? `${createdDefinition.name}${initialLifecycle === "planned" ? " · planned" : ""}`
+      : label;
+
+    onDefinitionCreated?.(createdDefinition);
+    setDefinitionId(createdDefinition.id);
+    setRegistrationKind(nextIsCable ? "cables" : registrationKind === "container" ? "container" : "gear");
+    setSelectedTags(nextTags);
+    setLabel(nextLabel);
+    setResearchResult(null);
+    setResearchError(null);
+    setDefinitionCreatorOpen(false);
+    if (!asset) {
+      setStageOnly(nextIsCable ? false : createdDefinition.showInSignalView === false);
+      const nextPowerDependencies = resolvePowerDependencies({}, createdDefinition);
+      setNeedsPowerSource(nextPowerDependencies.needsPowerSource);
+      setNeedsPowerAdapter(nextPowerDependencies.needsPowerAdapter);
+      const nextGroup = inferInventoryAssetCodeGroup({
+        isCable: nextIsCable,
+        isContainer: registrationKind === "container" && !nextIsCable,
+        label: nextLabel,
+        tags: nextTags,
+        definitionName: createdDefinition.name,
+        definitionCategory: createdDefinition.category,
       });
       setAssetTag(createInventoryAssetCode(existingAssetTags, nextGroup));
     }
@@ -255,10 +353,13 @@ export function GearAssetDialog({
       setHeightInches(result.physicalDimensions?.heightInches?.toString() ?? "");
       setWeightPounds(result.physicalDimensions?.weightPounds?.toString() ?? "");
       setStageOnly(result.ports.length === 0);
+      setNeedsPowerSource(false);
+      setNeedsPowerAdapter(false);
       setLabel(result.name);
       if (!asset) {
         const nextGroup = inferInventoryAssetCodeGroup({
           label: result.name,
+          isContainer: containerAssetSelected,
           tags: selectedTags,
           definitionName: result.name,
           definitionCategory: result.category,
@@ -283,6 +384,9 @@ export function GearAssetDialog({
     const fallback = definitions.find((item) => !isCableDefinition(item));
     setDefinitionId(fallback?.id ?? "");
     setStageOnly(fallback?.showInSignalView === false);
+    const fallbackPowerDependencies = resolvePowerDependencies({}, fallback);
+    setNeedsPowerSource(fallbackPowerDependencies.needsPowerSource);
+    setNeedsPowerAdapter(fallbackPowerDependencies.needsPowerAdapter);
   }
 
   function chooseReferenceImage(url: string, checked: boolean) {
@@ -391,8 +495,8 @@ export function GearAssetDialog({
           referenceImages: structuredClone(selectedReferenceImages),
           aiImport: researchResult.aiImport,
           ports: structuredClone(researchResult.ports),
-          needsPowerSource: false,
-          needsPowerAdapter: false,
+          needsPowerSource,
+          needsPowerAdapter,
           showInSignalView: !stageOnly,
           showPortNumbers: true,
           showPortLabels: true,
@@ -415,7 +519,11 @@ export function GearAssetDialog({
         cableLengthInches: normalizedCableLengthInches,
         cableColor,
         lifecycleStatus,
+        canContainAssets: containerAssetSelected,
         stageOnly: cableAssetSelected ? false : stageOnly,
+        needsPowerSource: cableAssetSelected || containerAssetSelected ? false : needsPowerSource,
+        needsPowerAdapter: cableAssetSelected || containerAssetSelected ? false : needsPowerAdapter,
+        expectedContentAssetIds: containerAssetSelected ? expectedContentAssetIds : undefined,
         tags: submittedTags,
         ownerPartyId: ownerPartyId || undefined,
         currentLocationId: physicalStatus && currentLocationId ? currentLocationId : undefined,
@@ -426,6 +534,19 @@ export function GearAssetDialog({
         photos: inheritedPhotos,
         createdAt: asset?.createdAt,
       }, photoFiles, setProgress);
+      const previousConnectionSet = asset ? connectionSetForAsset(asset, connectionSets) : undefined;
+      if (asset && (previousConnectionSet || connectionDraft)) {
+        const draft = connectionDraft;
+        await saveInventoryConnectionSet({
+          id: previousConnectionSet?.id ?? draft?.id,
+          sourceAssetId: saved.id,
+          memberAssetIds: draft?.memberAssetIds ?? [saved.id],
+          links: draft?.links ?? [],
+          signalConnectors: draft?.signalConnectors ?? [],
+          nodePositions: draft?.nodePositions,
+          createdAt: previousConnectionSet?.createdAt ?? draft?.createdAt,
+        });
+      }
       onSaved(saved);
       onOpenChange(false);
     } catch (caught) {
@@ -439,10 +560,20 @@ export function GearAssetDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>{asset ? `Edit ${asset.label}` : duplicateFrom ? `Duplicate ${duplicateFrom.label}` : initialLifecycle === "planned" ? "Create planned gear" : "Register physical gear"}</DialogTitle>
+          <DialogTitle>{asset
+            ? `Edit ${asset.label}`
+            : duplicateFrom
+              ? `Duplicate ${duplicateFrom.label}`
+              : containerAssetSelected
+                ? "Register container"
+                : initialLifecycle === "planned"
+                  ? "Create planned gear"
+                  : "Register physical gear"}</DialogTitle>
           <DialogDescription>
             {duplicateFrom
               ? "Reuse this item's definition, photos, owner, purchase link, notes, and lifecycle with a new permanent ID. Serial number and current location start blank for separate tracking."
+              : containerAssetSelected
+                ? "Create a trackable bag, case, or bin with its own 1000-series inventory ID."
               : initialLifecycle === "planned" && !asset
               ? "Reserve a permanent asset ID now. Its setup references and QR identity will survive ordering, delivery, and first check-in."
               : "Track the exact physical item, its owner, identifying details, photos, and current lifecycle."}
@@ -451,9 +582,10 @@ export function GearAssetDialog({
 
         <Tabs value={registrationKind} onValueChange={(value) => changeRegistrationKind(value)} className="gap-4">
           {!asset && !duplicateFrom ? (
-            <TabsList className="grid w-full grid-cols-2" aria-label="Registration type">
+            <TabsList className="grid w-full grid-cols-3" aria-label="Registration type">
               <TabsTrigger value="gear"><PackageIcon aria-hidden />Gear</TabsTrigger>
               <TabsTrigger value="cables"><CableIcon aria-hidden />Cables</TabsTrigger>
+              <TabsTrigger value="container"><BoxesIcon aria-hidden />Container</TabsTrigger>
             </TabsList>
           ) : null}
           <TabsContent value={registrationKind}>
@@ -595,7 +727,7 @@ export function GearAssetDialog({
 
           <FieldGroup className="grid gap-4 sm:grid-cols-2">
             <Field className="sm:col-span-2">
-              <FieldLabel htmlFor="gear-asset-definition">{cableAssetSelected ? "Cable definition" : "Gear definition"}</FieldLabel>
+              <FieldLabel htmlFor="gear-asset-definition">{cableAssetSelected ? "Cable definition" : containerAssetSelected ? "Container definition" : "Gear definition"}</FieldLabel>
               <Select value={researchResult ? null : definitionId || NO_DEFINITION_VALUE} onValueChange={chooseDefinition} disabled={saving || Boolean(asset) || Boolean(researchResult)}>
                 <SelectTrigger id="gear-asset-definition" className="w-full">
                   <SelectValue>{researchResult
@@ -607,6 +739,12 @@ export function GearAssetDialog({
                         : "None · basic inventory item"}</SelectValue>
                 </SelectTrigger>
                 <SelectContent><SelectGroup>
+                  {!asset && !duplicateFrom ? (
+                    <>
+                      <SelectItem value={CREATE_DEFINITION_VALUE}><PlusIcon />Create definition from this item</SelectItem>
+                      <SelectSeparator />
+                    </>
+                  ) : null}
                   {cableAssetSelected
                     ? <SelectItem value={NO_DEFINITION_VALUE} disabled>Choose a cable definition</SelectItem>
                     : <SelectItem value={NO_DEFINITION_VALUE}>None · basic inventory item</SelectItem>}
@@ -632,12 +770,13 @@ export function GearAssetDialog({
                 if (!asset && !definitionId && !researchResult) {
                   const nextGroup = inferInventoryAssetCodeGroup({
                     isCable: cableAssetSelected,
+                    isContainer: containerAssetSelected,
                     label: nextLabel,
                     tags: selectedTags,
                   });
                   setAssetTag(createInventoryAssetCode(existingAssetTags, nextGroup));
                 }
-              }} placeholder={cableAssetSelected ? "6' XLR-M → TRS-M" : definitionId || researchResult ? "Ike's SM58 #2" : "Tall boom mic stand"} required disabled={saving} />
+              }} placeholder={cableAssetSelected ? "6' XLR-M → TRS-M" : containerAssetSelected ? "Blue cable duffel" : definitionId || researchResult ? "Ike's SM58 #2" : "Tall boom mic stand"} required disabled={saving} />
             </Field>
             <Field data-invalid={Boolean(assetTagIssue)}>
               <FieldLabel htmlFor="gear-asset-tag">Inventory ID</FieldLabel>
@@ -657,7 +796,9 @@ export function GearAssetDialog({
               {assetTagIssue
                 ? <FieldError>{assetTagIssue}</FieldError>
                 : <FieldDescription>
-                  Assigned automatically as a four-digit check-in number. Microphones begin at 0100, stands at 0200, instruments at 0300, pedals at 0400, and rack gear at 0500.
+                  {containerAssetSelected
+                    ? "Assigned automatically from the container series, beginning at 1000."
+                    : "Assigned automatically as a four-digit check-in number. Microphones begin at 0100, stands at 0200, instruments at 0300, pedals at 0400, and rack gear at 0500."}
                 </FieldDescription>}
             </Field>
             {cableAssetSelected ? (
@@ -721,7 +862,9 @@ export function GearAssetDialog({
             <Field>
               <FieldLabel htmlFor="gear-asset-lifecycle">Lifecycle</FieldLabel>
               <Select value={lifecycleStatus} onValueChange={(value) => value && setLifecycleStatus(value as InventoryAssetLifecycle)} disabled={saving}>
-                <SelectTrigger id="gear-asset-lifecycle" className="w-full"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="gear-asset-lifecycle" className="w-full">
+                  <SelectValue>{ASSET_LIFECYCLE_OPTIONS.find((option) => option.value === lifecycleStatus)?.label ?? "Choose lifecycle"}</SelectValue>
+                </SelectTrigger>
                 <SelectContent><SelectGroup>
                   {ASSET_LIFECYCLE_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
                 </SelectGroup></SelectContent>
@@ -730,7 +873,9 @@ export function GearAssetDialog({
             <Field>
               <FieldLabel htmlFor="gear-asset-owner">Owner</FieldLabel>
               <Select value={ownerPartyId || "none"} onValueChange={(value) => setOwnerPartyId(value === "none" || !value ? "" : value)} disabled={saving}>
-                <SelectTrigger id="gear-asset-owner" className="w-full"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="gear-asset-owner" className="w-full">
+                  <SelectValue>{ownerPartyId ? parties.find((party) => party.id === ownerPartyId)?.name ?? "Unknown owner" : "Not assigned"}</SelectValue>
+                </SelectTrigger>
                 <SelectContent><SelectGroup>
                   <SelectItem value="none">Not assigned</SelectItem>
                   {parties.map((party) => <SelectItem key={party.id} value={party.id}>{party.name}</SelectItem>)}
@@ -742,7 +887,9 @@ export function GearAssetDialog({
               <Field>
                 <FieldLabel htmlFor="gear-asset-location">Current location</FieldLabel>
                 <Select value={currentLocationId || "none"} onValueChange={(value) => setCurrentLocationId(value === "none" || !value ? "" : value)} disabled={saving}>
-                  <SelectTrigger id="gear-asset-location" className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="gear-asset-location" className="w-full">
+                    <SelectValue>{currentLocationId ? locations.find((location) => location.id === currentLocationId)?.name ?? "Unknown location" : "Not checked in"}</SelectValue>
+                  </SelectTrigger>
                   <SelectContent><SelectGroup>
                     <SelectItem value="none">Not checked in</SelectItem>
                     {locations.map((location) => <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>)}
@@ -756,13 +903,105 @@ export function GearAssetDialog({
             </Field> : null}
           </FieldGroup>
 
-          {!cableAssetSelected ? <Field orientation="horizontal" className="rounded-lg border bg-muted/30 p-3" data-disabled={saving || researching}>
-            <FieldContent>
-              <FieldLabel htmlFor="gear-asset-stage-only">Stage only</FieldLabel>
-              <FieldDescription>Keep this exact item in STAGE planning, but hide it from the logical SIGNAL diagram when it is assigned to a setup.</FieldDescription>
-            </FieldContent>
-            <Switch id="gear-asset-stage-only" checked={stageOnly} onCheckedChange={setStageOnly} disabled={saving || researching} />
-          </Field> : null}
+          {!cableAssetSelected ? <FieldGroup>
+            <Field orientation="horizontal" className="rounded-lg border bg-muted/30 p-3" data-disabled={saving || researching}>
+              <FieldContent>
+                <FieldLabel htmlFor="gear-asset-stage-only">Stage only</FieldLabel>
+                <FieldDescription>Keep this exact item in STAGE planning, but hide it from the logical SIGNAL diagram when it is assigned to a setup.</FieldDescription>
+              </FieldContent>
+              <Switch id="gear-asset-stage-only" checked={stageOnly} onCheckedChange={setStageOnly} disabled={saving || researching} />
+            </Field>
+            {!containerAssetSelected ? <>
+              <Field orientation="horizontal" className="rounded-lg border bg-muted/30 p-3" data-disabled={saving || researching}>
+                <FieldContent>
+                  <FieldLabel htmlFor="gear-asset-needs-power-source">Needs power source</FieldLabel>
+                  <FieldDescription>Keep this exact item within reach of a power drop, outlet, or other power source.</FieldDescription>
+                </FieldContent>
+                <Switch
+                  id="gear-asset-needs-power-source"
+                  checked={needsPowerSource}
+                  onCheckedChange={(checked) => {
+                    setNeedsPowerSource(checked);
+                    if (!checked) setNeedsPowerAdapter(false);
+                  }}
+                  disabled={saving || researching}
+                />
+              </Field>
+              <Field orientation="horizontal" className="rounded-lg border bg-muted/30 p-3" data-disabled={saving || researching}>
+                <FieldContent>
+                  <FieldLabel htmlFor="gear-asset-needs-power-adapter">Needs power adapter</FieldLabel>
+                  <FieldDescription>The separate adapter carries this item&apos;s same four-digit ID and is checked in with it.</FieldDescription>
+                </FieldContent>
+                <Switch
+                  id="gear-asset-needs-power-adapter"
+                  checked={needsPowerAdapter}
+                  onCheckedChange={(checked) => {
+                    setNeedsPowerAdapter(checked);
+                    if (checked) setNeedsPowerSource(true);
+                  }}
+                  disabled={saving || researching}
+                />
+              </Field>
+            </> : null}
+          </FieldGroup> : null}
+
+          {asset && !containerAssetSelected ? (
+            <GearConnectionsField
+              asset={asset}
+              assets={assets}
+              definitions={definitions}
+              connectionSets={connectionSets}
+              value={connectionDraft}
+              onChange={setConnectionDraft}
+              disabled={saving || researching}
+            />
+          ) : null}
+
+          {asset && containerAssetSelected ? (
+            <FieldSet>
+              <FieldLegend>Expected contents</FieldLegend>
+              <FieldDescription>Save the items that should be placed directly inside this container. Nested contents stay with their inner container.</FieldDescription>
+              <div className="overflow-hidden rounded-lg border bg-muted/20">
+                <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-medium">
+                      {expectedContentAssetIds === undefined
+                        ? "No expected contents set"
+                        : `${expectedContentAssetIds.length} expected item${expectedContentAssetIds.length === 1 ? "" : "s"}`}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">{currentDirectContents.length} item{currentDirectContents.length === 1 ? " is" : "s are"} currently placed directly inside.</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setExpectedContentAssetIds(currentDirectContents.map((item) => item.id))}
+                    disabled={saving}
+                  >
+                    <BoxesIcon data-icon="inline-start" />
+                    Set expected contents to current contents
+                  </Button>
+                </div>
+                {expectedContentAssetIds === undefined ? (
+                  <Alert className="rounded-none border-x-0 border-b-0">
+                    <BoxesIcon aria-hidden />
+                    <AlertTitle>This container does not have a packing checklist yet.</AlertTitle>
+                    <AlertDescription>Use the button above, then save the asset to create one.</AlertDescription>
+                  </Alert>
+                ) : expectedContentRows.length ? (
+                  <ol className="max-h-52 divide-y overflow-y-auto border-t" aria-label="Expected container contents">
+                    {expectedContentRows.map(({ assetId, asset: expectedAsset }) => (
+                      <li className="flex items-center gap-3 px-4 py-3" key={assetId}>
+                        <strong className="font-mono text-sm tracking-[0.06em]">{expectedAsset?.assetTag ?? "—"}</strong>
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium">{expectedAsset?.label ?? "Inventory item no longer exists"}</span>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="border-t px-4 py-3 text-sm text-muted-foreground">No items are expected in this container. Save the asset to keep this empty checklist.</p>
+                )}
+              </div>
+            </FieldSet>
+          ) : null}
 
           <Field data-invalid={Boolean(purchaseUrlIssue)}>
             <FieldLabel htmlFor="gear-asset-purchase-url">Purchase URL</FieldLabel>
@@ -882,7 +1121,7 @@ export function GearAssetDialog({
             <Textarea id="gear-asset-notes" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Why we need it, condition, identifying marks, or receiving instructions." rows={3} disabled={saving} />
           </Field>
 
-          {asset ? <GearLabelPrinter assetTag={canonicalAssetTag} assetName={cableAssetSelected ? formatCableAssetLabel(label, normalizedCableLengthInches) : label} /> : null}
+          {asset ? <GearLabelPrinter key={`${canonicalAssetTag}-${cableAssetSelected ? "cable" : "gear"}`} assetTag={canonicalAssetTag} assetName={cableAssetSelected ? formatCableAssetLabel(label, normalizedCableLengthInches) : label} isCable={cableAssetSelected} /> : null}
 
           {saving && (photoFiles.length || selectedReferenceUrls.size) ? <Progress value={progress} aria-label={`Gear photo upload ${progress}% complete`} /> : null}
               {error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}
@@ -894,10 +1133,32 @@ export function GearAssetDialog({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
           <Button type="submit" form="gear-asset-form" disabled={saving || researching || !label.trim() || Boolean(assetTagIssue) || Boolean(cableLengthIssue) || Boolean(cableDefinitionIssue) || Boolean(purchaseUrlIssue)}>
             {asset ? <SaveIcon data-icon="inline-start" /> : duplicateFrom ? <CopyPlusIcon data-icon="inline-start" /> : <PackagePlusIcon data-icon="inline-start" />}
-            {saving ? "Saving..." : asset ? "Save asset" : duplicateFrom ? "Create duplicate" : initialLifecycle === "planned" ? "Create planned asset" : "Register asset"}
+            {saving
+              ? "Saving..."
+              : asset
+                ? "Save asset"
+                : duplicateFrom
+                  ? "Create duplicate"
+                  : containerAssetSelected
+                    ? "Register container"
+                    : initialLifecycle === "planned"
+                      ? "Create planned asset"
+                      : "Register asset"}
           </Button>
         </DialogFooter>
       </DialogContent>
+      {!asset && !duplicateFrom ? (
+        <EquipmentTemplateDialog
+          key={`asset-definition-${registrationKind}-${definitionCreatorSession}`}
+          open={definitionCreatorOpen}
+          onOpenChange={setDefinitionCreatorOpen}
+          initialDefinitionKind={cableAssetSelected ? "cable" : "equipment"}
+          initialName={cableAssetSelected ? "" : label}
+          lockDefinitionKind
+          creationContext="asset"
+          onCreated={useCreatedDefinition}
+        />
+      ) : null}
     </Dialog>
   );
 }

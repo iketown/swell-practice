@@ -18,24 +18,27 @@ export function GearShell({
   children,
   isAdmin = false,
   isDemoAdmin = false,
+  wide = false,
 }: {
   assetTag?: string;
-  active?: "single" | "batch";
+  active?: "single" | "batch" | "pack";
   children: React.ReactNode;
   isAdmin?: boolean;
   isDemoAdmin?: boolean;
+  wide?: boolean;
 }) {
   const demoQuery = isDemoAdmin ? "?demo=1" : "";
   const navItems = [
     ...(assetTag ? [{ href: `/g/${encodeURIComponent(assetTag.toLowerCase())}${demoQuery}`, label: "Check in", key: "single" as const }] : []),
     ...(isAdmin || active === "batch" ? [{ href: `/gear/check-in${demoQuery}`, label: "Scan multiple", key: "batch" as const }] : []),
+    ...(isAdmin || active === "pack" ? [{ href: `/gear/pack${demoQuery}`, label: "Pack a bag", key: "pack" as const }] : []),
     ...(isAdmin ? [{ href: `/gear${demoQuery}`, label: "Inventory", key: "inventory" as const }] : []),
   ];
 
   return (
     <div className="swell-shell min-h-screen text-foreground">
       <header className="swell-header border-b">
-        <div className="mx-auto flex max-w-xl flex-col gap-3 px-4 py-4 sm:px-6">
+        <div className={cn("mx-auto flex flex-col gap-3 px-4 py-4 sm:px-6", wide ? "max-w-7xl" : "max-w-xl")}>
           <div className="flex items-center justify-between gap-4">
             <Image
               src="/swell-logo-horizontal-stripes.svg"
@@ -64,7 +67,7 @@ export function GearShell({
           </nav>
         </div>
       </header>
-      <main className="mx-auto flex w-full max-w-xl flex-col gap-5 px-4 py-6 sm:px-6">
+      <main className={cn("mx-auto flex w-full flex-col gap-5 px-4 py-6 sm:px-6", wide ? "max-w-7xl" : "max-w-xl")}>
         {children}
       </main>
     </div>

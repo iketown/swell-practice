@@ -65,8 +65,8 @@ const buildPhases = [
   {
     phase: "Phase 3",
     title: "Containers and history",
-    status: "Planned",
-    detail: "Container manifests, nested placement, mobile QR scanning, manual batch check-in, optional GPS, and append-only item history.",
+    status: "Working now",
+    detail: "Container expected contents, nested placement, mobile QR scanning, missing and unexpected item checks, and append-only item history.",
   },
   {
     phase: "Phase 4",
@@ -642,21 +642,17 @@ Equipment research stores:
               <AccordionContent>
                 <div className="flex flex-col gap-4 text-foreground">
                   <p className="leading-6 text-muted-foreground">Bags, road cases, racks, bins, and trunks are normal inventory assets with a container capability. A manifest is the expected organization. Placement events establish the actual hierarchy.</p>
+                  <p className="leading-6 text-muted-foreground">The working <strong className="font-semibold text-foreground">Pack a Bag</strong> interface confirms the container at a named location first, then accepts inventory search, number lookup, or camera scans while showing actual direct and nested contents. It can set expected contents from the current direct items, reports missing and unexpected items, and marks an exact match packed and ready. The fresh confirmation prevents newly packed gear from inheriting an old container location.</p>
                   <pre className="overflow-x-auto rounded-md border bg-muted p-4 text-xs leading-6 text-foreground"><code>{`InventoryAsset {
   ...,
   canContainAssets?: boolean,
+  expectedContentAssetIds?: string[],
   currentPlacement:
     | { kind: "location", locationId: string }
     | { kind: "container", containerAssetId: string },
   effectiveLocationId?: string,
   locationInheritedFromAssetId?: string,
   ancestorContainerIds?: string[]
-}
-
-ContainerManifest {
-  containerAssetId,
-  expectedItems: [{ assetId, required, sortOrder, notes? }],
-  updatedAt, updatedById
 }`}</code></pre>
                   <div className="grid gap-3 md:grid-cols-3">
                     <Definition term="Expected contents">The 14 cords assigned to Cable Duffle A. This powers teardown and packing checklists.</Definition>
@@ -667,6 +663,7 @@ ContainerManifest {
                     <li>Moving a container creates one direct event for the container. Child histories show inherited movement without pretending each child was scanned.</li>
                     <li>A container can move even when its manifest is incomplete, but the interface keeps the missing-items warning visible.</li>
                     <li>Containers may nest, such as cable pouch to duffle to car. Cycles are rejected and initial nesting depth is limited.</li>
+                    <li>Every packing session begins with a new direct location observation for its container; a stale container cannot accept item check-ins.</li>
                     <li>Scanning a container opens its manifest so teardown can confirm every expected item before the container leaves.</li>
                   </ul>
                 </div>

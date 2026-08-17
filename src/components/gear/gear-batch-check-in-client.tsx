@@ -3,6 +3,7 @@
 import type { IScannerControls } from "@zxing/browser";
 import {
   AlertTriangleIcon,
+  BoxesIcon,
   CameraIcon,
   CheckIcon,
   CheckCircle2Icon,
@@ -23,6 +24,8 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState, useSyncEx
 import { toast } from "sonner";
 
 import { AdminSignInDialog } from "@/components/admin-sign-in-dialog";
+import { ContainerLocationConfirmation } from "@/components/gear/container-location-confirmation";
+import { GearAssetDialog } from "@/components/gear/gear-asset-dialog";
 import { GearShell } from "@/components/gear/gear-shell";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -48,19 +51,24 @@ import { useAdmin } from "@/hooks/use-admin";
 import {
   canonicalizeAssetTag,
   createGearId,
+  normalizeGearSearchText,
   normalizeInventoryAssetCode,
   type GearLocation,
   type GearLocationKind,
+  type GearParty,
   type InventoryAsset,
 } from "@/lib/gear/domain";
 import {
   checkInInventoryAsset,
   createGearLocation,
   listGearLocations,
+  listGearParties,
   listInventoryAssets,
 } from "@/lib/gear/repository";
 import { assetTagFromScannedValue, cameraAccessErrorMessage } from "@/lib/gear/scanner";
 import { spokenGearAssetCodes } from "@/lib/gear/voice-entry";
+import { powerCheckInTag, resolvePowerDependencies, type EquipmentTemplate } from "@/lib/setup-designer/domain";
+import { listEquipmentTemplates } from "@/lib/setup-designer/repository";
 
 const LOCATION_KINDS: Array<{ value: GearLocationKind; label: string }> = [
   { value: "house", label: "House" },
@@ -68,7 +76,6 @@ const LOCATION_KINDS: Array<{ value: GearLocationKind; label: string }> = [
   { value: "studio", label: "Studio" },
   { value: "venue", label: "Venue" },
   { value: "warehouse", label: "Warehouse" },
-  { value: "container", label: "Container" },
   { value: "other", label: "Other" },
 ];
 
@@ -149,6 +156,7 @@ interface CameraDetectionBox {
 interface ScannedSessionItem {
   assetId: string;
   assetTag: string;
+  displayTag: string;
   label: string;
   checkInId: string;
   checkedInAt: number;
@@ -159,6 +167,7 @@ interface VoiceQueueItem {
   code: string;
   assetId?: string;
   assetTag: string;
+  displayTag: string;
   label: string;
   status: VoiceQueueStatus;
   error?: string;
@@ -313,14 +322,18 @@ function formatScanTime(value: number) {
   }).format(value);
 }
 
-export function GearBatchCheckInClient({ initialLocationId }: { initialLocationId?: string }) {
+export function GearBatchCheckInClient({ initialLocationId, initialContainerId }: { initialLocationId?: string; initialContainerId?: string }) {
   const admin = useAdmin();
   const [assets, setAssets] = useState<InventoryAsset[]>([]);
+  const [definitions, setDefinitions] = useState<EquipmentTemplate[]>([]);
   const [locations, setLocations] = useState<GearLocation[]>([]);
+  const [parties, setParties] = useState<GearParty[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loginOpen, setLoginOpen] = useState(false);
   const [selectedLocationId, setSelectedLocationId] = useState("");
+  const [selectedContainerId, setSelectedContainerId] = useState("");
+  const [containerLocationConfirmed, setContainerLocationConfirmed] = useState(false);
   const [phase, setPhase] = useState<SessionPhase>("setup");
   const [entryMode, setEntryMode] = useState<ScanEntryMode>("voice");
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>("idle");
@@ -337,6 +350,7 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
   const [scannedItems, setScannedItems] = useState<ScannedSessionItem[]>([]);
   const [lastScan, setLastScan] = useState<ScannedSessionItem | null>(null);
   const [creatingLocation, setCreatingLocation] = useState(false);
+  const [creatingContainer, setCreatingContainer] = useState(false);
   const [newLocationName, setNewLocationName] = useState("");
   const [newLocationKind, setNewLocationKind] = useState<GearLocationKind>("other");
   const [savingLocation, setSavingLocation] = useState(false);
@@ -369,12 +383,16 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
     setLoading(true);
     setLoadError(null);
     try {
-      const [nextAssets, nextLocations] = await Promise.all([
+      const [nextAssets, nextLocations, nextDefinitions, nextParties] = await Promise.all([
         listInventoryAssets(),
         listGearLocations(),
+        listEquipmentTemplates(),
+        listGearParties(),
       ]);
       setAssets(nextAssets);
       setLocations(nextLocations);
+      setDefinitions(nextDefinitions);
+      setParties(nextParties);
       if (
         initialLocationId
         && !initialLocationAppliedRef.current
@@ -382,13 +400,20 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
       ) {
         setSelectedLocationId(initialLocationId);
         initialLocationAppliedRef.current = true;
+      } else if (initialContainerId && !initialLocationAppliedRef.current) {
+        const canonicalContainerTag = canonicalizeAssetTag(initialContainerId);
+        const initialContainer = nextAssets.find((asset) => asset.canContainAssets && (
+          asset.id === initialContainerId || canonicalizeAssetTag(asset.assetTag) === canonicalContainerTag
+        ));
+        if (initialContainer) setSelectedContainerId(initialContainer.id);
+        initialLocationAppliedRef.current = true;
       }
     } catch (caught) {
       setLoadError(caught instanceof Error ? caught.message : "Could not load gear and locations.");
     } finally {
       setLoading(false);
     }
-  }, [admin.isAdmin, initialLocationId]);
+  }, [admin.isAdmin, initialContainerId, initialLocationId]);
 
   useEffect(() => {
     if (!admin.isAdmin) return;
@@ -403,10 +428,20 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
   }), [locations]);
   const recentLocations = sortedLocations.slice(0, 4);
   const selectedLocation = locations.find((location) => location.id === selectedLocationId) ?? null;
+  const containers = useMemo(() => assets
+    .filter((asset) => asset.lifecycleStatus === "active" && asset.canContainAssets)
+    .sort((left, right) => left.assetTag.localeCompare(right.assetTag)), [assets]);
+  const selectedContainer = containers.find((container) => container.id === selectedContainerId) ?? null;
+  const selectedDestination = useMemo(() => selectedContainer
+    ? { kind: "container" as const, id: selectedContainer.id, name: selectedContainer.label }
+    : selectedLocation
+      ? { kind: "location" as const, id: selectedLocation.id, name: selectedLocation.name }
+      : null, [selectedContainer, selectedLocation]);
   const locationById = useMemo(() => new Map(locations.map((location) => [location.id, location])), [locations]);
   const assetByTag = useMemo(() => new Map(
     assets.map((asset) => [canonicalizeAssetTag(asset.assetTag), asset]),
   ), [assets]);
+  const definitionById = useMemo(() => new Map(definitions.map((definition) => [definition.id, definition])), [definitions]);
   const normalizedManualAssetTag = normalizeInventoryAssetCode(manualAssetTag);
   const manualSubmitting = manualPendingCount > 0;
 
@@ -521,7 +556,7 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
   }, []);
 
   const processScannedValue = useCallback(async (rawValue: string, source: ScanSource) => {
-    if (!sessionActiveRef.current || !selectedLocation) return false;
+    if (!sessionActiveRef.current || !selectedDestination) return false;
     const assetTag = assetTagFromScannedValue(rawValue);
     const detectionKey = assetTag || rawValue.trim();
     if (!detectionKey) return false;
@@ -551,41 +586,48 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
 
     processingAssetIdsRef.current.add(asset.id);
     try {
-      const previousLocationName = asset.currentLocationId
-        ? locationById.get(asset.currentLocationId)?.name
-        : undefined;
-      const checkIn = await checkInInventoryAsset({
+      const outcome = await checkInInventoryAsset({
         assetId: asset.id,
-        locationId: selectedLocation.id,
+        destination: selectedDestination.kind === "container"
+          ? { kind: "container", containerAssetId: selectedDestination.id }
+          : { kind: "location", locationId: selectedDestination.id },
         method: source === "camera" ? "qr_camera" : "manual_bulk",
         actorId: admin.user?.uid ?? "demo-admin",
         operationId: operationIdRef.current,
       });
-      const item: ScannedSessionItem = {
-        assetId: asset.id,
-        assetTag: asset.assetTag,
-        label: asset.label,
-        checkInId: checkIn.id,
-        checkedInAt: checkIn.checkedInAt,
-        previousLocationName,
-      };
-      successfulAssetIdsRef.current.add(asset.id);
+      const checkInByAssetId = new Map(outcome.checkIns.map((checkIn) => [checkIn.assetId, checkIn]));
+      const checkedItems = outcome.assets.flatMap((checkedAsset): ScannedSessionItem[] => {
+        if (successfulAssetIdsRef.current.has(checkedAsset.id)) return [];
+        const checkIn = checkInByAssetId.get(checkedAsset.id);
+        if (!checkIn) return [];
+        const previousAsset = assets.find((item) => item.id === checkedAsset.id);
+        return [{
+          assetId: checkedAsset.id,
+          assetTag: checkedAsset.assetTag,
+          displayTag: powerCheckInTag(checkedAsset.assetTag, resolvePowerDependencies(checkedAsset, definitionById.get(checkedAsset.definitionId)).needsPowerAdapter),
+          label: checkedAsset.label,
+          checkInId: checkIn.id,
+          checkedInAt: checkIn.checkedInAt,
+          previousLocationName: previousAsset?.currentLocationId ? locationById.get(previousAsset.currentLocationId)?.name : undefined,
+        }];
+      });
+      for (const checkedItem of checkedItems) successfulAssetIdsRef.current.add(checkedItem.assetId);
       markCameraDetectionRecorded(asset.id);
-      setScannedItems((current) => [...current, item]);
-      setLastScan(item);
-      setAssets((current) => current.map((currentAsset) => currentAsset.id === asset.id
-        ? {
-            ...currentAsset,
-            lifecycleStatus: "active",
-            currentLocationId: selectedLocation.id,
-            updatedAt: checkIn.checkedInAt,
-          }
-        : currentAsset));
-      setLocations((current) => current.map((location) => location.id === selectedLocation.id
-        ? { ...location, lastCheckInAt: checkIn.checkedInAt }
-        : location));
-      toast.success(`${asset.assetTag} checked into ${selectedLocation.name}.`, {
-        description: asset.label,
+      setScannedItems((current) => [...current, ...checkedItems]);
+      const sourceItem = checkedItems.find((item) => item.assetId === asset.id) ?? checkedItems.at(-1);
+      if (sourceItem) setLastScan(sourceItem);
+      const checkedAssetById = new Map(outcome.assets.map((checkedAsset) => [checkedAsset.id, checkedAsset]));
+      const propagatedAssetById = new Map((outcome.propagatedAssets ?? outcome.assets).map((checkedAsset) => [checkedAsset.id, checkedAsset]));
+      setAssets((current) => current.map((currentAsset) => propagatedAssetById.get(currentAsset.id) ?? checkedAssetById.get(currentAsset.id) ?? currentAsset));
+      const checkedInAt = outcome.checkIns[0]?.checkedInAt ?? Date.now();
+      if (selectedDestination.kind === "location") {
+        setLocations((current) => current.map((location) => location.id === selectedDestination.id
+          ? { ...location, lastCheckInAt: checkedInAt }
+          : location));
+      }
+      const checkedDisplayTags = checkedItems.map((item) => item.displayTag);
+      toast.success(`${checkedDisplayTags.join(" + ")} checked into ${selectedDestination.name}.`, {
+        description: checkedItems.length > 1 ? `${checkedItems.length} connected items moved together.` : asset.label,
         duration: 2400,
       });
       playSuccessFeedback();
@@ -603,11 +645,13 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
   }, [
     admin.user,
     assetByTag,
+    assets,
+    definitionById,
     locationById,
     markCameraDetectionRecorded,
     playSuccessFeedback,
     removeCameraDetection,
-    selectedLocation,
+    selectedDestination,
   ]);
 
   const appendVoiceCodes = useCallback((codes: string[]) => {
@@ -619,17 +663,22 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
         if (seen.has(code)) continue;
         seen.add(code);
         const asset = assetByTag.get(code);
+        const displayTag = asset
+          ? powerCheckInTag(asset.assetTag, resolvePowerDependencies(asset, definitionById.get(asset.definitionId)).needsPowerAdapter)
+          : code;
         additions.push(asset
           ? {
               code,
               assetId: asset.id,
               assetTag: asset.assetTag,
+              displayTag,
               label: asset.label,
               status: successfulAssetIdsRef.current.has(asset.id) ? "checked" : "pending",
             }
           : {
               code,
               assetTag: code,
+              displayTag,
               label: "No matching inventory item",
               status: "error",
               error: "This number is not registered.",
@@ -637,7 +686,7 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
       }
       return additions.length ? [...current, ...additions] : current;
     });
-  }, [assetByTag]);
+  }, [assetByTag, definitionById]);
 
   const parseVoiceTranscript = useCallback((transcript: string) => {
     const codes = spokenGearAssetCodes(transcript);
@@ -875,6 +924,8 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
       const location = await createGearLocation({ name: newLocationName, kind: newLocationKind });
       setLocations((current) => [...current, location]);
       setSelectedLocationId(location.id);
+      setSelectedContainerId("");
+      setContainerLocationConfirmed(false);
       setNewLocationName("");
       setNewLocationKind("other");
       setCreatingLocation(false);
@@ -887,7 +938,7 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
   }
 
   async function beginSession() {
-    if (!selectedLocation) return;
+    if (!selectedDestination || (selectedDestination.kind === "container" && !containerLocationConfirmed)) return;
     stopCamera();
     cancelVoiceCapture();
     await primeFeedback().catch(() => undefined);
@@ -924,6 +975,8 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
     cancelVoiceCapture();
     setCameraRequested(false);
     setSelectedLocationId("");
+    setSelectedContainerId("");
+    setContainerLocationConfirmed(false);
     setScannedItems([]);
     setLastScan(null);
     setPhase("setup");
@@ -1025,7 +1078,7 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
     );
   }
 
-  if (phase === "summary" && selectedLocation) {
+  if (phase === "summary" && selectedDestination) {
     const inventoryHref = admin.isDemoAdmin ? "/gear?demo=1" : "/gear";
     return (
       <GearShell active="batch" isAdmin isDemoAdmin={admin.isDemoAdmin}>
@@ -1038,7 +1091,7 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
                 {scannedItems.length} item{scannedItems.length === 1 ? "" : "s"} checked in
               </h1>
               <p className="text-base text-muted-foreground">
-                Destination: <strong className="font-semibold text-foreground">{selectedLocation.name}</strong>
+                Destination: <strong className="font-semibold text-foreground">{selectedDestination.name}</strong>
               </p>
             </div>
           </div>
@@ -1049,7 +1102,7 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
                 <CheckCircle2Icon className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center gap-2">
-                    <strong className="font-semibold">{item.assetTag}</strong>
+                    <strong className="font-semibold">{item.displayTag}</strong>
                     <Badge variant="secondary">{formatScanTime(item.checkedInAt)}</Badge>
                   </span>
                   <span className="mt-0.5 block text-sm text-muted-foreground">{item.label}</span>
@@ -1073,13 +1126,13 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
     );
   }
 
-  if (phase === "scanning" && selectedLocation) {
+  if (phase === "scanning" && selectedDestination) {
     return (
       <GearShell active="batch" isAdmin isDemoAdmin={admin.isDemoAdmin}>
         <section className="flex flex-col gap-4">
           <header className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="swell-page-kicker">Checking in to {selectedLocation.name}</p>
+              <p className="swell-page-kicker">Checking in to {selectedDestination.name}</p>
               <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Check in gear</h1>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
@@ -1155,13 +1208,13 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
                             className="size-14 shrink-0"
                             onClick={() => removeVoiceQueueItem(item.code)}
                             disabled={item.status === "checking" || item.status === "checked"}
-                            aria-label={`Remove ${item.assetTag} from this list`}
+                            aria-label={`Remove ${item.displayTag} from this list`}
                           >
                             <XIcon className="size-7" aria-hidden />
                           </Button>
 
                           <span className="min-w-0">
-                            <strong className="block font-mono text-xl tracking-[0.08em]">{item.assetTag}</strong>
+                            <strong className="block font-mono text-xl tracking-[0.08em]">{item.displayTag}</strong>
                             <span className="block truncate text-base font-medium">{item.label}</span>
                             {item.status === "checked" ? (
                               <span className="mt-0.5 block text-sm font-medium text-foreground">Checked in</span>
@@ -1180,8 +1233,8 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
                             onClick={() => void confirmVoiceQueueItem(item.code)}
                             disabled={!item.assetId || item.status === "checking" || item.status === "checked"}
                             aria-label={item.status === "checked"
-                              ? `${item.assetTag} checked in`
-                              : `Confirm check-in for ${item.assetTag}`}
+                              ? `${item.displayTag} checked in`
+                              : `Confirm check-in for ${item.displayTag}`}
                           >
                             {item.status === "checking" ? (
                               <LoaderCircleIcon className="size-7 motion-safe:animate-spin" aria-hidden />
@@ -1304,7 +1357,7 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
           </Tabs>
 
           <p className="sr-only" aria-live="polite">
-            {lastScan ? `${lastScan.assetTag} checked into ${selectedLocation.name}.` : "Scanner ready."}
+            {lastScan ? `${lastScan.displayTag} checked into ${selectedDestination.name}.` : "Scanner ready."}
           </p>
 
           {entryMode !== "voice" ? (
@@ -1320,7 +1373,7 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
                     <li className="flex items-start gap-3 p-4 sm:px-5" key={item.checkInId}>
                       <CheckCircle2Icon className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
                       <span className="min-w-0 flex-1">
-                        <strong className="block truncate font-semibold">{item.assetTag}</strong>
+                        <strong className="block truncate font-semibold">{item.displayTag}</strong>
                         <span className="block truncate text-sm text-muted-foreground">{item.label}</span>
                       </span>
                       <span className="text-xs text-muted-foreground">{formatScanTime(item.checkedInAt)}</span>
@@ -1382,7 +1435,7 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
                 </Button>
               </div>
               <div className="flex items-center justify-between gap-3 bg-muted/35 px-3 py-2 text-sm">
-                <strong className="truncate">{selectedLocation.name}</strong>
+                <strong className="truncate">{selectedDestination.name}</strong>
                 <span className="shrink-0 text-muted-foreground">{scannedItems.length} checked in</span>
               </div>
             </div>
@@ -1425,7 +1478,7 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
               <Separator />
               <div className="flex items-center gap-3 bg-muted/35 px-3 py-2.5">
                 <span className="min-w-0 flex-1 text-sm">
-                  <strong className="block truncate">{selectedLocation.name}</strong>
+                  <strong className="block truncate">{selectedDestination.name}</strong>
                   <span className="text-muted-foreground">{scannedItems.length} checked in</span>
                 </span>
                 <Button size="sm" variant="ghost" onClick={finishSession}>
@@ -1441,8 +1494,8 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
   }
 
   return (
-    <GearShell active="batch" isAdmin isDemoAdmin={admin.isDemoAdmin}>
-      <section className="swell-panel overflow-hidden">
+    <GearShell active="batch" isAdmin isDemoAdmin={admin.isDemoAdmin} wide>
+      <section className="swell-panel mx-auto w-full max-w-3xl overflow-hidden">
         <div className="flex flex-col gap-5 p-5 sm:p-7">
           <div className="flex items-start justify-between gap-4">
             <div className="flex flex-col gap-2">
@@ -1463,126 +1516,247 @@ export function GearBatchCheckInClient({ initialLocationId }: { initialLocationI
             </Alert>
           ) : null}
 
-          {recentLocations.length ? (
-            <Field>
-              <FieldLabel id="recent-batch-locations">Recent locations</FieldLabel>
-              <ToggleGroup
-                aria-labelledby="recent-batch-locations"
-                className="w-full"
-                orientation="vertical"
-                spacing={2}
-                value={selectedLocationId ? [selectedLocationId] : []}
-                onValueChange={(values) => setSelectedLocationId(values[0] ?? "")}
-                variant="outline"
-              >
-                {recentLocations.map((location) => (
-                  <ToggleGroupItem
-                    key={location.id}
-                    value={location.id}
-                    className="min-h-11 w-full justify-start px-3 text-left"
+          <div className="grid items-start gap-6 sm:grid-cols-2 sm:gap-5">
+            <section className="flex min-w-0 flex-col gap-3" aria-labelledby="batch-locations-heading">
+              <h2 id="batch-locations-heading" className="swell-page-kicker">Locations</h2>
+
+              <div className="sm:min-h-[12.5rem]">
+                {recentLocations.length ? (
+                  <ToggleGroup
+                    aria-label="Recent locations"
+                    className="w-full"
+                    orientation="vertical"
+                    spacing={2}
+                    value={selectedLocationId ? [selectedLocationId] : []}
+                    onValueChange={(values) => {
+                      setSelectedLocationId(values[0] ?? "");
+                      setSelectedContainerId("");
+                      setContainerLocationConfirmed(false);
+                    }}
+                    variant="outline"
                   >
-                    <MapPinIcon aria-hidden />
-                    <span className="truncate">{location.name}</span>
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
-            </Field>
-          ) : null}
+                    {recentLocations.map((location) => (
+                      <ToggleGroupItem key={location.id} value={location.id} className="min-h-11 w-full justify-start px-3 text-left">
+                        <MapPinIcon aria-hidden />
+                        <span className="truncate">{location.name}</span>
+                      </ToggleGroupItem>
+                    ))}
+                  </ToggleGroup>
+                ) : (
+                  <FieldDescription>No saved locations yet.</FieldDescription>
+                )}
+              </div>
 
-          <Field>
-            <FieldLabel htmlFor="batch-check-in-location">Search all locations</FieldLabel>
-            <Combobox
-              items={sortedLocations}
-              itemToStringValue={(location) => location.name}
-              value={selectedLocation}
-              onValueChange={(location) => setSelectedLocationId(location?.id ?? "")}
-              autoHighlight
-            >
-              <ComboboxInput id="batch-check-in-location" className="w-full" placeholder="Search locations..." showClear />
-              <ComboboxContent>
-                <ComboboxEmpty>No matching location.</ComboboxEmpty>
-                <ComboboxList>
-                  {(location) => (
-                    <ComboboxItem key={location.id} value={location}>{location.name}</ComboboxItem>
-                  )}
-                </ComboboxList>
-              </ComboboxContent>
-            </Combobox>
-          </Field>
+              <Field>
+                <FieldLabel htmlFor="batch-check-in-location">Search locations</FieldLabel>
+                <Combobox
+                  items={sortedLocations}
+                  itemToStringValue={(location) => location.name}
+                  value={selectedLocation}
+                  onValueChange={(location) => {
+                    setSelectedLocationId(location?.id ?? "");
+                    setSelectedContainerId("");
+                    setContainerLocationConfirmed(false);
+                  }}
+                  autoHighlight
+                >
+                  <ComboboxInput id="batch-check-in-location" className="w-full" placeholder="Search locations..." showClear />
+                  <ComboboxContent>
+                    <ComboboxEmpty>No matching location.</ComboboxEmpty>
+                    <ComboboxList>
+                      {(location) => (
+                        <ComboboxItem key={location.id} value={location}>{location.name}</ComboboxItem>
+                      )}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
+              </Field>
 
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            aria-expanded={creatingLocation}
-            onClick={() => {
-              setCreatingLocation((current) => !current);
-              setLocationError(null);
-            }}
-          >
-            <PlusIcon data-icon="inline-start" />
-            Create new location
-          </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                aria-expanded={creatingLocation}
+                onClick={() => {
+                  setCreatingLocation((current) => !current);
+                  setLocationError(null);
+                }}
+              >
+                <PlusIcon data-icon="inline-start" />
+                Create new location
+              </Button>
 
-          {creatingLocation ? (
+              {creatingLocation ? (
+                <form onSubmit={submitNewLocation} className="flex flex-col gap-4 rounded-lg border bg-muted/30 p-3">
+                  <FieldGroup>
+                    <Field data-invalid={Boolean(locationError)}>
+                      <FieldLabel htmlFor="new-batch-location-name">Location name</FieldLabel>
+                      <Input
+                        id="new-batch-location-name"
+                        value={newLocationName}
+                        onChange={(event) => setNewLocationName(event.target.value)}
+                        placeholder="Ike studio"
+                        aria-invalid={Boolean(locationError)}
+                        autoFocus
+                        required
+                        disabled={savingLocation}
+                      />
+                      <FieldError>{locationError}</FieldError>
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="new-batch-location-kind">Type</FieldLabel>
+                      <Select
+                        value={newLocationKind}
+                        onValueChange={(value) => value && setNewLocationKind(value as GearLocationKind)}
+                        disabled={savingLocation}
+                      >
+                        <SelectTrigger id="new-batch-location-kind" className="w-full"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            {LOCATION_KINDS.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  </FieldGroup>
+                  <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <Button type="button" variant="ghost" onClick={() => setCreatingLocation(false)} disabled={savingLocation}>Cancel</Button>
+                    <Button type="submit" disabled={savingLocation || !newLocationName.trim()}>
+                      <PlusIcon data-icon="inline-start" />
+                      {savingLocation ? "Creating..." : "Create location"}
+                    </Button>
+                  </div>
+                </form>
+              ) : null}
+            </section>
+
+            <section className="flex min-w-0 flex-col gap-3" aria-labelledby="batch-containers-heading">
+              <h2 id="batch-containers-heading" className="swell-page-kicker">Containers</h2>
+
+              <div className="sm:min-h-[12.5rem]">
+                {containers.length ? (
+                  <ToggleGroup
+                    aria-label="Containers"
+                    className="w-full"
+                    orientation="vertical"
+                    spacing={2}
+                    value={selectedContainerId ? [selectedContainerId] : []}
+                    onValueChange={(values) => {
+                      setSelectedContainerId(values[0] ?? "");
+                      setSelectedLocationId("");
+                      setContainerLocationConfirmed(false);
+                    }}
+                    variant="outline"
+                  >
+                    {containers.slice(0, 4).map((container) => (
+                      <ToggleGroupItem key={container.id} value={container.id} className="min-h-11 w-full justify-start px-3 text-left">
+                        <BoxesIcon aria-hidden />
+                        <span className="font-mono">{container.assetTag}</span>
+                        <span className="truncate">{container.label}</span>
+                      </ToggleGroupItem>
+                    ))}
+                  </ToggleGroup>
+                ) : (
+                  <FieldDescription>No registered containers yet.</FieldDescription>
+                )}
+              </div>
+
+              <Field>
+                <FieldLabel htmlFor="batch-check-in-container">Search containers</FieldLabel>
+                <Combobox
+                  items={containers}
+                  itemToStringValue={(container) => `${container.assetTag} ${container.label}`}
+                  filter={(container, search) => normalizeGearSearchText(`${container.assetTag} ${container.label}`).includes(normalizeGearSearchText(search))}
+                  value={selectedContainer}
+                  onValueChange={(container) => {
+                    setSelectedContainerId(container?.id ?? "");
+                    setSelectedLocationId("");
+                    setContainerLocationConfirmed(false);
+                  }}
+                  autoHighlight
+                >
+                  <ComboboxInput id="batch-check-in-container" className="w-full" placeholder="Search containers..." showClear />
+                  <ComboboxContent>
+                    <ComboboxEmpty>No matching container.</ComboboxEmpty>
+                    <ComboboxList>
+                      {(container) => <ComboboxItem key={container.id} value={container}>{container.assetTag} · {container.label}</ComboboxItem>}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
+              </Field>
+
+              <Button type="button" variant="outline" className="w-full" onClick={() => setCreatingContainer(true)}>
+                <PlusIcon data-icon="inline-start" />
+                Create new container
+              </Button>
+            </section>
+          </div>
+
+          {selectedContainer && !containerLocationConfirmed ? (
             <>
               <Separator />
-              <form onSubmit={submitNewLocation} className="flex flex-col gap-4">
-                <FieldGroup>
-                  <Field data-invalid={Boolean(locationError)}>
-                    <FieldLabel htmlFor="new-batch-location-name">Location name</FieldLabel>
-                    <Input
-                      id="new-batch-location-name"
-                      value={newLocationName}
-                      onChange={(event) => setNewLocationName(event.target.value)}
-                      placeholder="Ike studio"
-                      aria-invalid={Boolean(locationError)}
-                      autoFocus
-                      required
-                      disabled={savingLocation}
-                    />
-                    <FieldError>{locationError}</FieldError>
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="new-batch-location-kind">Type</FieldLabel>
-                    <Select
-                      value={newLocationKind}
-                      onValueChange={(value) => value && setNewLocationKind(value as GearLocationKind)}
-                      disabled={savingLocation}
-                    >
-                      <SelectTrigger id="new-batch-location-kind" className="w-full"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {LOCATION_KINDS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                </FieldGroup>
-                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                  <Button type="button" variant="ghost" onClick={() => setCreatingLocation(false)} disabled={savingLocation}>Cancel</Button>
-                  <Button type="submit" disabled={savingLocation || !newLocationName.trim()}>
-                    <PlusIcon data-icon="inline-start" />
-                    {savingLocation ? "Creating..." : "Create location"}
-                  </Button>
-                </div>
-              </form>
+              <ContainerLocationConfirmation
+                container={selectedContainer}
+                assets={assets}
+                locations={locations}
+                actorId={admin.user?.uid ?? "demo-admin"}
+                onConfirmed={(outcome, location) => {
+                  const updatedById = new Map((outcome.propagatedAssets ?? outcome.assets).map((asset) => [asset.id, asset]));
+                  setAssets((current) => current.map((asset) => updatedById.get(asset.id) ?? asset));
+                  setLocations((current) => current.map((item) => item.id === location.id ? { ...item, lastCheckInAt: Date.now() } : item));
+                  setContainerLocationConfirmed(true);
+                  toast.success(`${selectedContainer.label} confirmed at ${location.name}.`);
+                }}
+              />
             </>
+          ) : selectedContainer ? (
+            <Alert>
+              <CheckCircle2Icon aria-hidden />
+              <AlertTitle>{selectedContainer.label} is ready</AlertTitle>
+              <AlertDescription>Its location was freshly confirmed. Items scanned in this session will inherit that location.</AlertDescription>
+            </Alert>
           ) : null}
+
         </div>
         <Separator />
         <div className="flex flex-col gap-2 bg-muted/35 p-4 sm:p-5">
-          <Button size="lg" className="w-full" onClick={() => void beginSession()} disabled={!selectedLocation || Boolean(loadError)}>
+          <Button size="lg" className="w-full" onClick={() => void beginSession()} disabled={!selectedDestination || (selectedDestination.kind === "container" && !containerLocationConfirmed) || Boolean(loadError)}>
             <ScanLineIcon data-icon="inline-start" />
-            {selectedLocation ? `Start check-in to ${selectedLocation.name}` : "Choose a location"}
+            {selectedDestination
+              ? selectedDestination.kind === "container" && !containerLocationConfirmed
+                ? "Confirm the container's location above"
+                : `Start check-in to ${selectedDestination.name}`
+              : "Choose a location or container"}
           </Button>
           <p className="text-center text-xs text-muted-foreground">
             Voice uses the microphone. Number entry works with no permissions.
           </p>
         </div>
       </section>
+      <GearAssetDialog
+        key={`check-in-container-${creatingContainer ? "open" : "closed"}`}
+        open={creatingContainer}
+        onOpenChange={setCreatingContainer}
+        definitions={definitions}
+        assets={assets}
+        parties={parties}
+        locations={locations}
+        initialRegistrationKind="container"
+        initialLifecycle="active"
+        onDefinitionCreated={(definition) => {
+          setDefinitions((current) => [...current.filter((item) => item.id !== definition.id), definition]
+            .sort((left, right) => left.name.localeCompare(right.name)));
+        }}
+        onSaved={(container) => {
+          setAssets((current) => [container, ...current.filter((item) => item.id !== container.id)]);
+          setSelectedContainerId(container.id);
+          setSelectedLocationId("");
+          setContainerLocationConfirmed(false);
+          toast.success(`${container.assetTag} ${container.label} is ready to check in.`);
+        }}
+      />
     </GearShell>
   );
 }

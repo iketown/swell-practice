@@ -47,7 +47,9 @@ import {
   cableColorLabel,
   formatCableAssetLabel,
   formatCableLength,
+  inventoryAssetLocationChain,
   isCableInventoryAsset,
+  isContainerInventoryAsset,
   lifecycleLabel,
   normalizeCableLengthInches,
   normalizeInventoryTags,
@@ -57,20 +59,23 @@ import {
   type GearLocation,
   type GearParty,
   type InventoryAsset,
+  type InventoryConnectionSet,
   type PurchaseOrder,
 } from "@/lib/gear/domain";
+import { connectionSetForAsset } from "@/lib/gear/connections";
 import {
   deleteInventoryAssets,
   listGearLocations,
   listGearParties,
   listInventoryAssets,
+  listInventoryConnectionSets,
   listPurchaseOrders,
   syncPublicGearAssetRecords,
 } from "@/lib/gear/repository";
 import type { GearSheetLabelItem } from "@/lib/gear/labels";
 import { cableEndImagePath } from "@/lib/setup-designer/cable-end-images";
 import { formatCableDefinitionEnd, isCableDefinition } from "@/lib/setup-designer/cable-definitions";
-import type { EquipmentTemplate } from "@/lib/setup-designer/domain";
+import { powerDependencyLabel, resolvePowerDependencies, type EquipmentTemplate } from "@/lib/setup-designer/domain";
 import { portGroupDisplayName, summarizePortGroups } from "@/lib/setup-designer/ports";
 import { archiveEquipmentTemplate, listEquipmentTemplates, unassignInventoryAssetsFromSetups } from "@/lib/setup-designer/repository";
 
@@ -81,8 +86,10 @@ export function GearIndexClient({ initialQuery = "" }: { initialQuery?: string }
   const router = useRouter();
   const setupsHref = admin.isDemoAdmin ? "/setups?demo=1" : "/setups";
   const scannerHref = admin.isDemoAdmin ? "/gear/check-in?demo=1" : "/gear/check-in";
+  const packHref = admin.isDemoAdmin ? "/gear/pack?demo=1" : "/gear/pack";
   const [definitions, setDefinitions] = useState<EquipmentTemplate[]>([]);
   const [assets, setAssets] = useState<InventoryAsset[]>([]);
+  const [connectionSets, setConnectionSets] = useState<InventoryConnectionSet[]>([]);
   const [parties, setParties] = useState<GearParty[]>([]);
   const [locations, setLocations] = useState<GearLocation[]>([]);
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
@@ -111,9 +118,10 @@ export function GearIndexClient({ initialQuery = "" }: { initialQuery?: string }
     setLoading(true);
     setError(null);
     try {
-      const [nextDefinitions, nextAssets, nextParties, nextLocations, nextOrders] = await Promise.all([
+      const [nextDefinitions, nextAssets, nextConnectionSets, nextParties, nextLocations, nextOrders] = await Promise.all([
         listEquipmentTemplates(),
         listInventoryAssets(),
+        listInventoryConnectionSets(),
         listGearParties(),
         listGearLocations(),
         listPurchaseOrders(),
@@ -123,6 +131,7 @@ export function GearIndexClient({ initialQuery = "" }: { initialQuery?: string }
       });
       setDefinitions(nextDefinitions);
       setAssets(nextAssets);
+      setConnectionSets(nextConnectionSets);
       setParties(nextParties);
       setLocations(nextLocations);
       setOrders(nextOrders);
@@ -164,10 +173,11 @@ export function GearIndexClient({ initialQuery = "" }: { initialQuery?: string }
       definition?.name,
       definition?.manufacturer,
       definition?.model,
+      inventoryAssetLocationChain(item, assets, locations),
       ...(definition?.cableEnds ? [...definition.cableEnds.end1, ...definition.cableEnds.end2].flatMap((connector) => [connector.label, connector.gender]) : []),
       ...(item.tags ?? []),
     ].some((value) => normalizeGearSearchText(value ?? "").includes(normalizedQuery));
-  }), [assets, definitionById, normalizedQuery]);
+  }), [assets, definitionById, locations, normalizedQuery]);
   const availableOnHandTags = useMemo(() => normalizeInventoryTags(
     assets.filter((item) => item.lifecycleStatus === "active").flatMap((item) => item.tags ?? []),
   ).sort((left, right) => left.localeCompare(right)), [assets]);
@@ -293,6 +303,7 @@ export function GearIndexClient({ initialQuery = "" }: { initialQuery?: string }
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
               <Link href={scannerHref} className={buttonVariants()}><ScanLineIcon data-icon="inline-start" />Scan gear</Link>
+              <Link href={packHref} className={buttonVariants({ variant: "secondary" })}><BoxesIcon data-icon="inline-start" />Pack a bag</Link>
               <Button variant="secondary" onClick={() => beginCreateAsset("planned")}><PackagePlusIcon data-icon="inline-start" />Plan gear</Button>
               <Button variant="outline" onClick={() => beginCreateAsset("active")}><PackageCheckIcon data-icon="inline-start" />Register owned gear</Button>
               <Button variant="outline" onClick={() => setCreatingDefinition(true)}><PlusIcon data-icon="inline-start" />New definition</Button>
@@ -365,6 +376,7 @@ export function GearIndexClient({ initialQuery = "" }: { initialQuery?: string }
                 title="Purchase queue"
                 description="Permanent asset records that exist in the plan but are not yet checked into physical inventory."
                 assets={purchaseQueue}
+                allAssets={assets}
                 definitions={definitionById}
                 parties={partyById}
                 locations={locationById}
@@ -381,6 +393,7 @@ export function GearIndexClient({ initialQuery = "" }: { initialQuery?: string }
                 title="On-hand inventory"
                 description="Physical, QR-ready items with an owner and latest observed location."
                 assets={activeAssets}
+                allAssets={assets}
                 definitions={definitionById}
                 parties={partyById}
                 locations={locationById}
@@ -428,6 +441,7 @@ export function GearIndexClient({ initialQuery = "" }: { initialQuery?: string }
                           <p className="text-sm text-muted-foreground">{[definition.manufacturer, definition.model, definition.category].filter(Boolean).join(" · ")}</p>
                           <div className="mt-2 flex flex-wrap gap-1.5">
                             {cableDefinition ? <Badge variant="outline">Cable definition</Badge> : definition.showInSignalView === false ? <Badge variant="outline">STAGE only by default</Badge> : null}
+                            {powerDependencyLabel(definition) ? <Badge variant="outline">{powerDependencyLabel(definition)}</Badge> : null}
                             {definition.physicalDimensions?.widthInches && definition.physicalDimensions?.depthInches ? <Badge variant="outline">{definition.physicalDimensions.widthInches} × {definition.physicalDimensions.depthInches} in</Badge> : null}
                             {definition.cableEnds ? <Badge variant="secondary">End 1: {formatCableDefinitionEnd(definition.cableEnds.end1)}</Badge> : null}
                             {definition.cableEnds ? <Badge variant="secondary">End 2: {formatCableDefinitionEnd(definition.cableEnds.end2)}</Badge> : null}
@@ -514,6 +528,7 @@ export function GearIndexClient({ initialQuery = "" }: { initialQuery?: string }
         }}
         definitions={definitions}
         assets={assets}
+        connectionSets={connectionSets}
         parties={parties}
         locations={locations}
         asset={editingAsset}
@@ -526,6 +541,7 @@ export function GearIndexClient({ initialQuery = "" }: { initialQuery?: string }
             ? current.map((item) => item.id === saved.id ? toSheetLabelItem(saved) : item)
             : current.filter((item) => item.id !== saved.id));
           toast.success(editingAsset ? "Gear asset updated." : duplicatingAsset ? "Gear asset duplicated." : saved.lifecycleStatus === "planned" ? "Planned gear added to the purchase queue." : "Physical gear registered.");
+          void refresh();
         }}
       />
       <GearOrderDialog
@@ -543,11 +559,22 @@ export function GearIndexClient({ initialQuery = "" }: { initialQuery?: string }
         open={Boolean(checkingIn)}
         onOpenChange={(open) => !open && setCheckingIn(null)}
         asset={checkingIn}
+        definition={checkingIn ? definitionById.get(checkingIn.definitionId) : undefined}
+        connectedAssets={checkingIn ? (connectionSetForAsset(checkingIn, connectionSets)?.memberAssetIds.flatMap((assetId) => {
+          const connectedAsset = assets.find((item) => item.id === assetId);
+          return connectedAsset ? [connectedAsset] : [];
+        }) ?? [checkingIn]) : []}
         locations={locations}
+        assets={assets}
         actorId={admin.user?.uid ?? "demo-admin"}
-        onCheckedIn={(assetId, locationId) => {
-          setAssets((current) => current.map((asset) => asset.id === assetId ? { ...asset, lifecycleStatus: "active", currentLocationId: locationId, updatedAt: Date.now() } : asset));
-          toast.success("Item checked in and added to location history.");
+        onCheckedIn={(checkedInAssets, _destination, propagatedAssets) => {
+          const checkedInById = new Map(propagatedAssets.map((item) => [item.id, item]));
+          setAssets((current) => current.map((asset) => checkedInById.get(asset.id) ?? asset));
+          toast.success(checkedInAssets.length > 1
+            ? `${checkedInAssets.length} connected items checked in together.`
+            : "Item checked in and added to location history.", {
+            description: checkedInAssets.map((item) => item.assetTag).join(" + "),
+          });
         }}
       />
       <GearDirectoryDialog open={partyDialogOpen} onOpenChange={setPartyDialogOpen} kind="party" onPartyCreated={(party) => { setParties((current) => [...current, party].sort((a, b) => a.name.localeCompare(b.name))); toast.success("Owner or provider added."); }} />
@@ -570,6 +597,7 @@ function AssetSection({
   title,
   description,
   assets,
+  allAssets,
   definitions,
   parties,
   locations,
@@ -588,6 +616,7 @@ function AssetSection({
   title: string;
   description: string;
   assets: InventoryAsset[];
+  allAssets: InventoryAsset[];
   definitions: Map<string, EquipmentTemplate>;
   parties: Map<string, GearParty>;
   locations: Map<string, GearLocation>;
@@ -633,29 +662,36 @@ function AssetSection({
           {assets.map((asset) => {
             const definition = definitions.get(asset.definitionId);
             const owner = asset.ownerPartyId ? parties.get(asset.ownerPartyId) : undefined;
-            const location = asset.currentLocationId ? locations.get(asset.currentLocationId) : undefined;
+            const locationChain = inventoryAssetLocationChain(asset, allAssets, [...locations.values()]);
             const order = asset.purchaseOrderId ? orders.find((item) => item.id === asset.purchaseOrderId) : undefined;
             const previewUrl = asset.photos[0]?.downloadUrl ?? definition?.image?.downloadUrl ?? definition?.detailImages?.[0]?.downloadUrl ?? definition?.referenceImages[0]?.url;
             const isCable = isCableInventoryAsset(asset);
             const cableLength = isCable ? formatCableLength(asset.cableLengthInches) : "";
             const canQueueCableLabel = Boolean(cableLength);
+            const powerLabel = isCable ? undefined : powerDependencyLabel(resolvePowerDependencies(asset, definition));
             return (
               <article key={asset.id} className="grid gap-3 border-b p-4 last:border-b-0 md:grid-cols-[3.5rem_minmax(0,1fr)_minmax(12rem,0.7fr)_auto] md:items-center">
-                <span className="relative flex aspect-square overflow-hidden rounded-md border bg-muted">
-                  {previewUrl ? <Image src={previewUrl} alt="" fill sizes="56px" className={asset.photos[0] ? "object-cover" : "object-contain"} unoptimized /> : <BoxesIcon className="m-auto size-4 text-muted-foreground" aria-hidden />}
-                </span>
+                <div className="flex w-14 flex-col items-center gap-1">
+                  <span className="relative flex aspect-square w-full overflow-hidden rounded-md border bg-muted">
+                    {previewUrl ? <Image src={previewUrl} alt="" fill sizes="56px" className={asset.photos[0] ? "object-cover" : "object-contain"} unoptimized /> : <BoxesIcon className="m-auto size-4 text-muted-foreground" aria-hidden />}
+                  </span>
+                  {asset.purchaseUrl ? (
+                    <a href={asset.purchaseUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-7 items-center text-xs font-medium text-muted-foreground underline decoration-border underline-offset-4 hover:text-foreground focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      Source
+                    </a>
+                  ) : null}
+                </div>
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2"><h3 className="truncate font-semibold">{asset.label}</h3><Badge variant={asset.lifecycleStatus === "active" ? "secondary" : "outline"}>{lifecycleLabel(asset.lifecycleStatus)}</Badge>{isCable ? <Badge variant="outline">{CABLE_INVENTORY_TAG}</Badge> : null}{asset.cableManufacturer ? <Badge variant="outline">{asset.cableManufacturer}</Badge> : null}{isCable && asset.cableColor ? <Badge variant="outline"><CableColorSwatch color={asset.cableColor} />{cableColorLabel(asset.cableColor)}</Badge> : null}{cableLength ? <Badge variant="outline">{cableLength} · {asset.cableLengthInches} in</Badge> : null}{!isCable && asset.stageOnly ? <Badge variant="outline">STAGE only</Badge> : null}</div>
+                  <div className="flex flex-wrap items-center gap-2"><h3 className="truncate font-semibold">{asset.label}</h3><Badge variant={asset.lifecycleStatus === "active" ? "secondary" : "outline"}>{lifecycleLabel(asset.lifecycleStatus)}</Badge>{isContainerInventoryAsset(asset) ? <Badge variant="secondary">Container</Badge> : null}{isCable ? <Badge variant="outline">{CABLE_INVENTORY_TAG}</Badge> : null}{asset.cableManufacturer ? <Badge variant="outline">{asset.cableManufacturer}</Badge> : null}{isCable && asset.cableColor ? <Badge variant="outline"><CableColorSwatch color={asset.cableColor} />{cableColorLabel(asset.cableColor)}</Badge> : null}{cableLength ? <Badge variant="outline">{cableLength} · {asset.cableLengthInches} in</Badge> : null}{powerLabel ? <Badge variant="outline">{powerLabel}</Badge> : null}{!isCable && asset.stageOnly ? <Badge variant="outline">STAGE only</Badge> : null}</div>
                   <p className="truncate text-sm text-muted-foreground">{definition ? isCable ? definition.name : [definition.manufacturer, definition.model || definition.name].filter(Boolean).join(" · ") : "No reusable definition"}</p>
                   <code className="mt-1 block text-xs text-muted-foreground">{asset.assetTag}</code>
                 </div>
                 <dl className="grid gap-1 text-sm">
                   <div className="flex min-w-0 items-baseline gap-2"><dt className="shrink-0 text-muted-foreground">Owner:</dt><dd className="min-w-0 truncate font-medium">{owner?.name ?? "Unassigned"}</dd></div>
-                  <div className="flex min-w-0 items-baseline gap-2"><dt className="shrink-0 text-muted-foreground">Location:</dt><dd className="min-w-0 truncate font-medium">{location?.name ?? "Not checked in"}</dd></div>
+                  <div className="flex min-w-0 items-baseline gap-2"><dt className="shrink-0 text-muted-foreground">Location:</dt><dd className="min-w-0 truncate font-medium" title={locationChain}>{asset.currentPlacement ? locationChain : "Not checked in"}</dd></div>
                   {order ? <div className="flex min-w-0 items-baseline gap-2"><dt className="shrink-0 text-muted-foreground">Order:</dt><dd className="min-w-0 truncate font-medium">{order.vendor}</dd></div> : null}
                 </dl>
                 <div className="flex flex-wrap gap-2 md:justify-end">
-                  {asset.purchaseUrl ? <a href={asset.purchaseUrl} target="_blank" rel="noreferrer" className={buttonVariants({ variant: "outline", size: "sm" })}>Purchase page <ExternalLinkIcon data-icon="inline-end" /></a> : null}
                   {isCable ? (
                     <Button variant={sheetLabelQueueIds.has(asset.id) ? "secondary" : "outline"} size="sm" onClick={() => onToggleSheetLabel(asset)} aria-pressed={sheetLabelQueueIds.has(asset.id)} disabled={!canQueueCableLabel}>
                       <BarcodeIcon data-icon="inline-start" />

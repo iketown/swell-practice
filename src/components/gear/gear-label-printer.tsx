@@ -5,20 +5,35 @@ import {
   EncodeHintType,
   QRCodeWriter,
 } from "@zxing/library";
-import { PrinterIcon } from "lucide-react";
-import { RefObject, useMemo, useRef } from "react";
+import JsBarcode from "jsbarcode";
+import { BarcodeIcon, PrinterIcon, QrCodeIcon } from "lucide-react";
+import { RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   DEFAULT_GEAR_LABEL_FORMAT,
   gearLabelPayload,
   printGearLabel,
+  splitCableLabelDescription,
+  type GearLabelKind,
 } from "@/lib/gear/labels";
 
-export function GearLabelPrinter({ assetTag, assetName }: { assetTag: string; assetName: string }) {
+type SingleLabelKind = Extract<GearLabelKind, "qr" | "barcode">;
+
+export function GearLabelPrinter({
+  assetTag,
+  assetName,
+  isCable = false,
+}: {
+  assetTag: string;
+  assetName: string;
+  isCable?: boolean;
+}) {
   const labelRef = useRef<HTMLDivElement>(null);
-  const payload = gearLabelPayload("qr", assetTag);
+  const [labelKind, setLabelKind] = useState<SingleLabelKind>(isCable ? "barcode" : "qr");
+  const payload = gearLabelPayload(labelKind, assetTag);
 
   function print() {
     if (!labelRef.current) return;
@@ -31,21 +46,41 @@ export function GearLabelPrinter({ assetTag, assetName }: { assetTag: string; as
     <section className="flex flex-col gap-4 rounded-lg border bg-muted/25 p-4" aria-labelledby="gear-label-heading">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="max-w-xl">
-          <h3 id="gear-label-heading" className="font-semibold">Print 1 × 1½ inch gear label</h3>
-          <p className="text-sm text-muted-foreground">The four-digit number leads the 1-inch edge for fast reading. A LabelWriter 450 Turbo-safe top inset keeps it clear of the label feed boundary.</p>
+          <h3 id="gear-label-heading" className="font-semibold">Print 1 × 1½ inch {isCable ? "cable barrel" : "gear"} label</h3>
+          <p className="text-sm text-muted-foreground">
+            {labelKind === "qr"
+              ? "The four-digit number leads the 1-inch edge, and the QR code opens the public gear page."
+              : "A tall Code 128 barcode leads the label, with the inventory number and item description grouped at the bottom."}
+          </p>
         </div>
-        <Button type="button" onClick={print}>
-          <PrinterIcon data-icon="inline-start" />
-          Open print dialog
-        </Button>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <ToggleGroup
+            aria-label="Label code format"
+            variant="outline"
+            size="sm"
+            spacing={0}
+            value={[labelKind]}
+            onValueChange={(values) => {
+              const nextKind = values[0] as SingleLabelKind | undefined;
+              if (nextKind) setLabelKind(nextKind);
+            }}
+          >
+            <ToggleGroupItem value="qr"><QrCodeIcon data-icon="inline-start" />QR</ToggleGroupItem>
+            <ToggleGroupItem value="barcode"><BarcodeIcon data-icon="inline-start" />Barcode</ToggleGroupItem>
+          </ToggleGroup>
+          <Button type="button" onClick={print}>
+            <PrinterIcon data-icon="inline-start" />
+            Print {labelKind === "qr" ? "QR" : "barcode"} label
+          </Button>
+        </div>
       </div>
 
       <div className="grid items-center gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(14rem,0.8fr)]">
-        <GearLabelPreview ref={labelRef} assetTag={assetTag} assetName={assetName} />
+        <GearLabelPreview ref={labelRef} assetTag={assetTag} assetName={assetName} labelKind={labelKind} isCable={isCable} />
         <div className="min-w-0 space-y-3 text-sm text-muted-foreground">
           <p>Load the 1 × 1½ inch stock in portrait orientation. Choose the exact 1 × 1½ inch paper size, 100% scale, portrait orientation, and no margins.</p>
           <div className="min-w-0 rounded-md bg-background px-3 py-2 text-xs">
-            <span className="block font-medium text-foreground">QR code destination</span>
+            <span className="block font-medium text-foreground">{labelKind === "qr" ? "QR code destination" : "Barcode value"}</span>
             <code className="block truncate" title={payload}>{payload}</code>
           </div>
         </div>
@@ -58,12 +93,16 @@ function GearLabelPreview({
   ref,
   assetTag,
   assetName,
+  labelKind,
+  isCable,
 }: {
   ref: RefObject<HTMLDivElement | null>;
   assetTag: string;
   assetName: string;
+  labelKind: SingleLabelKind;
+  isCable: boolean;
 }) {
-  const cleanTag = assetTag.trim().padStart(4, "0");
+  const cleanTag = gearLabelPayload("barcode", assetTag).padStart(4, "0");
   const cleanName = assetName.trim() || "Gear asset";
 
   return (
@@ -72,7 +111,7 @@ function GearLabelPreview({
         ref={ref}
         className="gear-print-label"
         role="img"
-        aria-label={`QR gear label for ${cleanName}, inventory number ${cleanTag}`}
+        aria-label={`${labelKind === "qr" ? "QR" : "Code 128 barcode"} label for ${cleanName}, inventory number ${cleanTag}`}
         style={{
           width: `${DEFAULT_GEAR_LABEL_FORMAT.widthMm}mm`,
           height: `${DEFAULT_GEAR_LABEL_FORMAT.heightMm}mm`,
@@ -85,7 +124,167 @@ function GearLabelPreview({
           fontFamily: "Arial, Helvetica, sans-serif",
         }}
       >
-        <QrGearLabel assetTag={cleanTag} assetName={cleanName} />
+        {labelKind === "qr"
+          ? <QrGearLabel assetTag={cleanTag} assetName={cleanName} />
+          : <BarcodeGearLabel assetTag={cleanTag} assetName={cleanName} isCable={isCable} />}
+      </div>
+    </div>
+  );
+}
+
+function BarcodeGearLabel({ assetTag, assetName, isCable }: { assetTag: string; assetName: string; isCable: boolean }) {
+  const barcodeRef = useRef<SVGSVGElement>(null);
+  const cableDescription = isCable ? splitCableLabelDescription(assetName) : null;
+
+  useEffect(() => {
+    if (!barcodeRef.current) return;
+    // Numeric Code 128C gives a four-digit ID the fewest possible modules.
+    // The SVG fills the label width; its 10-module margins remain blank quiet zones.
+    JsBarcode(barcodeRef.current, gearLabelPayload("barcode", assetTag), {
+      format: "CODE128C",
+      width: 1,
+      height: 78,
+      displayValue: false,
+      margin: 0,
+      marginLeft: 10,
+      marginRight: 10,
+      background: "rgb(255 255 255)",
+      lineColor: "rgb(10 10 10)",
+    });
+  }, [assetTag]);
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        width: "100%",
+        height: "100%",
+        flexDirection: "column",
+        alignItems: "center",
+        padding: "4.5mm 0 0.65mm",
+      }}
+    >
+      <svg
+        ref={barcodeRef}
+        aria-hidden="true"
+        preserveAspectRatio="none"
+        shapeRendering="crispEdges"
+        style={{
+          display: "block",
+          width: "100%",
+          height: "18.5mm",
+          flex: "0 0 18.5mm",
+          overflow: "visible",
+        }}
+      />
+
+      <div
+        style={{
+          display: "flex",
+          width: "100%",
+          flex: "1 1 auto",
+          minHeight: 0,
+          flexDirection: "column",
+          alignItems: "center",
+          padding: "0.35mm 0.7mm 0",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            width: "100%",
+            height: "5mm",
+            flex: "0 0 5mm",
+            alignItems: "center",
+            justifyContent: "center",
+            fontFamily: '"Arial Black", Arial, Helvetica, sans-serif',
+            fontSize: "4.4mm",
+            fontVariantNumeric: "tabular-nums",
+            fontWeight: 900,
+            letterSpacing: "0.9mm",
+            lineHeight: 0.9,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {assetTag}
+        </div>
+
+        {cableDescription?.length ? (
+          <>
+            <div
+              style={{
+                display: "flex",
+                width: "100%",
+                height: "3.2mm",
+                flex: "0 0 3.2mm",
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "hidden",
+                fontSize: "2.8mm",
+                fontWeight: 800,
+                lineHeight: 1,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {cableDescription.length}
+            </div>
+            <div
+              style={{
+                width: "100%",
+                height: "2.4mm",
+                flex: "0 0 2.4mm",
+                overflow: "hidden",
+                textAlign: "center",
+                textOverflow: "clip",
+                fontFamily: '"Arial Narrow", Arial, Helvetica, sans-serif',
+                fontSize: cableDescription.endTypes.length > 25 ? "1.5mm" : cableDescription.endTypes.length > 20 ? "1.65mm" : "1.8mm",
+                fontWeight: 700,
+                letterSpacing: "-0.01mm",
+                lineHeight: 1.15,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {cableDescription.endTypes}
+            </div>
+          </>
+        ) : (
+          <div
+            style={{
+              display: "-webkit-box",
+              width: "100%",
+              minHeight: 0,
+              overflow: "hidden",
+              textAlign: "center",
+              fontSize: assetName.length > 34 ? "1.55mm" : assetName.length > 26 ? "1.75mm" : "2mm",
+              fontWeight: 700,
+              lineHeight: 1.05,
+              WebkitBoxOrient: "vertical",
+              WebkitLineClamp: 2,
+            }}
+          >
+            {assetName}
+          </div>
+        )}
+
+        <div
+          aria-hidden="true"
+          style={{
+            display: "flex",
+            height: "2.2mm",
+            flex: "0 0 2.2mm",
+            alignItems: "flex-end",
+            justifyContent: "center",
+            marginTop: "auto",
+            fontFamily: "Arial, Helvetica, sans-serif",
+            fontSize: "1.7mm",
+            fontWeight: 400,
+            letterSpacing: "0.06mm",
+            lineHeight: 1,
+            whiteSpace: "nowrap",
+          }}
+        >
+          <span>www.</span><strong style={{ fontWeight: 700 }}>TheSwell</strong><span>.live</span>
+        </div>
       </div>
     </div>
   );

@@ -33,7 +33,6 @@ const LOCATION_KINDS: Array<{ value: GearLocationKind; label: string }> = [
   { value: "studio", label: "Studio" },
   { value: "venue", label: "Venue" },
   { value: "warehouse", label: "Warehouse" },
-  { value: "container", label: "Container" },
   { value: "other", label: "Other" },
 ];
 

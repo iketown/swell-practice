@@ -68,6 +68,12 @@ export function gearLabelPayload(kind: GearLabelKind, assetTag: string) {
   return kind === "barcode" ? canonicalizeAssetTag(assetTag) : gearCheckInUrl(assetTag);
 }
 
+export function splitCableLabelDescription(assetName: string) {
+  const match = assetName.match(/^((?:\d+(?:\.\d+)?'(?:\s+\d+(?:\.\d+)?")?)|(?:\d+(?:\.\d+)?"))\s+(.+)$/);
+  if (!match) return { length: "", endTypes: assetName };
+  return { length: match[1], endTypes: match[2] };
+}
+
 export function gearSheetStartIndex(row: number, column: number) {
   const safeRow = Math.min(Math.max(Math.trunc(row), 1), GEAR_SHEET_LABEL_FORMAT.rows);
   const safeColumn = Math.min(Math.max(Math.trunc(column), 1), GEAR_SHEET_LABEL_FORMAT.columns);

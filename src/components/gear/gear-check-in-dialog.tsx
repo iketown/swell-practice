@@ -1,6 +1,6 @@
 "use client";
 
-import { LocateFixedIcon, MapPinCheckIcon } from "lucide-react";
+import { BoxesIcon, LocateFixedIcon, MapPinCheckIcon } from "lucide-react";
 import { FormEvent, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -13,10 +13,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import type { GearLocation, InventoryAsset } from "@/lib/gear/domain";
+import type { CheckInDestination, GearLocation, InventoryAsset } from "@/lib/gear/domain";
 import { checkInInventoryAsset } from "@/lib/gear/repository";
+import { powerCheckInTag, resolvePowerDependencies, type EquipmentTemplate } from "@/lib/setup-designer/domain";
 
 interface Coordinates {
   latitude: number;
@@ -28,18 +29,30 @@ export function GearCheckInDialog({
   open,
   onOpenChange,
   asset,
+  definition,
+  connectedAssets,
   locations,
+  assets,
   actorId,
   onCheckedIn,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   asset: InventoryAsset | null;
+  definition?: EquipmentTemplate;
+  connectedAssets?: InventoryAsset[];
   locations: GearLocation[];
+  assets: InventoryAsset[];
   actorId: string;
-  onCheckedIn: (assetId: string, locationId: string) => void;
+  onCheckedIn: (assets: InventoryAsset[], destination: CheckInDestination, propagatedAssets: InventoryAsset[]) => void;
 }) {
-  const [locationId, setLocationId] = useState(asset?.currentLocationId ?? "");
+  const currentEffectiveLocationId = asset?.effectiveLocationId ?? asset?.currentLocationId;
+  const initialDestination = asset?.currentPlacement?.kind === "container"
+    ? `container:${asset.currentPlacement.containerAssetId}`
+    : currentEffectiveLocationId
+      ? `location:${currentEffectiveLocationId}`
+      : "";
+  const [destinationValue, setDestinationValue] = useState(initialDestination);
   const [notes, setNotes] = useState("");
   const [coordinates, setCoordinates] = useState<Coordinates | null>(null);
   const [locating, setLocating] = useState(false);
@@ -68,13 +81,17 @@ export function GearCheckInDialog({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!asset || !locationId || saving) return;
+    if (!asset || !destinationValue || saving) return;
+    const [kind, id] = destinationValue.split(":", 2);
+    const destination: CheckInDestination = kind === "container"
+      ? { kind: "container", containerAssetId: id }
+      : { kind: "location", locationId: id };
     setSaving(true);
     setError(null);
     try {
-      await checkInInventoryAsset({
+      const outcome = await checkInInventoryAsset({
         assetId: asset.id,
-        locationId,
+        destination,
         method: "manual_single",
         actorId,
         latitude: coordinates?.latitude,
@@ -82,7 +99,7 @@ export function GearCheckInDialog({
         accuracyMeters: coordinates?.accuracyMeters,
         notes,
       });
-      onCheckedIn(asset.id, locationId);
+      onCheckedIn(outcome.assets, destination, outcome.propagatedAssets ?? outcome.assets);
       onOpenChange(false);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not check in this item.");
@@ -92,24 +109,44 @@ export function GearCheckInDialog({
   }
 
   if (!asset) return null;
+  const powerDependencies = resolvePowerDependencies(asset, definition);
+  const displayTag = powerCheckInTag(asset.assetTag, powerDependencies.needsPowerAdapter);
+  const companions = (connectedAssets ?? []).filter((item) => item.id !== asset.id);
+  const containers = assets.filter((item) => item.lifecycleStatus === "active" && item.canContainAssets && item.id !== asset.id);
+  const selectedDestinationLabel = destinationValue.startsWith("container:")
+    ? containers.find((container) => `container:${container.id}` === destinationValue)?.label
+    : locations.find((location) => `location:${location.id}` === destinationValue)?.name;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Check in {asset.label}</DialogTitle>
-          <DialogDescription>This creates an append-only observation that the item is at this location now. It does not require recording where it came from.</DialogDescription>
+          <DialogTitle>Check in {displayTag}</DialogTitle>
+          <DialogDescription>
+            {asset.label}. This records that the item{powerDependencies.needsPowerAdapter ? " and its matching adapter are" : " is"} at this location now.
+            {companions.length ? ` It will also check in ${companions.map((item) => item.assetTag).join(", ")} because they stay connected.` : ""}
+          </DialogDescription>
         </DialogHeader>
         <form id="gear-check-in-form" onSubmit={submit} className="flex flex-col gap-4">
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="gear-check-in-location">Location</FieldLabel>
-              <Select value={locationId} onValueChange={(value) => value && setLocationId(value)} disabled={saving}>
-                <SelectTrigger id="gear-check-in-location" className="w-full"><SelectValue placeholder="Choose destination" /></SelectTrigger>
-                <SelectContent><SelectGroup>
-                  {locations.map((location) => <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>)}
-                </SelectGroup></SelectContent>
+              <FieldLabel htmlFor="gear-check-in-location">Location or container</FieldLabel>
+              <Select value={destinationValue} onValueChange={(value) => value && setDestinationValue(value)} disabled={saving}>
+                <SelectTrigger id="gear-check-in-location" className="w-full">
+                  <SelectValue>{selectedDestinationLabel ?? "Choose destination"}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>Locations</SelectLabel>
+                    {locations.map((location) => <SelectItem key={location.id} value={`location:${location.id}`}>{location.name}</SelectItem>)}
+                  </SelectGroup>
+                  {containers.length ? <SelectGroup>
+                    <SelectLabel>Containers</SelectLabel>
+                    {containers.map((container) => <SelectItem key={container.id} value={`container:${container.id}`}><BoxesIcon />{container.assetTag} · {container.label}</SelectItem>)}
+                  </SelectGroup> : null}
+                </SelectContent>
               </Select>
+              {destinationValue.startsWith("container:") ? <FieldDescription>The container must have a freshly confirmed location. Use Pack a Bag or Scan multiple if confirmation is required.</FieldDescription> : null}
             </Field>
             <Field>
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -133,9 +170,9 @@ export function GearCheckInDialog({
         </form>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
-          <Button type="submit" form="gear-check-in-form" disabled={saving || !locationId}>
+          <Button type="submit" form="gear-check-in-form" disabled={saving || !destinationValue}>
             <MapPinCheckIcon data-icon="inline-start" />
-            {saving ? "Checking in..." : "Check in item"}
+            {saving ? "Checking in..." : `Check in ${displayTag}`}
           </Button>
         </DialogFooter>
       </DialogContent>

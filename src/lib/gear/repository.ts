@@ -32,6 +32,8 @@ import {
   normalizeCableLengthInches,
   normalizeInventoryAssetCodeGroup,
   normalizeInventoryTags,
+  type AssetPlacement,
+  type CheckInDestination,
   type CheckInMethod,
   type GearLocation,
   type GearLocationKind,
@@ -40,6 +42,7 @@ import {
   type InventoryAsset,
   type InventoryAssetCodeGroup,
   type InventoryAssetLifecycle,
+  type InventoryCheckInOutcome,
   type InventoryCheckIn,
   type InventoryConnectionLink,
   type InventoryConnectionSet,
@@ -60,6 +63,7 @@ const INVENTORY_CODE_GROUP_ORDER: InventoryAssetCodeGroup[] = [
   "instrument",
   "pedal",
   "rack",
+  "container",
   "general",
   "cable",
 ];
@@ -94,8 +98,12 @@ export interface InventoryAssetInput {
   cableColor?: InventoryAsset["cableColor"];
   lifecycleStatus: InventoryAssetLifecycle;
   stageOnly?: boolean;
+  needsPowerSource?: boolean;
+  needsPowerAdapter?: boolean;
   tags?: string[];
   ownerPartyId?: string;
+  canContainAssets?: boolean;
+  expectedContentAssetIds?: string[];
   currentLocationId?: string;
   serialNumber?: string;
   purchaseUrl?: string;
@@ -209,6 +217,27 @@ function readDemoStore() {
         cableColor: normalizeCableColor(asset.cableColor),
         purchaseUrl: normalizeAssetPurchaseUrl(asset.purchaseUrl),
         stageOnly: asset.stageOnly === true,
+        ...powerDependencyOverridesFromData(asset),
+        connectionSetId: typeof asset.connectionSetId === "string" && asset.connectionSetId ? asset.connectionSetId : undefined,
+        canContainAssets: asset.canContainAssets === true,
+        currentPlacement: placementFromData(asset.currentPlacement)
+          ?? (typeof asset.currentLocationId === "string" && asset.currentLocationId
+            ? { kind: "location" as const, locationId: asset.currentLocationId }
+            : undefined),
+        effectiveLocationId: typeof asset.effectiveLocationId === "string" && asset.effectiveLocationId
+          ? asset.effectiveLocationId
+          : asset.currentLocationId,
+        locationInheritedFromAssetId: typeof asset.locationInheritedFromAssetId === "string" && asset.locationInheritedFromAssetId
+          ? asset.locationInheritedFromAssetId
+          : undefined,
+        ancestorContainerIds: Array.isArray(asset.ancestorContainerIds)
+          ? asset.ancestorContainerIds.filter((item): item is string => typeof item === "string" && Boolean(item))
+          : [],
+        lastPlacedAt: typeof asset.lastPlacedAt === "number" && Number.isFinite(asset.lastPlacedAt)
+          ? asset.lastPlacedAt
+          : asset.currentLocationId
+            ? asset.updatedAt
+            : undefined,
         tags: normalizeInventoryTags(asset.tags ?? []).slice(0, MAX_INVENTORY_TAGS),
       })) : [],
       orders: Array.isArray(value.orders) ? value.orders : [],
@@ -236,6 +265,18 @@ function timestampMillis(value: unknown, fallback = Date.now()) {
 
 function stringValue(value: unknown) {
   return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function placementFromData(value: unknown): AssetPlacement | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const data = value as Record<string, unknown>;
+  if (data.kind === "location" && typeof data.locationId === "string" && data.locationId) {
+    return { kind: "location", locationId: data.locationId };
+  }
+  if (data.kind === "container" && typeof data.containerAssetId === "string" && data.containerAssetId) {
+    return { kind: "container", containerAssetId: data.containerAssetId };
+  }
+  return undefined;
 }
 
 function powerDependencyOverridesFromData(value: {
@@ -368,6 +409,10 @@ function publicGearAssetDocumentValue(asset: Pick<InventoryAsset, "assetTag" | "
 
 function assetFromData(id: string, value: Record<string, unknown>): InventoryAsset {
   const lifecycleValues: InventoryAssetLifecycle[] = ["planned", "cart", "ordered", "in_transit", "awaiting_check_in", "active", "retired", "cancelled"];
+  const legacyLocationId = stringValue(value.currentLocationId);
+  const currentPlacement = placementFromData(value.currentPlacement)
+    ?? (legacyLocationId ? { kind: "location" as const, locationId: legacyLocationId } : undefined);
+  const effectiveLocationId = stringValue(value.effectiveLocationId) ?? legacyLocationId;
   return {
     id,
     assetTag: String(value.assetTag ?? id),
@@ -388,7 +433,22 @@ function assetFromData(id: string, value: Record<string, unknown>): InventoryAss
       ? normalizeInventoryTags(value.tags.filter((tag): tag is string => typeof tag === "string")).slice(0, MAX_INVENTORY_TAGS)
       : [],
     ownerPartyId: stringValue(value.ownerPartyId),
-    currentLocationId: stringValue(value.currentLocationId),
+    canContainAssets: value.canContainAssets === true,
+    expectedContentAssetIds: Array.isArray(value.expectedContentAssetIds)
+      ? [...new Set(value.expectedContentAssetIds.filter((item): item is string => typeof item === "string" && Boolean(item)))]
+      : undefined,
+    currentPlacement,
+    effectiveLocationId,
+    locationInheritedFromAssetId: stringValue(value.locationInheritedFromAssetId),
+    ancestorContainerIds: Array.isArray(value.ancestorContainerIds)
+      ? value.ancestorContainerIds.filter((item): item is string => typeof item === "string" && Boolean(item))
+      : [],
+    lastPlacedAt: value.lastPlacedAt
+      ? timestampMillis(value.lastPlacedAt)
+      : currentPlacement
+        ? timestampMillis(value.updatedAt)
+        : undefined,
+    currentLocationId: effectiveLocationId,
     serialNumber: stringValue(value.serialNumber),
     purchaseUrl: normalizeAssetPurchaseUrl(value.purchaseUrl),
     notes: stringValue(value.notes),
@@ -522,6 +582,7 @@ function assetCodeGroupFor(
   const definition = definitionsById.get(asset.definitionId);
   return inferInventoryAssetCodeGroup({
     isCable: isCableInventoryAsset(asset),
+    isContainer: asset.canContainAssets,
     label: asset.label,
     tags: asset.tags,
     definitionName: definition?.name,
@@ -709,6 +770,13 @@ function assetDocumentValue(asset: InventoryAsset) {
     connectionSetId: asset.connectionSetId ?? "",
     tags: asset.tags,
     ownerPartyId: asset.ownerPartyId ?? "",
+    canContainAssets: asset.canContainAssets === true,
+    expectedContentAssetIds: asset.expectedContentAssetIds ?? null,
+    currentPlacement: asset.currentPlacement ?? null,
+    effectiveLocationId: asset.effectiveLocationId ?? asset.currentLocationId ?? "",
+    locationInheritedFromAssetId: asset.locationInheritedFromAssetId ?? "",
+    ancestorContainerIds: asset.ancestorContainerIds ?? [],
+    lastPlacedAt: asset.lastPlacedAt ?? null,
     currentLocationId: asset.currentLocationId ?? "",
     serialNumber: asset.serialNumber ?? "",
     purchaseUrl: asset.purchaseUrl ?? "",
@@ -731,6 +799,12 @@ export async function saveInventoryAsset(
   const previousAsset = existingAssets.find((item) => item.id === id);
   const tags = normalizeInventoryTags(input.tags ?? []).slice(0, MAX_INVENTORY_TAGS);
   const isCable = isCableInventoryAsset({ tags });
+  const isContainer = input.canContainAssets === true;
+  const expectedContentAssetIds = isContainer
+    ? input.expectedContentAssetIds === undefined
+      ? previousAsset?.expectedContentAssetIds
+      : [...new Set(input.expectedContentAssetIds.filter((assetId) => assetId && assetId !== id))]
+    : undefined;
   const cableManufacturer = isCable ? input.cableManufacturer?.trim() || undefined : undefined;
   const cableLengthInches = isCable ? normalizeCableLengthInches(input.cableLengthInches) : undefined;
   const cableColor = isCable ? normalizeCableColor(input.cableColor) ?? "black" : undefined;
@@ -741,7 +815,7 @@ export async function saveInventoryAsset(
   const existingAssetTags = existingAssets.filter((item) => item.id !== id).map((item) => item.assetTag);
   const assetCodeGroup = input.assetCodeGroup
     ?? previousAsset?.assetCodeGroup
-    ?? inferInventoryAssetCodeGroup({ isCable, label: input.label, tags });
+    ?? inferInventoryAssetCodeGroup({ isCable, isContainer, label: input.label, tags });
   const previousCode = previousAsset && isInventoryAssetCode(previousAsset.assetTag) ? previousAsset.assetTag : "";
   const requestedCode = isInventoryAssetCode(input.assetTag ?? "") && !existingAssetTags.includes(input.assetTag?.trim() ?? "")
     ? input.assetTag?.trim() ?? ""
@@ -756,6 +830,16 @@ export async function saveInventoryAsset(
     }));
   }
   const now = Date.now();
+  const requestedLocationId = input.currentLocationId || undefined;
+  const locationChanged = requestedLocationId !== (previousAsset?.effectiveLocationId ?? previousAsset?.currentLocationId);
+  const currentPlacement = previousAsset && !locationChanged
+    ? previousAsset.currentPlacement
+    : requestedLocationId
+      ? { kind: "location" as const, locationId: requestedLocationId }
+      : previousAsset?.currentPlacement;
+  const effectiveLocationId = currentPlacement?.kind === "location"
+    ? currentPlacement.locationId
+    : previousAsset?.effectiveLocationId ?? previousAsset?.currentLocationId;
   const asset: InventoryAsset = {
     id,
     assetTag,
@@ -768,9 +852,18 @@ export async function saveInventoryAsset(
     cableColor,
     lifecycleStatus: input.lifecycleStatus,
     stageOnly: isCable ? false : input.stageOnly === true,
+    ...normalizePowerDependencies(isCable || isContainer ? {} : input),
+    connectionSetId: previousAsset?.connectionSetId,
     tags,
     ownerPartyId: input.ownerPartyId || undefined,
-    currentLocationId: input.currentLocationId || undefined,
+    canContainAssets: isContainer,
+    expectedContentAssetIds,
+    currentPlacement,
+    effectiveLocationId,
+    locationInheritedFromAssetId: currentPlacement?.kind === "container" ? previousAsset?.locationInheritedFromAssetId : undefined,
+    ancestorContainerIds: currentPlacement?.kind === "container" ? previousAsset?.ancestorContainerIds ?? [] : [],
+    lastPlacedAt: locationChanged || (!previousAsset && currentPlacement) ? now : previousAsset?.lastPlacedAt,
+    currentLocationId: effectiveLocationId,
     serialNumber: isCable ? undefined : input.serialNumber?.trim() || undefined,
     purchaseUrl,
     notes: input.notes?.trim() || undefined,
@@ -808,6 +901,38 @@ export async function saveInventoryAsset(
     console.warn("Could not update the public QR label record.", syncError);
   });
   return storedAsset;
+}
+
+export async function updateContainerExpectedContents(
+  containerAssetId: string,
+  expectedContentAssetIds: readonly string[],
+) {
+  const assets = await listInventoryAssets();
+  const container = assets.find((asset) => asset.id === containerAssetId);
+  if (!container?.canContainAssets) throw new Error("Choose a registered container.");
+
+  const existingAssetIds = new Set(assets.map((asset) => asset.id));
+  const normalizedIds = [...new Set(expectedContentAssetIds)]
+    .filter((assetId) => assetId !== containerAssetId && existingAssetIds.has(assetId));
+  const updatedAt = Date.now();
+  const updatedContainer: InventoryAsset = {
+    ...container,
+    expectedContentAssetIds: normalizedIds,
+    updatedAt,
+  };
+
+  if (isDemoMode() || !db) {
+    const store = readDemoStore();
+    store.assets = store.assets.map((asset) => asset.id === containerAssetId ? updatedContainer : asset);
+    writeDemoStore(store);
+    return updatedContainer;
+  }
+
+  await setDoc(doc(firestoreOrThrow(), "inventoryAssets", containerAssetId), {
+    expectedContentAssetIds: normalizedIds,
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
+  return updatedContainer;
 }
 
 export async function listInventoryConnectionSets() {
@@ -953,6 +1078,28 @@ function partitionConnectionSetInput(input: InventoryConnectionSetInput & { id: 
 export async function deleteInventoryAssets(assets: readonly InventoryAsset[]) {
   if (!assets.length) return;
   const deletedAssetIds = new Set(assets.map((asset) => asset.id));
+  const remainingContents = (await listInventoryAssets()).filter((asset) => (
+    asset.currentPlacement?.kind === "container"
+    && deletedAssetIds.has(asset.currentPlacement.containerAssetId)
+    && !deletedAssetIds.has(asset.id)
+  ));
+  if (remainingContents.length) {
+    throw new Error(`Move ${remainingContents.length} contained item${remainingContents.length === 1 ? "" : "s"} out before deleting this container.`);
+  }
+  const affectedConnectionSets = (await listInventoryConnectionSets())
+    .filter((connectionSet) => connectionSet.memberAssetIds.some((assetId) => deletedAssetIds.has(assetId)));
+  for (const connectionSet of affectedConnectionSets) {
+    const remainingMemberAssetIds = connectionSet.memberAssetIds.filter((assetId) => !deletedAssetIds.has(assetId));
+    await saveInventoryConnectionSet({
+      id: connectionSet.id,
+      sourceAssetId: remainingMemberAssetIds[0] ?? connectionSet.memberAssetIds[0] ?? "",
+      memberAssetIds: remainingMemberAssetIds,
+      links: connectionSet.links.filter((link) => !deletedAssetIds.has(link.a.assetId) && !deletedAssetIds.has(link.b.assetId)),
+      signalConnectors: connectionSet.signalConnectors.filter((connector) => !deletedAssetIds.has(connector.endpoint.assetId)),
+      nodePositions: connectionSet.nodePositions,
+      createdAt: connectionSet.createdAt,
+    });
+  }
 
   if (isDemoMode() || !db) {
     const store = readDemoStore();
@@ -1117,9 +1264,82 @@ export async function savePurchaseOrder(input: PurchaseOrderInput) {
   return order;
 }
 
+export const CONTAINER_LOCATION_CONFIRMATION_MAX_AGE_MS = 30 * 60 * 1000;
+export const MAX_CONTAINER_NESTING_DEPTH = 5;
+
+function placementSnapshotForAsset(
+  assetId: string,
+  assetsById: ReadonlyMap<string, InventoryAsset>,
+  resolving = new Set<string>(),
+): Pick<InventoryAsset, "effectiveLocationId" | "currentLocationId" | "locationInheritedFromAssetId" | "ancestorContainerIds"> {
+  const asset = assetsById.get(assetId);
+  if (!asset) return { locationInheritedFromAssetId: undefined, ancestorContainerIds: [] };
+  if (resolving.has(assetId)) throw new Error("A container cannot be placed inside itself.");
+  const placement = asset.currentPlacement;
+  if (!placement) return { ancestorContainerIds: [] };
+  if (placement.kind === "location") {
+    return {
+      effectiveLocationId: placement.locationId,
+      currentLocationId: placement.locationId,
+      locationInheritedFromAssetId: undefined,
+      ancestorContainerIds: [],
+    };
+  }
+
+  const container = assetsById.get(placement.containerAssetId);
+  if (!container?.canContainAssets) throw new Error("The selected container no longer exists.");
+  const nextResolving = new Set(resolving).add(assetId);
+  const parentSnapshot = placementSnapshotForAsset(container.id, assetsById, nextResolving);
+  const ancestorContainerIds = [container.id, ...(parentSnapshot.ancestorContainerIds ?? [])];
+  if (ancestorContainerIds.length > MAX_CONTAINER_NESTING_DEPTH) {
+    throw new Error(`Containers can be nested up to ${MAX_CONTAINER_NESTING_DEPTH} levels deep.`);
+  }
+  return {
+    effectiveLocationId: parentSnapshot.effectiveLocationId,
+    currentLocationId: parentSnapshot.effectiveLocationId,
+    locationInheritedFromAssetId: container.id,
+    ancestorContainerIds,
+  };
+}
+
+function withResolvedPlacementSnapshots(
+  assets: readonly InventoryAsset[],
+  directlyPlacedAssets: readonly InventoryAsset[],
+  checkedInAt: number,
+) {
+  const directlyPlacedById = new Map(directlyPlacedAssets.map((asset) => [asset.id, asset]));
+  const assetsById = new Map(assets.map((asset) => [asset.id, directlyPlacedById.get(asset.id) ?? asset]));
+  const propagatedAssets: InventoryAsset[] = [];
+
+  for (const asset of assetsById.values()) {
+    const snapshot = placementSnapshotForAsset(asset.id, assetsById);
+    const previous = assets.find((item) => item.id === asset.id) ?? asset;
+    const changed = directlyPlacedById.has(asset.id)
+      || snapshot.effectiveLocationId !== previous.effectiveLocationId
+      || snapshot.currentLocationId !== previous.currentLocationId
+      || snapshot.locationInheritedFromAssetId !== previous.locationInheritedFromAssetId
+      || JSON.stringify(snapshot.ancestorContainerIds ?? []) !== JSON.stringify(previous.ancestorContainerIds ?? []);
+    if (!changed) continue;
+    const updated = {
+      ...asset,
+      ...snapshot,
+      updatedAt: checkedInAt,
+    };
+    assetsById.set(asset.id, updated);
+    propagatedAssets.push(updated);
+  }
+
+  return {
+    propagatedAssets,
+    directlyPlacedAssets: directlyPlacedAssets.map((asset) => assetsById.get(asset.id) ?? asset),
+  };
+}
+
 export async function checkInInventoryAsset(input: {
   assetId: string;
-  locationId: string;
+  destination?: CheckInDestination;
+  /** Legacy convenience accepted by existing callers. */
+  locationId?: string;
   method: CheckInMethod;
   actorId: string;
   operationId?: string;
@@ -1127,74 +1347,146 @@ export async function checkInInventoryAsset(input: {
   longitude?: number;
   accuracyMeters?: number;
   notes?: string;
-}) {
-  const id = input.operationId
-    ? `${input.operationId}-${input.assetId}`
-    : createGearId("checkin");
-  const value: InventoryCheckIn = {
-    id,
-    assetId: input.assetId,
-    locationId: input.locationId,
+}): Promise<InventoryCheckInOutcome> {
+  const destination = input.destination
+    ?? (input.locationId ? { kind: "location" as const, locationId: input.locationId } : undefined);
+  if (!destination) throw new Error("Choose a check-in destination.");
+  const [assets, connectionSets, locations] = await Promise.all([
+    listInventoryAssets(),
+    listInventoryConnectionSets(),
+    listGearLocations(),
+  ]);
+  const sourceAsset = assets.find((asset) => asset.id === input.assetId);
+  if (!sourceAsset) throw new Error("This gear item no longer exists.");
+  if (destination.kind === "location" && !locations.some((location) => location.id === destination.locationId)) {
+    throw new Error("The selected location no longer exists.");
+  }
+
+  const connectionSet = (sourceAsset.connectionSetId
+    ? connectionSets.find((item) => item.id === sourceAsset.connectionSetId)
+    : undefined)
+    ?? connectionSets.find((item) => item.memberAssetIds.includes(sourceAsset.id));
+  const affectedAssetIds = connectionSet?.memberAssetIds.length ? connectionSet.memberAssetIds : [sourceAsset.id];
+  const affectedAssetIdSet = new Set(affectedAssetIds);
+  const affectedAssets = affectedAssetIds.flatMap((assetId) => {
+    const asset = assets.find((item) => item.id === assetId);
+    return asset ? [asset] : [];
+  });
+  const checkedInAt = Date.now();
+
+  if (destination.kind === "container") {
+    const container = assets.find((asset) => asset.id === destination.containerAssetId);
+    if (!container?.canContainAssets) throw new Error("Choose a registered container.");
+    if (affectedAssetIdSet.has(container.id) || container.ancestorContainerIds?.some((id) => affectedAssetIdSet.has(id))) {
+      throw new Error("A container cannot be placed inside itself or one of its contents.");
+    }
+    if (container.currentPlacement?.kind !== "location" || !container.effectiveLocationId || !container.lastPlacedAt) {
+      throw new Error("Check the container into a location before adding items.");
+    }
+    if (checkedInAt - container.lastPlacedAt > CONTAINER_LOCATION_CONFIRMATION_MAX_AGE_MS) {
+      throw new Error("Confirm the container's current location before adding items.");
+    }
+  }
+
+  const operationId = input.operationId ?? createGearId("checkin-operation");
+  const checkIns = affectedAssets.map((asset): InventoryCheckIn => ({
+    id: `${operationId}-${asset.id}`,
+    assetId: asset.id,
+    destination,
+    locationId: destination.kind === "location" ? destination.locationId : undefined,
     method: input.method,
     actorId: input.actorId,
-    operationId: input.operationId,
+    operationId,
     latitude: input.latitude,
     longitude: input.longitude,
     accuracyMeters: input.accuracyMeters,
     notes: input.notes?.trim() || undefined,
-    checkedInAt: Date.now(),
-  };
-  if (!value.locationId) throw new Error("Choose a check-in location.");
+    checkedInAt,
+  }));
+  const directlyPlacedAssets = affectedAssets.map((asset): InventoryAsset => ({
+    ...asset,
+    lifecycleStatus: "active",
+    currentPlacement: destination,
+    lastPlacedAt: checkedInAt,
+    updatedAt: checkedInAt,
+  }));
+  const resolved = withResolvedPlacementSnapshots(assets, directlyPlacedAssets, checkedInAt);
+
   if (isDemoMode() || !db) {
     const store = readDemoStore();
-    if (!store.checkIns.some((checkIn) => checkIn.id === value.id)) {
-      store.checkIns.push(value);
+    for (const checkIn of checkIns) {
+      if (!store.checkIns.some((item) => item.id === checkIn.id)) store.checkIns.push(checkIn);
     }
-    store.assets = store.assets.map((asset) => asset.id === input.assetId ? {
-      ...asset,
-      lifecycleStatus: "active",
-      currentLocationId: input.locationId,
-      updatedAt: value.checkedInAt,
-    } : asset);
-    store.locations = store.locations.map((location) => location.id === input.locationId ? {
-      ...location,
-      lastCheckInAt: value.checkedInAt,
-    } : location);
+    const updatedById = new Map(resolved.propagatedAssets.map((asset) => [asset.id, asset]));
+    store.assets = store.assets.map((asset) => updatedById.get(asset.id) ?? asset);
+    if (destination.kind === "location") {
+      store.locations = store.locations.map((location) => location.id === destination.locationId ? {
+        ...location,
+        lastCheckInAt: checkedInAt,
+      } : location);
+    }
     writeDemoStore(store);
-    return value;
+    return {
+      operationId,
+      checkIns,
+      assets: resolved.directlyPlacedAssets,
+      propagatedAssets: resolved.propagatedAssets,
+    };
   }
+
   const firestore = firestoreOrThrow();
   const batch = writeBatch(firestore);
-  batch.set(doc(firestore, "inventoryAssets", input.assetId, "checkIns", id), {
-    id: value.id,
-    assetId: value.assetId,
-    locationId: value.locationId,
-    method: value.method,
-    actorId: value.actorId,
-    operationId: value.operationId ?? "",
-    latitude: value.latitude ?? null,
-    longitude: value.longitude ?? null,
-    accuracyMeters: value.accuracyMeters ?? null,
-    notes: value.notes ?? "",
-    checkedInAt: serverTimestamp(),
-  });
-  batch.update(doc(firestore, "inventoryAssets", input.assetId), {
-    lifecycleStatus: "active",
-    currentLocationId: input.locationId,
-    updatedAt: serverTimestamp(),
-  });
-  const defaultLocation = DEFAULT_LOCATIONS.find((location) => location.id === input.locationId);
-  batch.set(doc(firestore, "gearLocations", input.locationId), {
-    ...(defaultLocation ? {
-      name: defaultLocation.name,
-      kind: defaultLocation.kind,
-      notes: defaultLocation.notes ?? "",
-      status: defaultLocation.status,
-      createdAt: serverTimestamp(),
+  for (const checkIn of checkIns) {
+    batch.set(doc(firestore, "inventoryAssets", checkIn.assetId, "checkIns", checkIn.id), {
+      id: checkIn.id,
+      assetId: checkIn.assetId,
+      destination: checkIn.destination,
+      locationId: checkIn.locationId ?? "",
+      containerAssetId: checkIn.destination.kind === "container" ? checkIn.destination.containerAssetId : "",
+      method: checkIn.method,
+      actorId: checkIn.actorId,
+      operationId,
+      latitude: checkIn.latitude ?? null,
+      longitude: checkIn.longitude ?? null,
+      accuracyMeters: checkIn.accuracyMeters ?? null,
+      notes: checkIn.notes ?? "",
+      checkedInAt: serverTimestamp(),
+    });
+  }
+  for (const asset of resolved.propagatedAssets) {
+    const direct = affectedAssetIdSet.has(asset.id);
+    batch.update(doc(firestore, "inventoryAssets", asset.id), {
+      ...(direct ? {
+        lifecycleStatus: "active",
+        currentPlacement: destination,
+        lastPlacedAt: serverTimestamp(),
+      } : {}),
+      effectiveLocationId: asset.effectiveLocationId ?? "",
+      currentLocationId: asset.currentLocationId ?? "",
+      locationInheritedFromAssetId: asset.locationInheritedFromAssetId ?? "",
+      ancestorContainerIds: asset.ancestorContainerIds ?? [],
       updatedAt: serverTimestamp(),
-    } : {}),
-    lastCheckInAt: serverTimestamp(),
-  }, { merge: true });
+    });
+  }
+  if (destination.kind === "location") {
+    const defaultLocation = DEFAULT_LOCATIONS.find((location) => location.id === destination.locationId);
+    batch.set(doc(firestore, "gearLocations", destination.locationId), {
+      ...(defaultLocation ? {
+        name: defaultLocation.name,
+        kind: defaultLocation.kind,
+        notes: defaultLocation.notes ?? "",
+        status: defaultLocation.status,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      } : {}),
+      lastCheckInAt: serverTimestamp(),
+    }, { merge: true });
+  }
   await batch.commit();
-  return value;
+  return {
+    operationId,
+    checkIns,
+    assets: resolved.directlyPlacedAssets,
+    propagatedAssets: resolved.propagatedAssets,
+  };
 }

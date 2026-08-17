@@ -3,14 +3,13 @@
 import {
   ArrowDownIcon,
   ArrowUpIcon,
-  BarcodeIcon,
   ListPlusIcon,
   PrinterIcon,
   RulerIcon,
+  TagIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react";
-import JsBarcode from "jsbarcode";
 import { RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -26,6 +25,7 @@ import {
   gearSheetStartIndex,
   placeGearSheetLabels,
   printGearLabelSheet,
+  splitCableLabelDescription,
   type GearSheetLabelItem,
   type GearSheetLabelPlacement,
 } from "@/lib/gear/labels";
@@ -102,7 +102,7 @@ export function GearSheetLabelPrinter({
   function printQueue() {
     if (!printSheetRef.current || !queue.length || queueOverflow || !offsetsValid) return;
     const opened = printGearLabelSheet(printSheetRef.current, {
-      title: `${queue.length} gear labels`,
+      title: `${queue.length} cable labels`,
       xOffsetMm,
       yOffsetMm,
     });
@@ -124,11 +124,11 @@ export function GearSheetLabelPrinter({
       <div className="flex flex-col gap-3 border-b p-4 pr-12 sm:flex-row sm:items-start sm:justify-between sm:p-5 sm:pr-14">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h2 id="sheet-label-queue-heading" className="text-lg font-semibold">Sheet label queue</h2>
+            <h2 id="sheet-label-queue-heading" className="text-lg font-semibold">Cable label queue</h2>
             <Badge variant={queue.length ? "secondary" : "outline"}>{queue.length} queued</Badge>
           </div>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-            MR610-MAC stock has 8 columns and 4 rows. Only assets tagged Cables with a saved length can enter this queue. Each label prints its length, title, and four-digit cable ID against the laminate edge, with that number encoded as Code 128.
+            MR610-MAC stock has 8 columns and 4 rows. Only assets tagged Cables with a saved length can enter this queue. Each centered label emphasizes its length, end types, four-digit cable ID, and The Swell website against the laminate edge.
           </p>
         </div>
         <Button type="button" variant="outline" size="sm" onClick={() => onQueueAssets(unqueuedAssets)} disabled={!unqueuedAssets.length}>
@@ -235,7 +235,7 @@ export function GearSheetLabelPrinter({
           </p>
         </div>
 
-        <aside className="min-w-0 border-t p-4 lg:border-t-0" aria-label="Queued gear labels">
+        <aside className="min-w-0 border-t p-4 lg:border-t-0" aria-label="Queued cable labels">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold">Print order</h3>
             <Button type="button" variant="ghost" size="xs" onClick={onClear} disabled={!queue.length}>
@@ -263,7 +263,7 @@ export function GearSheetLabelPrinter({
           ) : (
             <Empty className="mt-3 min-h-32 border-y p-3">
               <EmptyHeader>
-                <EmptyMedia variant="icon"><BarcodeIcon /></EmptyMedia>
+                <EmptyMedia variant="icon"><TagIcon /></EmptyMedia>
                 <EmptyTitle>No labels queued</EmptyTitle>
                 <EmptyDescription>Add the Cables tag in an asset editor, then use Queue label below.</EmptyDescription>
               </EmptyHeader>
@@ -293,33 +293,15 @@ function GearSheetPrintPage({
 }
 
 function GearSheetAssetLabel({ placement }: { placement: GearSheetLabelPlacement }) {
-  const barcodeRef = useRef<SVGSVGElement>(null);
   const cableCode = placement.assetTag.trim();
   const assetName = placement.assetName.trim() || "Gear asset";
-
-  useEffect(() => {
-    if (!barcodeRef.current) return;
-    JsBarcode(barcodeRef.current, cableCode, {
-      format: "CODE128",
-      width: 1,
-      height: 34,
-      displayValue: false,
-      margin: 0,
-      // Keep the required 10-module Code 128 quiet zone. The surrounding
-      // layout supplies no additional horizontal padding, so the bars can use
-      // the maximum safe width inside the one-inch printable cell.
-      marginLeft: 10,
-      marginRight: 10,
-      background: "rgb(255 255 255)",
-      lineColor: "rgb(10 10 10)",
-    });
-  }, [cableCode]);
+  const cableDescription = splitCableLabelDescription(assetName);
 
   return (
     <div
       className="gear-sheet-print-label"
       role="img"
-      aria-label={`Code 128 label for ${assetName}, cable ID ${cableCode}`}
+      aria-label={`Cable label for ${assetName}, cable ID ${cableCode}`}
       style={{
         position: "absolute",
         left: `${GEAR_SHEET_LABEL_FORMAT.leftIn + (placement.column - 1) * GEAR_SHEET_LABEL_FORMAT.printableWidthIn}in`,
@@ -335,40 +317,86 @@ function GearSheetAssetLabel({ placement }: { placement: GearSheetLabelPlacement
       <div
         style={{
           position: "absolute",
+          top: 0,
           right: 0,
           bottom: 0,
           left: 0,
           display: "flex",
           flexDirection: "column",
-          padding: "0 0 0.45mm",
+          alignItems: "center",
+          justifyContent: "flex-end",
+          padding: "0.7mm 0.7mm 0.45mm",
         }}
       >
-        <svg
-          ref={barcodeRef}
-          aria-hidden="true"
-          preserveAspectRatio="none"
-          shapeRendering="crispEdges"
-          style={{ display: "block", width: "100%", height: "8.1mm", overflow: "visible" }}
-        />
         <div
           style={{
             display: "flex",
-            minWidth: 0,
-            alignItems: "baseline",
+            width: "100%",
+            height: "5.5mm",
+            flex: "0 0 5.5mm",
+            alignItems: "center",
             justifyContent: "center",
-            gap: "0.35mm",
-            marginTop: "0.45mm",
-            overflow: "hidden",
-            fontSize: assetName.length > 30 ? "1.5mm" : assetName.length > 24 ? "1.65mm" : "1.85mm",
+            fontSize: "15.5pt",
+            fontVariantNumeric: "tabular-nums",
             fontWeight: 700,
-            letterSpacing: "0.02mm",
-            lineHeight: 1,
-            padding: "0 0.75mm",
+            letterSpacing: "0.25pt",
+            lineHeight: 0.9,
             whiteSpace: "nowrap",
           }}
         >
-          <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{assetName}</span>
-          <span style={{ flexShrink: 0, fontFamily: "Courier New, monospace", fontSize: "2.05mm", letterSpacing: "0.12mm" }}>{cableCode}</span>
+          {cableCode}
+        </div>
+        <div
+          style={{
+            display: "flex",
+            width: "100%",
+            height: "4.6mm",
+            flex: "0 0 4.6mm",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
+            fontSize: "12.2pt",
+            fontWeight: 700,
+            lineHeight: 0.9,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {cableDescription.length}
+        </div>
+        <div
+          style={{
+            width: "100%",
+            height: "3mm",
+            flex: "0 0 3mm",
+            overflow: "hidden",
+            textAlign: "center",
+            fontFamily: '"Arial Narrow", Arial, Helvetica, sans-serif',
+            fontSize: cableDescription.endTypes.length > 32 ? "5.4pt" : cableDescription.endTypes.length > 26 ? "6.2pt" : "7.2pt",
+            fontWeight: 700,
+            letterSpacing: "-0.05pt",
+            lineHeight: 1.15,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {cableDescription.endTypes}
+        </div>
+        <div
+          aria-hidden="true"
+          style={{
+            display: "flex",
+            width: "100%",
+            height: "3mm",
+            flex: "0 0 3mm",
+            alignItems: "flex-end",
+            justifyContent: "center",
+            fontSize: "7.3pt",
+            fontWeight: 400,
+            letterSpacing: "0.02pt",
+            lineHeight: 1,
+            whiteSpace: "nowrap",
+          }}
+        >
+          <span>www.</span><strong style={{ fontWeight: 700 }}>TheSwell</strong><span>.live</span>
         </div>
       </div>
     </div>

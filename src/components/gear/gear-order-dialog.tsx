@@ -168,7 +168,9 @@ export function GearOrderDialog({
             <Field>
               <FieldLabel htmlFor="gear-order-status">Order status</FieldLabel>
               <Select value={status} onValueChange={(value) => value && setStatus(value as PurchaseOrderStatus)} disabled={saving}>
-                <SelectTrigger id="gear-order-status" className="w-full"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="gear-order-status" className="w-full">
+                  <SelectValue>{PURCHASE_ORDER_STATUS_OPTIONS.find((option) => option.value === status)?.label ?? "Choose status"}</SelectValue>
+                </SelectTrigger>
                 <SelectContent><SelectGroup>
                   {PURCHASE_ORDER_STATUS_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
                 </SelectGroup></SelectContent>
@@ -177,7 +179,9 @@ export function GearOrderDialog({
             <Field>
               <FieldLabel htmlFor="gear-order-payment-status">Payment status</FieldLabel>
               <Select value={paymentStatus} onValueChange={(value) => value && setPaymentStatus(value as PaymentStatus)} disabled={saving}>
-                <SelectTrigger id="gear-order-payment-status" className="w-full"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="gear-order-payment-status" className="w-full">
+                  <SelectValue>{PAYMENT_STATUS_OPTIONS.find((option) => option.value === paymentStatus)?.label ?? "Choose payment status"}</SelectValue>
+                </SelectTrigger>
                 <SelectContent><SelectGroup>
                   {PAYMENT_STATUS_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
                 </SelectGroup></SelectContent>
@@ -292,7 +296,9 @@ export function GearOrderDialog({
 function PartySelect({ id, value, onChange, parties, disabled }: { id: string; value: string; onChange: (value: string) => void; parties: GearParty[]; disabled: boolean }) {
   return (
     <Select value={value || "none"} onValueChange={(next) => onChange(next === "none" || !next ? "" : next)} disabled={disabled}>
-      <SelectTrigger id={id} className="w-full"><SelectValue /></SelectTrigger>
+      <SelectTrigger id={id} className="w-full">
+        <SelectValue>{value ? parties.find((party) => party.id === value)?.name ?? "Unknown party" : "Not recorded"}</SelectValue>
+      </SelectTrigger>
       <SelectContent><SelectGroup>
         <SelectItem value="none">Not recorded</SelectItem>
         {parties.map((party) => <SelectItem key={party.id} value={party.id}>{party.name}</SelectItem>)}

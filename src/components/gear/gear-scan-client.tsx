@@ -34,15 +34,18 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAdmin } from "@/hooks/use-admin";
-import type { GearLocation, GearLocationKind, InventoryAsset, PublicGearAsset } from "@/lib/gear/domain";
+import { inventoryAssetLocationChain, type GearLocation, type GearLocationKind, type InventoryAsset, type PublicGearAsset } from "@/lib/gear/domain";
 import {
   checkInInventoryAsset,
   createGearLocation,
   getInventoryAssetByTag,
   getPublicGearAssetByTag,
   listGearLocations,
+  listInventoryAssets,
   syncPublicGearAssetRecords,
 } from "@/lib/gear/repository";
+import { powerCheckInTag, resolvePowerDependencies, type EquipmentTemplate } from "@/lib/setup-designer/domain";
+import { listEquipmentTemplates } from "@/lib/setup-designer/repository";
 
 const LOCATION_KINDS: Array<{ value: GearLocationKind; label: string }> = [
   { value: "house", label: "House" },
@@ -50,7 +53,6 @@ const LOCATION_KINDS: Array<{ value: GearLocationKind; label: string }> = [
   { value: "studio", label: "Studio" },
   { value: "venue", label: "Venue" },
   { value: "warehouse", label: "Warehouse" },
-  { value: "container", label: "Container" },
   { value: "other", label: "Other" },
 ];
 
@@ -65,6 +67,8 @@ export function GearScanClient({ assetTag }: { assetTag: string }) {
   const admin = useAdmin();
   const [publicAsset, setPublicAsset] = useState<PublicGearAsset | null>(null);
   const [asset, setAsset] = useState<InventoryAsset | null>(null);
+  const [assets, setAssets] = useState<InventoryAsset[]>([]);
+  const [definition, setDefinition] = useState<EquipmentTemplate | null>(null);
   const [locations, setLocations] = useState<GearLocation[]>([]);
   const [publicLoading, setPublicLoading] = useState(true);
   const [privateLoading, setPrivateLoading] = useState(false);
@@ -110,6 +114,8 @@ export function GearScanClient({ assetTag }: { assetTag: string }) {
       if (!active) return;
       if (!admin.isAdmin) {
         setAsset(null);
+        setAssets([]);
+        setDefinition(null);
         setLocations([]);
         setPrivateLoading(false);
         setPrivateError(null);
@@ -119,9 +125,11 @@ export function GearScanClient({ assetTag }: { assetTag: string }) {
       setPrivateLoading(true);
       setPrivateError(null);
       try {
-        const [nextAsset, nextLocations] = await Promise.all([getInventoryAssetByTag(assetTag), listGearLocations()]);
+        const [nextAsset, nextAssets, nextLocations, definitions] = await Promise.all([getInventoryAssetByTag(assetTag), listInventoryAssets(), listGearLocations(), listEquipmentTemplates()]);
         if (active) {
           setAsset(nextAsset);
+          setAssets(nextAssets);
+          setDefinition(nextAsset ? definitions.find((item) => item.id === nextAsset.definitionId) ?? null : null);
           setLocations(nextLocations);
           if (nextAsset) {
             setPublicAsset({ assetTag: nextAsset.assetTag, label: nextAsset.label, updatedAt: nextAsset.updatedAt });
@@ -147,9 +155,11 @@ export function GearScanClient({ assetTag }: { assetTag: string }) {
   const recentLocations = sortedLocations.slice(0, 4);
   const selectedLocation = locations.find((location) => location.id === selectedLocationId) ?? null;
   const currentLocation = locations.find((location) => location.id === asset?.currentLocationId) ?? null;
+  const currentLocationChain = asset ? inventoryAssetLocationChain(asset, assets, locations) : null;
   const displayLabel = asset?.label ?? publicAsset?.label ?? "this piece of Swell gear";
-  const displayTag = asset?.assetTag ?? publicAsset?.assetTag ?? assetTag;
-  const noteHref = ownerNoteHref(displayTag, displayLabel);
+  const rawDisplayTag = asset?.assetTag ?? publicAsset?.assetTag ?? assetTag;
+  const checkInDisplayTag = powerCheckInTag(rawDisplayTag, asset ? resolvePowerDependencies(asset, definition ?? undefined).needsPowerAdapter : false);
+  const noteHref = ownerNoteHref(rawDisplayTag, displayLabel);
 
   async function submitNewLocation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -176,24 +186,26 @@ export function GearScanClient({ assetTag }: { assetTag: string }) {
     setCheckingIn(true);
     setCheckInError(null);
     try {
-      await checkInInventoryAsset({
+      const outcome = await checkInInventoryAsset({
         assetId: asset.id,
         locationId: selectedLocation.id,
         method: "qr_camera",
         actorId: admin.user?.uid ?? "demo-admin",
       });
-      const checkedInAt = Date.now();
-      setAsset({
-        ...asset,
-        lifecycleStatus: "active",
-        currentLocationId: selectedLocation.id,
-        updatedAt: checkedInAt,
-      });
+      const checkedInAt = outcome.assets[0]?.updatedAt ?? Date.now();
+      setAsset(outcome.assets.find((item) => item.id === asset.id) ?? asset);
+      const updatedById = new Map((outcome.propagatedAssets ?? outcome.assets).map((item) => [item.id, item]));
+      setAssets((current) => current.map((item) => updatedById.get(item.id) ?? item));
       setLocations((current) => current.map((location) => location.id === selectedLocation.id
         ? { ...location, lastCheckInAt: checkedInAt }
         : location));
       setCompletedLocation(selectedLocation);
-      toast.success(`${asset.label} is checked in at ${selectedLocation.name}.`);
+      toast.success(
+        outcome.assets.length > 1
+          ? `${outcome.assets.length} connected items are checked in at ${selectedLocation.name}.`
+          : `${checkInDisplayTag} is checked in at ${selectedLocation.name}.`,
+        { description: outcome.assets.length > 1 ? outcome.assets.map((item) => item.assetTag).join(" + ") : asset.label },
+      );
     } catch (caught) {
       setCheckInError(caught instanceof Error ? caught.message : "Could not check in this item.");
     } finally {
@@ -230,7 +242,7 @@ export function GearScanClient({ assetTag }: { assetTag: string }) {
               <span className="flex size-12 items-center justify-center rounded-full bg-muted">
                 <PackageSearchIcon className="size-6" aria-hidden />
               </span>
-              <Badge variant="secondary">{displayTag}</Badge>
+              <Badge variant="secondary">{rawDisplayTag}</Badge>
             </div>
             <div className="flex flex-col gap-2">
               <p className="swell-page-kicker">Gear label scanned</p>
@@ -296,7 +308,7 @@ export function GearScanClient({ assetTag }: { assetTag: string }) {
         <section className="swell-panel mx-auto flex w-full max-w-xl flex-col gap-3 p-5 sm:p-6">
           <PackageSearchIcon className="size-8 text-muted-foreground" aria-hidden />
           <p className="swell-page-kicker">Gear label</p>
-          <h1 className="text-2xl font-semibold">Could not find {displayTag}</h1>
+          <h1 className="text-2xl font-semibold">Could not find {rawDisplayTag}</h1>
           <p className="text-sm leading-6 text-muted-foreground">
             {privateError ?? "This asset tag is not registered in the gear system."}
           </p>
@@ -314,7 +326,7 @@ export function GearScanClient({ assetTag }: { assetTag: string }) {
           <div className="flex flex-col gap-5 p-5 text-center sm:p-7">
             <CheckCircle2Icon className="mx-auto size-12 text-primary" aria-hidden />
             <div className="flex flex-col gap-2">
-              <p className="swell-page-kicker">Check-in complete</p>
+              <p className="swell-page-kicker">{checkInDisplayTag} · Check-in complete</p>
               <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{asset.label}</h1>
               <p className="text-base text-muted-foreground">
                 Checked in at <strong className="font-semibold text-foreground">{completedLocation.name}</strong>.
@@ -344,7 +356,7 @@ export function GearScanClient({ assetTag }: { assetTag: string }) {
         <div className="flex flex-col gap-5 p-5 sm:p-7">
           <div className="flex items-start justify-between gap-4">
             <div className="flex flex-col gap-1">
-              <p className="swell-page-kicker">{asset.assetTag}</p>
+              <p className="swell-page-kicker">{checkInDisplayTag}</p>
               <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
                 Check {asset.label} in to:
               </h1>
@@ -354,7 +366,7 @@ export function GearScanClient({ assetTag }: { assetTag: string }) {
 
           {currentLocation ? (
             <p className="text-sm text-muted-foreground">
-              Currently recorded at <span className="font-medium text-foreground">{currentLocation.name}</span>.
+              Currently recorded at <span className="font-medium text-foreground">{currentLocationChain ?? currentLocation.name}</span>.
             </p>
           ) : null}
 
