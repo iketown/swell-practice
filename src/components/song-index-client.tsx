@@ -3,23 +3,37 @@
 import Link from "next/link";
 import { Clock3Icon, EyeOffIcon, MusicIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import { AppShell } from "@/components/app-shell";
 import { SongFilterInput } from "@/components/song-filter-input";
+import {
+  SongTagAssignmentField,
+  SongTagBadges,
+  SongTagManager,
+} from "@/components/song-tag-controls";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAdmin } from "@/hooks/use-admin";
-import type { Song } from "@/lib/domain";
+import type { Song, SongTag } from "@/lib/domain";
 import { isSongPublished, rankSongsForQuery } from "@/lib/domain";
 import { listSongs } from "@/lib/firestore";
+import {
+  createSongTag,
+  deleteSongTag,
+  listSongTags,
+  updateSongTag,
+  updateSongTagIds,
+} from "@/lib/song-tags";
 import { cn } from "@/lib/utils";
 
 export function SongIndexClient() {
   const admin = useAdmin();
   const [songs, setSongs] = useState<Song[]>([]);
+  const [tags, setTags] = useState<SongTag[]>([]);
   const [loading, setLoading] = useState(true);
   const [songQuery, setSongQuery] = useState("");
   const visibleSongs = admin.isAdmin
@@ -31,9 +45,11 @@ export function SongIndexClient() {
   useEffect(() => {
     let active = true;
 
-    listSongs()
-      .then((items) => {
-        if (active) setSongs(items);
+    Promise.all([listSongs(), listSongTags()])
+      .then(([songItems, tagItems]) => {
+        if (!active) return;
+        setSongs(songItems);
+        setTags(tagItems);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -43,6 +59,57 @@ export function SongIndexClient() {
       active = false;
     };
   }, []);
+
+  async function handleCreateTag(label: string) {
+    try {
+      const tag = await createSongTag(label);
+      setTags((current) => [...current, tag].sort((left, right) => left.label.localeCompare(right.label)));
+      toast.success(`Created “${tag.label}”.`);
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : "Could not create that tag.");
+      throw caught;
+    }
+  }
+
+  async function handleRenameTag(tag: SongTag, label: string) {
+    try {
+      const updatedTag = await updateSongTag(tag.id, label);
+      setTags((current) => current
+        .map((item) => item.id === tag.id ? updatedTag : item)
+        .sort((left, right) => left.label.localeCompare(right.label)));
+      toast.success(`Renamed “${tag.label}” to “${updatedTag.label}”.`);
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : "Could not rename that tag.");
+      throw caught;
+    }
+  }
+
+  async function handleDeleteTag(tag: SongTag) {
+    try {
+      await deleteSongTag(tag.id);
+      setTags((current) => current.filter((item) => item.id !== tag.id));
+      setSongs((current) => current.map((song) => ({
+        ...song,
+        tagIds: song.tagIds.filter((tagId) => tagId !== tag.id),
+      })));
+      toast.success(`Deleted “${tag.label}”.`);
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : "Could not delete that tag.");
+      throw caught;
+    }
+  }
+
+  async function handleSongTagsChange(song: Song, tagIds: string[]) {
+    const previousTagIds = song.tagIds;
+    setSongs((current) => current.map((item) => item.id === song.id ? { ...item, tagIds } : item));
+    try {
+      await updateSongTagIds(song.id, tagIds);
+    } catch (caught) {
+      setSongs((current) => current.map((item) => item.id === song.id ? { ...item, tagIds: previousTagIds } : item));
+      toast.error(caught instanceof Error ? caught.message : `Could not update tags for ${song.title}.`);
+      throw caught;
+    }
+  }
 
   return (
     <AppShell>
@@ -69,6 +136,15 @@ export function SongIndexClient() {
           </div>
         </div>
         <SongFilterInput id="public-song-search" songs={visibleSongs} value={songQuery} onChange={setSongQuery} matchCount={matchingSongCount} />
+        {admin.isAdmin ? (
+          <SongTagManager
+            onCreate={handleCreateTag}
+            onDelete={handleDeleteTag}
+            onRename={handleRenameTag}
+            songs={songs}
+            tags={tags}
+          />
+        ) : null}
       </section>
 
       {loading ? (
@@ -79,37 +155,45 @@ export function SongIndexClient() {
       ) : visibleSongs.length ? (
         <section className="grid gap-2.5">
           {rankedSongs.map(({ song, matchesQuery }) => (
-            <Link
+            <Card
               key={song.id}
-              href={`/songs/${song.slug}`}
-              aria-label={`Open ${song.title}`}
+              size="sm"
               className={cn(
-                "group/song-card block rounded-lg outline-none transition-opacity focus-visible:ring-3 focus-visible:ring-ring/40",
+                "transition-[background-color,opacity] hover:bg-muted/35",
                 songQuery.trim() && !matchesQuery ? "opacity-50" : "opacity-100"
               )}
             >
-              <Card size="sm" className="cursor-pointer transition-colors hover:bg-muted/70">
-                <CardHeader>
-                  <CardTitle className="text-base">
-                    <span className="flex flex-wrap items-center gap-2">
-                      <span className="group-hover/song-card:underline">{song.title}</span>
-                      {!isSongPublished(song) ? (
-                        <Badge variant="outline">
-                          <EyeOffIcon aria-hidden />
-                          Unpublished
-                        </Badge>
-                      ) : null}
-                    </span>
-                  </CardTitle>
-                  <CardAction>
-                    <span className={buttonVariants({ variant: "secondary", size: "sm", className: "pointer-events-none" })}>Open</span>
-                  </CardAction>
-                </CardHeader>
-                <CardContent>
+              <CardHeader>
+                <CardTitle className="text-base">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <Link className="underline-offset-4 hover:underline" href={`/songs/${song.slug}`}>{song.title}</Link>
+                    {!isSongPublished(song) ? (
+                      <Badge variant="outline">
+                        <EyeOffIcon aria-hidden />
+                        Unpublished
+                      </Badge>
+                    ) : null}
+                  </span>
+                </CardTitle>
+                <CardAction>
+                  <Link className={buttonVariants({ variant: "secondary", size: "sm" })} href={`/songs/${song.slug}`}>Open</Link>
+                </CardAction>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(18rem,0.7fr)] sm:items-end">
                   <p className="truncate text-sm text-muted-foreground">/songs/{song.slug}</p>
-                </CardContent>
-              </Card>
-            </Link>
+                  {admin.isAdmin ? (
+                    <SongTagAssignmentField
+                      onChange={(tagIds) => handleSongTagsChange(song, tagIds)}
+                      song={song}
+                      tags={tags}
+                    />
+                  ) : (
+                    <SongTagBadges tagIds={song.tagIds} tags={tags} />
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </section>
       ) : (

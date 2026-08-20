@@ -23,6 +23,7 @@ import type {
   MemberSongDefault,
   Song,
   SongAssignmentBundle,
+  SongTag,
   VocalPartSlug,
 } from "@/lib/domain";
 import {
@@ -43,6 +44,7 @@ import {
   sampleMemberSongDefaults,
 } from "@/lib/sample-assignments";
 import { sampleSongBundle, sampleSongList } from "@/lib/sample-data";
+import { applyDemoSongTags, listSongTags } from "@/lib/song-tags";
 
 const DEMO_STORE_KEY = "swell-parts:assignments:v1";
 
@@ -66,6 +68,7 @@ export interface MemberAssignmentPageData {
   member: BandMember;
   bands: Band[];
   selectedBand: Band;
+  tags: SongTag[];
   rows: MemberSongAssignmentRow[];
 }
 
@@ -668,11 +671,14 @@ function assignmentMemberIdsForBand(band: Band, members: BandMember[]) {
 }
 
 export async function getMemberAssignmentPage(memberSlug: string, bandId?: string): Promise<MemberAssignmentPageData | null> {
-  const [member, bands, members, songs] = await Promise.all([
+  const [member, bands, members, songs, tags] = await Promise.all([
     getMemberBySlug(memberSlug),
     listBands(),
     listMembers(),
-    isDemoAssignments() ? Promise.resolve(sampleSongList()) : listSongs(),
+    isDemoAssignments()
+      ? Promise.resolve(applyDemoSongTags(sampleSongList()))
+      : listSongs(),
+    listSongTags(),
   ]);
   if (!member) return null;
   const memberBands = bands.filter((band) => band.memberIds.includes(member.id));
@@ -724,6 +730,7 @@ export async function getMemberAssignmentPage(memberSlug: string, bandId?: strin
     member,
     bands: memberBands,
     selectedBand,
+    tags,
     rows,
   };
 }

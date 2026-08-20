@@ -22,6 +22,7 @@ This is not the public marketing site and not the full band OS. It is a practica
 - Give every song a separate test mixer at `/songs/[songSlug]/player`.
 - Give administrators a live band assignment table at `/assignments`.
 - Give administrators a percentage-based timing workspace at `/songs/timing` for totaling arbitrary attributes across every song.
+- Let administrators create, rename, and delete reusable song tags, assign multiple tags per song, and let members filter their set list by tag.
 - Give every part a detail page at `/parts/[partSlug]`.
 - Upload audio, PDFs, videos, zip files, and related rehearsal files once.
 - Assign each uploaded asset to one or more parts for the song.
@@ -136,6 +137,7 @@ Part pages group by song and show only assets assigned to that part for that son
   title: string;
   slug: string;
   sortTitle: string;
+  tagIds: string[]; // references songTags documents; absent on legacy documents means []
   published: boolean; // absent on legacy documents means true
   notes?: string;
   instrumentOrder?: number;
@@ -165,6 +167,21 @@ Part pages group by song and show only assets assigned to that part for that son
 `timingDurationSeconds` is the whole-song length used by `/songs/timing`. The timing workspace can populate it from the original recording metadata or accept a manually entered `m:ss` value.
 
 Songs are published by default. An administrator can change the status from the song player without deleting the song document, stems, downloads, rehearsal assets, timing data, or band assignments. Unpublished songs remain visible to administrators but are omitted from public song and part lists, member set lists, and the read-only assignment board. A non-admin opening an unpublished song URL directly receives an unavailable state.
+
+The `/songs` page places song-tag management above the library for administrators. Administrators can create, rename, and delete tag definitions and use a multi-select on every song to assign any number of tags. Deleting a definition also removes its ID from every song without deleting the songs. Members see the tags used by their current set list at the top of `/members/[memberSlug]`; selecting more than one tag matches songs carrying any selected tag.
+
+### `songTags/{tagId}`
+
+```ts
+{
+  label: string;
+  sortLabel: string; // whitespace-normalized, lower-case label used for uniqueness and sorting
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+```
+
+Tag definitions and song assignments are publicly readable. Creating, renaming, deleting, and assigning tags are administrator-only operations enforced by Firestore rules. Tag names are limited to 40 characters and compared case-insensitively.
 
 ### `timingAttributes/{attributeId}`
 

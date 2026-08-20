@@ -74,6 +74,7 @@ import {
   type StoredLyricAlignment,
 } from "@/lib/lyric-alignment";
 import { samplePartRows, sampleSongBundle, sampleSongList } from "@/lib/sample-data";
+import { applyDemoSongTags, isSongTagDemoMode } from "@/lib/song-tags";
 
 function requireFirebase() {
   if (!db || !storage) {
@@ -89,6 +90,7 @@ function songFromDoc(id: string, data: Record<string, unknown>): Song {
     title: String(data.title ?? ""),
     slug: String(data.slug ?? ""),
     sortTitle: String(data.sortTitle ?? data.title ?? ""),
+    tagIds: Array.isArray(data.tagIds) ? data.tagIds.map(String) : [],
     published: data.published !== false,
     notes: typeof data.notes === "string" ? data.notes : undefined,
     instrumentOrder:
@@ -458,7 +460,9 @@ async function nextAvailableSongSlug(baseSlug: string, ignoredSongId?: string) {
 }
 
 export async function listSongs(): Promise<Song[]> {
-  if (!hasFirebaseConfig || !db) return sampleSongList();
+  if (isSongTagDemoMode() || !hasFirebaseConfig || !db) {
+    return applyDemoSongTags(sampleSongList());
+  }
 
   try {
     const firestore = db;
@@ -474,10 +478,10 @@ export function subscribeSongs(
   onSongs: (songs: Song[]) => void,
   onError: (error: Error) => void,
 ): Unsubscribe {
-  if (!hasFirebaseConfig || !db) {
+  if (isSongTagDemoMode() || !hasFirebaseConfig || !db) {
     let active = true;
     queueMicrotask(() => {
-      if (active) onSongs(sampleSongList());
+      if (active) onSongs(applyDemoSongTags(sampleSongList()));
     });
     return () => {
       active = false;
@@ -763,6 +767,7 @@ export async function createSong(title: string) {
     title: trimmedTitle,
     slug,
     sortTitle: sortTitle(trimmedTitle),
+    tagIds: [],
     published: true,
     instrumentAssignments: createEmptyInstrumentAssignments(),
     createdAt: serverTimestamp(),
