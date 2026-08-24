@@ -764,6 +764,7 @@ export function SongPlayerPageClient({
           <CardContent className="p-0">
             <SongMixerPlayer
               key={`${requestedMix ?? ""}:${requestedPart ?? ""}`}
+              songSlug={bundle.song.slug}
               tracks={visibleTracks}
               videos={bundle.videos}
               configurations={bundle.configurations}
@@ -777,6 +778,12 @@ export function SongPlayerPageClient({
               hasUnsavedOverrideChanges={hasUnsavedOverrideChanges}
               overrideSaveStatus={overrideSaveStatus}
               manageStemsAction={manageStemsAction}
+              downloadStemsAction={(
+                <StemDownloadsDialog
+                  songTitle={bundle.song.title}
+                  files={[...visibleTracks, ...bundle.downloads]}
+                />
+              )}
               onAutoSaveOverridesChange={changeAutoSaveOverrides}
               onSaveOverrides={() => void saveDraftOverrides()}
               onRevertOverrides={revertDraftOverrides}
@@ -810,12 +817,14 @@ export function SongPlayerPageClient({
         </Empty>
       )}
 
-      <div className="flex justify-center py-2 sm:justify-end">
-        <StemDownloadsDialog
-          songTitle={bundle.song.title}
-          files={[...visibleTracks, ...bundle.downloads]}
-        />
-      </div>
+      {!visibleTracks.length ? (
+        <div className="flex justify-center py-2 sm:justify-end">
+          <StemDownloadsDialog
+            songTitle={bundle.song.title}
+            files={[...visibleTracks, ...bundle.downloads]}
+          />
+        </div>
+      ) : null}
     </AppShell>
   );
 }

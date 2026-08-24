@@ -60,6 +60,7 @@ const SongMixerWaveform = dynamic(
 );
 
 export function SongMixerPlayer({
+  songSlug,
   tracks,
   videos,
   configurations,
@@ -73,6 +74,7 @@ export function SongMixerPlayer({
   hasUnsavedOverrideChanges,
   overrideSaveStatus,
   manageStemsAction,
+  downloadStemsAction,
   onAutoSaveOverridesChange,
   onSaveOverrides,
   onRevertOverrides,
@@ -83,6 +85,7 @@ export function SongMixerPlayer({
   onImportAnnotations,
   onAnnotationsChange,
 }: {
+  songSlug: string;
   tracks: SongMixerTrack[];
   videos: SongMixerVideo[];
   configurations: SongMixerConfiguration[];
@@ -96,6 +99,7 @@ export function SongMixerPlayer({
   hasUnsavedOverrideChanges: boolean;
   overrideSaveStatus: "idle" | "dirty" | "saving" | "saved" | "error";
   manageStemsAction?: ReactNode;
+  downloadStemsAction: ReactNode;
   onAutoSaveOverridesChange: (autoSave: boolean) => void;
   onSaveOverrides: () => void;
   onRevertOverrides: () => void;
@@ -361,6 +365,9 @@ export function SongMixerPlayer({
             </p>
           </div>
         </section>
+        <div className="flex justify-center border-t-2 bg-card p-3 sm:justify-end sm:p-4">
+          {downloadStemsAction}
+        </div>
       </div>
     );
   }
@@ -370,6 +377,7 @@ export function SongMixerPlayer({
       key={`${effectiveConfigurationId ?? "no-mix"}:${activeTracks
         .map((track) => track.id)
         .join(":")}`}
+      songSlug={songSlug}
       tracks={activeTracks}
       settings={settings}
       annotations={annotations}
@@ -377,6 +385,8 @@ export function SongMixerPlayer({
       partVideoAction={<SelectedPartVideoLinks videos={selectedPartVideos} />}
       mixId={mixId}
       selectedTrackId={effectiveSelectedTrackId}
+      selectedPartSlug={selectedPartSlug}
+      downloadStemsAction={downloadStemsAction}
       onSelectedTrackChange={selectTrackFromWaveform}
       onTrackOverridesChange={canSaveOverrides ? onTrackOverridesChange : undefined}
       canEditAnnotations={canEditAnnotations}

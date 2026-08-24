@@ -3,7 +3,9 @@
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
+  DownloadIcon,
   FileMusicIcon,
+  LoaderCircleIcon,
   PauseIcon,
   PlayIcon,
   PlusIcon,
@@ -41,8 +43,13 @@ import {
   usePlaylistState,
   useDragSensors,
 } from "@waveform-playlist/browser";
-import { useAudioTracks, type AudioTrackConfig } from "@waveform-playlist/browser/tone";
+import {
+  useAudioTracks,
+  useExportWav,
+  type AudioTrackConfig,
+} from "@waveform-playlist/browser/tone";
 import { AnnotationProvider } from "@waveform-playlist/annotations";
+import { toast } from "sonner";
 import { start as startTone } from "tone";
 
 import {
@@ -174,6 +181,7 @@ const MIXER_THEME = {
 };
 
 export function SongMixerWaveform({
+  songSlug,
   tracks: mixerTracks,
   settings,
   annotations,
@@ -181,6 +189,8 @@ export function SongMixerWaveform({
   partVideoAction,
   mixId,
   selectedTrackId,
+  selectedPartSlug,
+  downloadStemsAction,
   onSelectedTrackChange,
   onTrackOverridesChange,
   canEditAnnotations,
@@ -190,6 +200,7 @@ export function SongMixerWaveform({
   onImportAnnotations,
   onAnnotationsChange,
 }: {
+  songSlug: string;
   tracks: SongMixerTrack[];
   settings: SongMixerSettings;
   annotations: SongAnnotation[];
@@ -197,6 +208,8 @@ export function SongMixerWaveform({
   partVideoAction?: ReactNode;
   mixId: SongMixerMixId;
   selectedTrackId: string | null;
+  selectedPartSlug: string | null;
+  downloadStemsAction: ReactNode;
   onSelectedTrackChange: (trackId: string) => void;
   onTrackOverridesChange?: (trackId: string, stateOverrides: SongMixerStateOverrides) => void;
   canEditAnnotations: boolean;
@@ -233,6 +246,7 @@ export function SongMixerWaveform({
     () => new Map<string, { sourceUrl: string | undefined; message: string }>(),
   );
   const [engineError, setEngineError] = useState<string | null>(null);
+  const [mixStateSynchronizing, setMixStateSynchronizing] = useState(true);
   const [annotationPlaybackMode, setAnnotationPlaybackMode] =
     useState<AnnotationPlaybackMode>("normal");
   const waveformRootRef = useRef<HTMLDivElement>(null);
@@ -431,6 +445,7 @@ export function SongMixerWaveform({
             mixerTracks={loadedMixerTracks}
             selectedTrackId={selectedTrackId}
             waveformRootRef={waveformRootRef}
+            onSynchronizingChange={setMixStateSynchronizing}
           />
           <SuppressWaveformTrackSelection />
           <MixerSpacebarShortcut onPlaybackStartError={handleEngineError} />
@@ -524,10 +539,112 @@ export function SongMixerWaveform({
             </AdminAnnotationDragProvider>
           </TimelineNavigationSurface>
           {partAndMixControls}
+          <MixerDownloadActions
+            songSlug={songSlug}
+            selectedPartSlug={selectedPartSlug}
+            mixId={mixId}
+            mixStateSynchronizing={mixStateSynchronizing}
+            downloadStemsAction={downloadStemsAction}
+          />
         </AnnotationProvider>
       </WaveformPlaylistProvider>
     </>
   );
+}
+
+function MixerDownloadActions({
+  songSlug,
+  selectedPartSlug,
+  mixId,
+  mixStateSynchronizing,
+  downloadStemsAction,
+}: {
+  songSlug: string;
+  selectedPartSlug: string | null;
+  mixId: SongMixerMixId;
+  mixStateSynchronizing: boolean;
+  downloadStemsAction: ReactNode;
+}) {
+  const { isReady, tracks, trackStates } = usePlaylistData();
+  const { exportWav, isExporting, progress } = useExportWav();
+  const filename = songMixDownloadFilename(songSlug, selectedPartSlug, mixId);
+  const progressPercent = Math.round(progress * 100);
+
+  async function downloadMix() {
+    try {
+      const result = await exportWav(tracks, trackStates, {
+        filename,
+        mode: "master",
+        bitDepth: 16,
+        autoDownload: false,
+      });
+
+      downloadAudioBlob(result.blob, `${filename}.wav`);
+      toast.success("Mix downloaded", {
+        description: `${filename}.wav is ready for offline playback.`,
+      });
+    } catch (caught) {
+      toast.error("Mix could not be downloaded", {
+        description: caught instanceof Error ? caught.message : "Please try again.",
+      });
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap justify-center gap-2 border-t-2 bg-card p-3 sm:justify-end sm:p-4">
+      {downloadStemsAction}
+      <Button
+        type="button"
+        disabled={!isReady || !tracks.length || mixStateSynchronizing || isExporting}
+        onClick={() => void downloadMix()}
+        aria-label={
+          isExporting
+            ? `Preparing ${filename}.wav, ${progressPercent}% complete`
+            : `Download ${filename}.wav`
+        }
+      >
+        {isExporting ? (
+          <LoaderCircleIcon className="animate-spin" data-icon="inline-start" aria-hidden />
+        ) : (
+          <DownloadIcon data-icon="inline-start" aria-hidden />
+        )}
+        <span aria-live="polite">
+          {isExporting ? `Preparing ${progressPercent}%` : "Download This Mix"}
+        </span>
+      </Button>
+    </div>
+  );
+}
+
+function songMixDownloadFilename(
+  songSlug: string,
+  selectedPartSlug: string | null,
+  mixId: SongMixerMixId,
+) {
+  const mode = mixId === "listen" ? "basic" : mixId;
+  const part = mixId === "listen" ? null : filenameSegment(selectedPartSlug ?? "part");
+
+  return [filenameSegment(songSlug), part, mode].filter(Boolean).join("-");
+}
+
+function filenameSegment(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "mix";
+}
+
+function downloadAudioBlob(blob: Blob, filename: string) {
+  const blobUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = blobUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1_000);
 }
 
 type AnnotationDragData = {
@@ -2087,12 +2204,14 @@ function MixStateSynchronizer({
   mixerTracks,
   selectedTrackId,
   waveformRootRef,
+  onSynchronizingChange,
 }: {
   effectiveStates: Array<{ name: SongMixerStateName; values: SongMixerStateValues }>;
   mixId: SongMixerMixId;
   mixerTracks: SongMixerTrack[];
   selectedTrackId: string | null;
   waveformRootRef: RefObject<HTMLDivElement | null>;
+  onSynchronizingChange: (synchronizing: boolean) => void;
 }) {
   const playlistData = usePlaylistData();
   const { setTrackMute, setTrackPan, setTrackSolo, setTrackVolume } = usePlaylistControls();
@@ -2135,10 +2254,14 @@ function MixStateSynchronizer({
 
       let frame = 0;
       let actionIndex = 0;
+      onSynchronizingChange(actions.length > 0);
 
       const applyNextAction = () => {
         const action = actions[actionIndex];
-        if (!action) return;
+        if (!action) {
+          onSynchronizingChange(false);
+          return;
+        }
 
         applyControlAction(action);
         actionIndex += 1;

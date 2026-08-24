@@ -25,6 +25,7 @@ This is not the public marketing site and not the full band OS. It is a practica
 - Let administrators create, rename, and delete reusable song tags, assign multiple tags per song, and let members filter their set list by tag.
 - Give every part a detail page at `/parts/[partSlug]`.
 - Upload audio, PDFs, videos, zip files, and related rehearsal files once.
+- Let members render and download the currently audible mixer balance for offline practice.
 - Assign each uploaded asset to one or more parts for the song.
 - Let admins remove an asset from every assigned part and permanently delete its uploaded files.
 - Surface the same asset in multiple contexts without duplicate uploads.
@@ -43,7 +44,7 @@ This is not the public marketing site and not the full band OS. It is a practica
 - No complex role hierarchy beyond admin vs viewer.
 - No login-specific personalization; member pages are shareable read-only URLs.
 - No duplicate file uploads for the same chart/demo when one asset belongs to many parts.
-- No stem trimming, mix exporting, or PDF annotation tools. Waveform editing is limited to song-section annotation boundaries.
+- No stem trimming or PDF annotation tools. Waveform editing is limited to song-section annotation boundaries.
 
 ## 5. Routes
 
@@ -384,6 +385,8 @@ Mixer videos are uploaded as MP4 files through the same mixer upload drop zone, 
 
 Mixer downloads are MIDI or ZIP files uploaded through the mixer drop zone. They never enter a player mix or load into the audio engine. They appear alongside the available MP3 stems in the song's Download stems dialog, where members download files individually. Administrators can permanently remove them from the Downloads tab in the stem manager.
 
+After every active stem is loaded, members can render the currently audible Learn Part, Practice Part, or Basic Mix balance to a 16-bit WAV entirely in the browser. The export uses the live volume, pan, and mute state, including session-only viewer adjustments, and does not upload the rendered file to Firebase. Learn and Practice filenames combine the song slug, selected part slug, and mode, replacing underscores with hyphens, such as `california-girls-voc-2-practice.wav`; Basic Mix uses `{songSlug}-basic.wav`.
+
 ### `songs/global-mixer-defaults/mixerSettings/main`
 
 ```ts
@@ -688,6 +691,7 @@ v1 decision:
 - Changing player mixes downloads and decodes only the new mix's stems, and the selected-part menu contains only selectable stems in that mix.
 - An admin can hide a mixer stem without deleting it, reorder mixer stems, or permanently remove a stem without changing rehearsal assets.
 - An admin can upload MIDI and ZIP files as download-only mixer files. They never enter player mixes, but members can download them individually from the Download stems dialog.
+- Once every active stem is ready, a member can download the live Learn, Practice, or Basic balance as a 16-bit WAV whose filename identifies the song, selected part when applicable, and mode.
 - An admin can mark a stem as `BG mix`; it remains in playback and override editing but cannot appear in the selected-part menu or become the selected Learn/Practice stem.
 - An admin can create, update, resize, and delete non-overlapping song annotations, while a viewer can use annotation buttons to seek without editing them.
 - A viewer or administrator can choose NORMAL, LOOP, or STOP for selected-annotation playback. NORMAL plays through, LOOP returns to the annotation start, and STOP pauses at its end without blocking playback that starts or seeks beyond it.
