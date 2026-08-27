@@ -148,6 +148,9 @@ const MIXER_ZOOM_LEVELS = [
 const SELECTED_ANNOTATION_VIEWPORT_FILL = 0.6;
 const TIMELINE_ZOOM_DRAG_STEP = 36;
 const TIMELINE_PAN_MULTIPLIER = 2;
+const MASTER_OUTPUT_MIN_DB = -60;
+const MASTER_OUTPUT_MAX_DB = 0;
+const MASTER_OUTPUT_STORAGE_KEY = "swell-mixer-main-output-db";
 
 type LoadedPlaylistTrack = ReturnType<typeof useAudioTracks>["tracks"][number];
 
@@ -591,7 +594,8 @@ function MixerDownloadActions({
   }
 
   return (
-    <div className="flex flex-wrap justify-center gap-2 border-t-2 bg-card p-3 sm:justify-end sm:p-4">
+    <div className="flex flex-wrap items-end justify-center gap-2 border-t-2 bg-card p-3 sm:justify-end sm:p-4">
+      <MixerMasterOutputControl />
       {downloadStemsAction}
       <Button
         type="button"
@@ -612,6 +616,72 @@ function MixerDownloadActions({
           {isExporting ? `Preparing ${progressPercent}%` : "Download This Mix"}
         </span>
       </Button>
+    </div>
+  );
+}
+
+function MixerMasterOutputControl() {
+  const { masterVolume } = usePlaylistData();
+  const { setMasterVolume } = usePlaylistControls();
+  const masterOutputDb = gainToDecibels(masterVolume);
+  const storageReadyRef = useRef(false);
+
+  useEffect(() => {
+    if (!storageReadyRef.current) {
+      storageReadyRef.current = true;
+
+      try {
+        const storedValue = window.localStorage.getItem(MASTER_OUTPUT_STORAGE_KEY);
+        const storedDecibels = storedValue === null ? Number.NaN : Number(storedValue);
+
+        if (
+          Number.isFinite(storedDecibels)
+          && storedDecibels >= MASTER_OUTPUT_MIN_DB
+          && storedDecibels <= MASTER_OUTPUT_MAX_DB
+        ) {
+          setMasterVolume(decibelsToGain(storedDecibels));
+          return;
+        }
+      } catch {
+        // Storage can be unavailable in privacy-restricted browser contexts.
+      }
+    }
+
+    try {
+      window.localStorage.setItem(MASTER_OUTPUT_STORAGE_KEY, String(masterOutputDb));
+    } catch {
+      // Playback remains usable when the preference cannot be saved.
+    }
+  }, [masterOutputDb, setMasterVolume]);
+
+  return (
+    <div className="grid w-full gap-1.5 sm:mr-auto sm:w-72">
+      <label
+        htmlFor="mixer-master-output"
+        className="flex items-baseline justify-between gap-3 text-xs font-semibold"
+      >
+        <span>
+          Main output
+          <span className="ml-1.5 font-normal text-muted-foreground">Playback only</span>
+        </span>
+        <output className="font-mono tabular-nums">
+          {formatDecibels(masterOutputDb)}
+        </output>
+      </label>
+      <input
+        id="mixer-master-output"
+        type="range"
+        min={MASTER_OUTPUT_MIN_DB}
+        max={MASTER_OUTPUT_MAX_DB}
+        step={1}
+        value={masterOutputDb}
+        onChange={(event) => {
+          setMasterVolume(decibelsToGain(Number(event.currentTarget.value)));
+        }}
+        aria-valuetext={`${formatDecibels(masterOutputDb)} playback output`}
+        title="Playback only. Downloaded mixes keep their saved track levels."
+        className="swell-mixer-range h-6 w-full"
+      />
     </div>
   );
 }
@@ -2551,6 +2621,24 @@ function MixerTransport({
       </div>
     </section>
   );
+}
+
+function gainToDecibels(gain: number) {
+  if (!Number.isFinite(gain) || gain <= 0) return MASTER_OUTPUT_MIN_DB;
+
+  return clamp(
+    Math.round(20 * Math.log10(gain)),
+    MASTER_OUTPUT_MIN_DB,
+    MASTER_OUTPUT_MAX_DB,
+  );
+}
+
+function decibelsToGain(decibels: number) {
+  return 10 ** (clamp(decibels, MASTER_OUTPUT_MIN_DB, MASTER_OUTPUT_MAX_DB) / 20);
+}
+
+function formatDecibels(decibels: number) {
+  return `${decibels > 0 ? "+" : ""}${decibels} dB`;
 }
 
 function MixerSpacebarShortcut({
