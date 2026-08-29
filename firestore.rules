@@ -101,6 +101,10 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    match /contributionProjects/{projectId} {
+      allow read, create, update, delete: if isAdmin();
+    }
+
     match /lyricAlignments/{songSlug} {
       allow read: if true;
       allow create, update, delete: if isAdmin();

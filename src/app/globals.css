@@ -164,11 +164,6 @@
 @layer components {
   .swell-shell {
     background-color: var(--background);
-    background-image: url("/sand-bg.jpeg");
-    background-position: center;
-    background-size: cover;
-    background-repeat: no-repeat;
-    background-attachment: fixed;
   }
 
   .swell-header {

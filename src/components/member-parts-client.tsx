@@ -16,6 +16,18 @@ import { useAdmin } from "@/hooks/use-admin";
 import { getMemberAssignmentPage, type MemberAssignmentPageData } from "@/lib/assignments";
 import { isSongPublished, partLabel } from "@/lib/domain";
 
+function defaultTagIdsForPage(data: MemberAssignmentPageData | null) {
+  if (!data) return [];
+  const tagIdsUsedByPublishedSongs = new Set(
+    data.rows
+      .filter((row) => isSongPublished(row.song))
+      .flatMap((row) => row.song.tagIds),
+  );
+  return data.tags
+    .filter((tag) => tag.filteredByDefault && tagIdsUsedByPublishedSongs.has(tag.id))
+    .map((tag) => tag.id);
+}
+
 export function MemberPartsClient({ memberSlug }: { memberSlug: string }) {
   const admin = useAdmin();
   const [data, setData] = useState<MemberAssignmentPageData | null>(null);
@@ -29,7 +41,7 @@ export function MemberPartsClient({ memberSlug }: { memberSlug: string }) {
     try {
       const next = await getMemberAssignmentPage(memberSlug, bandId);
       setData(next);
-      setSelectedTagIds([]);
+      setSelectedTagIds(defaultTagIdsForPage(next));
       if (!next) setError("This member is not part of a saved band yet.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load these parts.");
@@ -44,6 +56,7 @@ export function MemberPartsClient({ memberSlug }: { memberSlug: string }) {
       .then((next) => {
         if (!active) return;
         setData(next);
+        setSelectedTagIds(defaultTagIdsForPage(next));
         if (!next) setError("This member is not part of a saved band yet.");
       })
       .catch((caught) => {

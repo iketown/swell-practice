@@ -27,9 +27,9 @@ interface DemoSongTagStore {
 function seedDemoStore(): DemoSongTagStore {
   return {
     tags: [
-      { id: "demo-up-tempo", label: "Up-tempo" },
-      { id: "demo-vocal-feature", label: "Vocal feature" },
-      { id: "demo-rehearsal-focus", label: "Rehearsal focus" },
+      { id: "demo-up-tempo", label: "Up-tempo", filteredByDefault: false },
+      { id: "demo-vocal-feature", label: "Vocal feature", filteredByDefault: false },
+      { id: "demo-rehearsal-focus", label: "Rehearsal focus", filteredByDefault: false },
     ],
     songTagIds: {
       "demo-california-girls": ["demo-up-tempo"],
@@ -61,7 +61,11 @@ function readDemoStore(): DemoSongTagStore {
       tags: Array.isArray(parsed.tags)
         ? parsed.tags.flatMap((tag) => (
             tag && typeof tag.id === "string" && typeof tag.label === "string"
-              ? [{ id: tag.id, label: tag.label }]
+              ? [{
+                  id: tag.id,
+                  label: tag.label,
+                  filteredByDefault: tag.filteredByDefault === true,
+                }]
               : []
           ))
         : seed.tags,
@@ -108,6 +112,7 @@ function tagFromDoc(id: string, data: Record<string, unknown>): SongTag {
   return {
     id,
     label: String(data.label ?? ""),
+    filteredByDefault: data.filteredByDefault === true,
   };
 }
 
@@ -164,6 +169,7 @@ export async function createSongTag(label: string): Promise<SongTag> {
     const tag = {
       id: `demo-${slugify(cleaned) || "tag"}-${Date.now()}`,
       label: cleaned,
+      filteredByDefault: false,
     };
     store.tags = sortTags([...store.tags, tag]);
     writeDemoStore(store);
@@ -174,31 +180,51 @@ export async function createSongTag(label: string): Promise<SongTag> {
   await setDoc(tagRef, {
     label: cleaned,
     sortLabel: sortLabel(cleaned),
+    filteredByDefault: false,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
-  return { id: tagRef.id, label: cleaned };
+  return { id: tagRef.id, label: cleaned, filteredByDefault: false };
 }
 
-export async function updateSongTag(tagId: string, label: string): Promise<SongTag> {
+export async function updateSongTag(tag: SongTag, label: string): Promise<SongTag> {
   const cleaned = validateLabel(label);
-  await ensureUniqueLabel(cleaned, tagId);
+  await ensureUniqueLabel(cleaned, tag.id);
 
   if (isSongTagDemoMode() || !db) {
     const store = readDemoStore();
     store.tags = sortTags(
-      store.tags.map((tag) => tag.id === tagId ? { ...tag, label: cleaned } : tag),
+      store.tags.map((item) => item.id === tag.id ? { ...item, label: cleaned } : item),
     );
     writeDemoStore(store);
-    return { id: tagId, label: cleaned };
+    return { ...tag, label: cleaned };
   }
 
-  await updateDoc(doc(db, "songTags", tagId), {
+  await updateDoc(doc(db, "songTags", tag.id), {
     label: cleaned,
     sortLabel: sortLabel(cleaned),
     updatedAt: serverTimestamp(),
   });
-  return { id: tagId, label: cleaned };
+  return { ...tag, label: cleaned };
+}
+
+export async function updateSongTagFilteredByDefault(
+  tagId: string,
+  filteredByDefault: boolean,
+) {
+  if (isSongTagDemoMode() || !db) {
+    const store = readDemoStore();
+    store.tags = store.tags.map((tag) => (
+      tag.id === tagId ? { ...tag, filteredByDefault } : tag
+    ));
+    writeDemoStore(store);
+    return;
+  }
+
+  await updateDoc(doc(db, "songTags", tagId), {
+    filteredByDefault,
+    updatedAt: serverTimestamp(),
+  });
 }
 
 export async function deleteSongTag(tagId: string) {

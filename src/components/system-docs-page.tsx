@@ -296,7 +296,7 @@ export function SystemDocsPage() {
           </div>
           <div className="mt-4 grid gap-3 rounded-lg bg-muted/45 p-4 md:grid-cols-2">
             <div><p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Cable barcode</p><p className="mt-1 text-sm">Code 128 encodes only the four digits, such as <code>0016</code>, so the bars remain wide enough to scan on the narrow cord label.</p></div>
-            <div><p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Printed title</p><p className="mt-1 text-sm">The sheet label combines the saved length, connector title, and ID, such as <code>6&apos; XLRM → TRSM 0016</code>.</p></div>
+            <div><p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">DYMO cable label</p><p className="mt-1 text-sm">The cable barrel label combines the saved length, connector title, and ID, such as <code>6&apos; XLRM → TRSM 0016</code>.</p></div>
           </div>
         </section>
 
@@ -690,6 +690,7 @@ Equipment research stores:
                   <ul className="grid gap-2 pl-5 text-sm leading-6 text-muted-foreground marker:text-primary">
                     <li>Phone flow: choose a destination, allow optional location access, scan continuously, and see immediate confirmation.</li>
                     <li>Manual flow: filter assets, select several, and check them in together. Every asset receives its own immutable event with a shared operation ID.</li>
+                    <li>Single-item container flow: confirm that the container is still at its current location, or choose another one. The dialog updates the container and then completes the pending item check-in automatically.</li>
                     <li>GPS is supporting context. The selected named location or container is the intentional fact.</li>
                     <li>Corrections add a corrective observation rather than rewriting the history.</li>
                   </ul>

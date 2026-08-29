@@ -1,0 +1,244 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-16T12:42:02Z",
+  "title": "Design System: The Swell Parts",
+  "extensions": {
+    "colorMeta": {
+      "soundcheck-teal": {
+        "role": "primary",
+        "displayName": "Soundcheck Teal",
+        "canonical": "oklch(0.488 0.077 213.3)",
+        "tonalRamp": ["oklch(0.15 0.077 213.3)", "oklch(0.27 0.077 213.3)", "oklch(0.39 0.077 213.3)", "oklch(0.51 0.077 213.3)", "oklch(0.63 0.077 213.3)", "oklch(0.75 0.077 213.3)", "oklch(0.87 0.077 213.3)", "oklch(0.95 0.077 213.3)"]
+      },
+      "soundcheck-teal-hover": {
+        "role": "primary",
+        "displayName": "Deep Soundcheck Teal",
+        "canonical": "oklch(0.43 0.08 213.3)",
+        "tonalRamp": ["oklch(0.15 0.08 213.3)", "oklch(0.27 0.08 213.3)", "oklch(0.39 0.08 213.3)", "oklch(0.51 0.08 213.3)", "oklch(0.63 0.08 213.3)", "oklch(0.75 0.08 213.3)", "oklch(0.87 0.08 213.3)", "oklch(0.95 0.08 213.3)"]
+      },
+      "sand-background": {
+        "role": "neutral",
+        "displayName": "Sand Background",
+        "canonical": "oklch(0.982 0.016 88)",
+        "tonalRamp": ["oklch(0.15 0.016 88)", "oklch(0.27 0.016 88)", "oklch(0.39 0.016 88)", "oklch(0.51 0.016 88)", "oklch(0.63 0.016 88)", "oklch(0.75 0.016 88)", "oklch(0.87 0.016 88)", "oklch(0.95 0.016 88)"]
+      },
+      "paper-surface": {
+        "role": "neutral",
+        "displayName": "Paper Surface",
+        "canonical": "oklch(0.992 0.009 88)",
+        "tonalRamp": ["oklch(0.15 0.009 88)", "oklch(0.27 0.009 88)", "oklch(0.39 0.009 88)", "oklch(0.51 0.009 88)", "oklch(0.63 0.009 88)", "oklch(0.75 0.009 88)", "oklch(0.87 0.009 88)", "oklch(0.95 0.009 88)"]
+      },
+      "espresso-ink": {
+        "role": "neutral",
+        "displayName": "Espresso Ink",
+        "canonical": "oklch(0.286 0.005 67.6)",
+        "tonalRamp": ["oklch(0.15 0.005 67.6)", "oklch(0.27 0.005 67.6)", "oklch(0.39 0.005 67.6)", "oklch(0.51 0.005 67.6)", "oklch(0.63 0.005 67.6)", "oklch(0.75 0.005 67.6)", "oklch(0.87 0.005 67.6)", "oklch(0.95 0.005 67.6)"]
+      },
+      "driftwood-text": {
+        "role": "neutral",
+        "displayName": "Driftwood Text",
+        "canonical": "oklch(0.51 0.026 61)",
+        "tonalRamp": ["oklch(0.15 0.026 61)", "oklch(0.27 0.026 61)", "oklch(0.39 0.026 61)", "oklch(0.51 0.026 61)", "oklch(0.63 0.026 61)", "oklch(0.75 0.026 61)", "oklch(0.87 0.026 61)", "oklch(0.95 0.026 61)"]
+      },
+      "dune-secondary": {
+        "role": "secondary",
+        "displayName": "Dune Secondary",
+        "canonical": "oklch(0.937 0.027 83.5)",
+        "tonalRamp": ["oklch(0.15 0.027 83.5)", "oklch(0.27 0.027 83.5)", "oklch(0.39 0.027 83.5)", "oklch(0.51 0.027 83.5)", "oklch(0.63 0.027 83.5)", "oklch(0.75 0.027 83.5)", "oklch(0.87 0.027 83.5)", "oklch(0.95 0.027 83.5)"]
+      },
+      "dune-secondary-hover": {
+        "role": "secondary",
+        "displayName": "Pressed Dune",
+        "canonical": "oklch(0.905 0.03 83.5)",
+        "tonalRamp": ["oklch(0.15 0.03 83.5)", "oklch(0.27 0.03 83.5)", "oklch(0.39 0.03 83.5)", "oklch(0.51 0.03 83.5)", "oklch(0.63 0.03 83.5)", "oklch(0.75 0.03 83.5)", "oklch(0.87 0.03 83.5)", "oklch(0.95 0.03 83.5)"]
+      },
+      "dune-muted": {
+        "role": "neutral",
+        "displayName": "Dune Muted",
+        "canonical": "oklch(0.951 0.02 83)",
+        "tonalRamp": ["oklch(0.15 0.02 83)", "oklch(0.27 0.02 83)", "oklch(0.39 0.02 83)", "oklch(0.51 0.02 83)", "oklch(0.63 0.02 83)", "oklch(0.75 0.02 83)", "oklch(0.87 0.02 83)", "oklch(0.95 0.02 83)"]
+      },
+      "driftwood-border": {
+        "role": "neutral",
+        "displayName": "Driftwood Border",
+        "canonical": "oklch(0.887 0.026 78)",
+        "tonalRamp": ["oklch(0.15 0.026 78)", "oklch(0.27 0.026 78)", "oklch(0.39 0.026 78)", "oklch(0.51 0.026 78)", "oklch(0.63 0.026 78)", "oklch(0.75 0.026 78)", "oklch(0.87 0.026 78)", "oklch(0.95 0.026 78)"]
+      },
+      "beach-glass-accent": {
+        "role": "secondary",
+        "displayName": "Beach Glass Accent",
+        "canonical": "oklch(0.819 0.069 214.8)",
+        "tonalRamp": ["oklch(0.15 0.069 214.8)", "oklch(0.27 0.069 214.8)", "oklch(0.39 0.069 214.8)", "oklch(0.51 0.069 214.8)", "oklch(0.63 0.069 214.8)", "oklch(0.75 0.069 214.8)", "oklch(0.87 0.069 214.8)", "oklch(0.95 0.069 214.8)"]
+      },
+      "coral-alert": {
+        "role": "tertiary",
+        "displayName": "Coral Alert",
+        "canonical": "oklch(0.718 0.179 35.2)",
+        "tonalRamp": ["oklch(0.15 0.179 35.2)", "oklch(0.27 0.179 35.2)", "oklch(0.39 0.179 35.2)", "oklch(0.51 0.179 35.2)", "oklch(0.63 0.179 35.2)", "oklch(0.75 0.179 35.2)", "oklch(0.87 0.179 35.2)", "oklch(0.95 0.179 35.2)"]
+      },
+      "cable-gold": {
+        "role": "tertiary",
+        "displayName": "Cable Gold",
+        "canonical": "oklch(0.81 0.148 78.6)",
+        "tonalRamp": ["oklch(0.15 0.148 78.6)", "oklch(0.27 0.148 78.6)", "oklch(0.39 0.148 78.6)", "oklch(0.51 0.148 78.6)", "oklch(0.63 0.148 78.6)", "oklch(0.75 0.148 78.6)", "oklch(0.87 0.148 78.6)", "oklch(0.95 0.148 78.6)"]
+      },
+      "confirmation-green": {
+        "role": "tertiary",
+        "displayName": "Confirmation Green",
+        "canonical": "oklch(0.75 0.25 142)",
+        "tonalRamp": ["oklch(0.15 0.25 142)", "oklch(0.27 0.25 142)", "oklch(0.39 0.25 142)", "oklch(0.51 0.25 142)", "oklch(0.63 0.25 142)", "oklch(0.75 0.25 142)", "oklch(0.87 0.25 142)", "oklch(0.95 0.25 142)"]
+      },
+      "part-coral": {
+        "role": "tertiary",
+        "displayName": "Part Coral",
+        "canonical": "oklch(0.655 0.226 34.5)",
+        "tonalRamp": ["oklch(0.15 0.226 34.5)", "oklch(0.27 0.226 34.5)", "oklch(0.39 0.226 34.5)", "oklch(0.51 0.226 34.5)", "oklch(0.63 0.226 34.5)", "oklch(0.75 0.226 34.5)", "oklch(0.87 0.226 34.5)", "oklch(0.95 0.226 34.5)"]
+      },
+      "part-sun": {
+        "role": "tertiary",
+        "displayName": "Part Sun",
+        "canonical": "oklch(0.891 0.183 96.2)",
+        "tonalRamp": ["oklch(0.15 0.183 96.2)", "oklch(0.27 0.183 96.2)", "oklch(0.39 0.183 96.2)", "oklch(0.51 0.183 96.2)", "oklch(0.63 0.183 96.2)", "oklch(0.75 0.183 96.2)", "oklch(0.87 0.183 96.2)", "oklch(0.95 0.183 96.2)"]
+      },
+      "part-lime": {
+        "role": "tertiary",
+        "displayName": "Part Lime",
+        "canonical": "oklch(0.767 0.167 125.1)",
+        "tonalRamp": ["oklch(0.15 0.167 125.1)", "oklch(0.27 0.167 125.1)", "oklch(0.39 0.167 125.1)", "oklch(0.51 0.167 125.1)", "oklch(0.63 0.167 125.1)", "oklch(0.75 0.167 125.1)", "oklch(0.87 0.167 125.1)", "oklch(0.95 0.167 125.1)"]
+      },
+      "part-sky": {
+        "role": "tertiary",
+        "displayName": "Part Sky",
+        "canonical": "oklch(0.764 0.112 228.8)",
+        "tonalRamp": ["oklch(0.15 0.112 228.8)", "oklch(0.27 0.112 228.8)", "oklch(0.39 0.112 228.8)", "oklch(0.51 0.112 228.8)", "oklch(0.63 0.112 228.8)", "oklch(0.75 0.112 228.8)", "oklch(0.87 0.112 228.8)", "oklch(0.95 0.112 228.8)"]
+      },
+      "part-purple": {
+        "role": "tertiary",
+        "displayName": "Part Purple",
+        "canonical": "oklch(0.401 0.138 304.1)",
+        "tonalRamp": ["oklch(0.15 0.138 304.1)", "oklch(0.27 0.138 304.1)", "oklch(0.39 0.138 304.1)", "oklch(0.51 0.138 304.1)", "oklch(0.63 0.138 304.1)", "oklch(0.75 0.138 304.1)", "oklch(0.87 0.138 304.1)", "oklch(0.95 0.138 304.1)"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Song Display", "purpose": "Large song and member identity only." },
+      "display-outline": { "displayName": "Part Display", "purpose": "Large outlined part identity only." },
+      "headline": { "displayName": "Task Headline", "purpose": "Primary headings in administrative and gear workflows." },
+      "title": { "displayName": "Section Title", "purpose": "Panel, list-group, and section headings." },
+      "body": { "displayName": "Working Body", "purpose": "Instructions, explanations, forms, and general interface copy." },
+      "label": { "displayName": "Wayfinding Label", "purpose": "Uppercase kickers and compact status context." },
+      "mono": { "displayName": "Inventory Mono", "purpose": "IDs, codes, times, measurements, and machine-readable values." }
+    },
+    "shadows": [
+      { "name": "control-xs", "value": "1px 1px 0 0 var(--border)", "purpose": "Tiny controls and the lightest pressed affordances." },
+      { "name": "control-sm", "value": "2px 2px 0 0 var(--border)", "purpose": "Default tabs, compact buttons, and small floating tools." },
+      { "name": "control-md", "value": "4px 4px 0 0 var(--border)", "purpose": "Primary buttons and intentionally tactile cards at rest." },
+      { "name": "control-lg", "value": "6px 6px 0 0 var(--border)", "purpose": "Rare high-emphasis controls only." },
+      { "name": "panel-ambient", "value": "0 16px 38px -34px var(--swell-espresso)", "purpose": "Large paper panels on the solid sand working surface." }
+    ],
+    "motion": [
+      { "name": "state-standard", "value": "200ms cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Button, panel, and selection state changes." },
+      { "name": "state-fast", "value": "140ms cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Cable and connector hover feedback." },
+      { "name": "state-medium", "value": "180ms cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Workspace focus, waveform emphasis, and canvas feedback." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "workspace-stack", "value": "900px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "workspace-compact", "value": "1180px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The tactile teal action used for the next meaningful step.",
+      "html": "<button class=\"ds-btn-primary\">Save changes</button>",
+      "css": ".ds-btn-primary { background: var(--primary, #1B6B7A); color: var(--primary-foreground, #FFFCF6); border: 2px solid var(--foreground, #2C2A28); border-radius: 5px; padding: 6px 16px; font: 500 16px/24px var(--font-geist-sans, sans-serif); box-shadow: 4px 4px 0 0 var(--border, #E3D8C7); transition: transform 200ms cubic-bezier(0.22,1,0.36,1), background-color 200ms cubic-bezier(0.22,1,0.36,1), box-shadow 200ms cubic-bezier(0.22,1,0.36,1); } .ds-btn-primary:hover { background: var(--primary-hover, #005B6A); transform: translateY(1px); box-shadow: 2px 2px 0 0 var(--border, #E3D8C7); } .ds-btn-primary:active { transform: translate(1px,2px); box-shadow: none; } .ds-btn-primary:focus-visible { outline: 2px solid var(--primary, #1B6B7A); outline-offset: 2px; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "A secondary action with the same tactile structure and a quiet transparent fill.",
+      "html": "<button class=\"ds-btn-outline\">Create location</button>",
+      "css": ".ds-btn-outline { background: transparent; color: var(--foreground, #2C2A28); border: 2px solid var(--foreground, #2C2A28); border-radius: 5px; padding: 6px 16px; font: 500 16px/24px var(--font-geist-sans, sans-serif); box-shadow: 4px 4px 0 0 var(--border, #E3D8C7); transition: transform 200ms cubic-bezier(0.22,1,0.36,1), background-color 200ms cubic-bezier(0.22,1,0.36,1), box-shadow 200ms cubic-bezier(0.22,1,0.36,1); } .ds-btn-outline:hover { background: var(--accent, #8FD0E0); transform: translateY(1px); box-shadow: 2px 2px 0 0 var(--border, #E3D8C7); } .ds-btn-outline:active { transform: translate(1px,2px); box-shadow: none; } .ds-btn-outline:focus-visible { outline: 2px solid var(--primary, #1B6B7A); outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "A compact field that stays visually quiet until focus or validation requires attention.",
+      "html": "<input class=\"ds-input\" value=\"Search songs\" aria-label=\"Search songs\">",
+      "css": ".ds-input { width: 100%; height: 32px; background: transparent; color: var(--foreground, #2C2A28); border: 1px solid var(--input, #E3D8C7); border-radius: 8px; padding: 4px 10px; font: 400 14px/20px var(--font-geist-sans, sans-serif); outline: none; transition: border-color 200ms cubic-bezier(0.22,1,0.36,1), box-shadow 200ms cubic-bezier(0.22,1,0.36,1); } .ds-input:hover { border-color: var(--muted-foreground, #726357); } .ds-input:focus-visible { border-color: var(--ring, #1B6B7A); box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring, #1B6B7A) 50%, transparent); }"
+    },
+    {
+      "name": "Active Navigation Tab",
+      "kind": "nav",
+      "refersTo": "nav-active",
+      "description": "The active location in the app shell, reversed to espresso for unmistakable wayfinding.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item ds-nav-item-active\" href=\"#\">Songs</a><a class=\"ds-nav-item\" href=\"#\">Members</a></nav>",
+      "css": ".ds-nav { display: flex; gap: 8px; } .ds-nav-item { background: var(--card, #FFFCF6); color: var(--foreground, #2C2A28); border: 1px solid var(--border, #E3D8C7); border-radius: 6.4px; padding: 8px 16px; font: 600 14px/20px var(--font-geist-sans, sans-serif); text-decoration: none; transition: transform 200ms cubic-bezier(0.22,1,0.36,1), background-color 200ms cubic-bezier(0.22,1,0.36,1), border-color 200ms cubic-bezier(0.22,1,0.36,1); } .ds-nav-item:hover { background: var(--muted, #F5EEE0); border-color: var(--primary, #1B6B7A); } .ds-nav-item:focus-visible { outline: 2px solid var(--ring, #1B6B7A); outline-offset: 2px; } .ds-nav-item:active { transform: translateY(1px); } .ds-nav-item-active { background: var(--foreground, #2C2A28); color: var(--background, #FEF9ED); border-color: var(--foreground, #2C2A28); }"
+    },
+    {
+      "name": "Secondary Badge",
+      "kind": "chip",
+      "refersTo": "badge-secondary",
+      "description": "A compact dune-colored label for state, count, or category context.",
+      "html": "<span class=\"ds-badge\">Available now</span>",
+      "css": ".ds-badge { display: inline-flex; height: 20px; align-items: center; justify-content: center; background: var(--secondary, #F3E9D6); color: var(--secondary-foreground, #2C2A28); border: 1px solid transparent; border-radius: 999px; padding: 2px 8px; font: 500 12px/16px var(--font-geist-sans, sans-serif); } .ds-badge:hover { background: color-mix(in oklch, var(--secondary, #F3E9D6) 80%, transparent); } .ds-badge:focus-visible { outline: 3px solid color-mix(in oklch, var(--ring, #1B6B7A) 50%, transparent); outline-offset: 1px; }"
+    },
+    {
+      "name": "Working Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "The paper-like task surface that rests quietly on solid sand.",
+      "html": "<section class=\"ds-panel\"><p class=\"ds-kicker\">Assignment board</p><h2>Who sings this part?</h2><p>Show the effective answer first, then explain the exception.</p></section>",
+      "css": ".ds-panel { background: color-mix(in oklch, var(--card, #FFFCF6) 92%, transparent); color: var(--card-foreground, #2C2A28); border: 1px solid var(--border, #E3D8C7); border-radius: 8px; padding: 20px; box-shadow: 0 16px 38px -34px var(--swell-espresso, #47302A); font: 400 16px/24px var(--font-geist-sans, sans-serif); } .ds-panel h2 { margin: 4px 0 8px; font-size: 24px; line-height: 30px; letter-spacing: -0.025em; } .ds-panel p { margin: 0; max-width: 68ch; } .ds-panel:hover { border-color: color-mix(in oklch, var(--primary, #1B6B7A), var(--border, #E3D8C7) 62%); } .ds-panel:focus-within { box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring, #1B6B7A) 24%, transparent), 0 16px 38px -34px var(--swell-espresso, #47302A); } .ds-kicker { color: var(--muted-foreground, #726357); font-size: 12px; font-weight: 600; line-height: 16px; letter-spacing: 0.08em; text-transform: uppercase; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Working Set List",
+    "overview": "The Swell Parts feels like a dependable set list laid open on a bright rehearsal table near the water. The working surface is a solid sandy neutral, never a photographic texture. Pale ocean color in the header, muted teal actions, the striped Swell logo, and occasional coral or gold cues carry the beach character without turning the product into a themed novelty.\n\nThis is a compact internal tool used under time pressure. Familiar controls, predictable grids, clear labels, and strong selected states take priority over ornament. Members should reach the effective answer quickly; administrators can handle denser planning views, but the interface must remain warm and legible.\n\nThe system explicitly rejects a generic SaaS analytics dashboard, a decorative music-festival aesthetic, and a dense enterprise staffing system. It also rejects the old photographic sand background, which made a modern working tool feel like an early personal website.",
+    "keyCharacteristics": [
+      "Solid sand working surfaces with pale ocean structure",
+      "Dark espresso text and restrained soundcheck teal actions",
+      "Compact, familiar controls with tactile offset shadows",
+      "Londrina display type reserved for song, member, and part identity",
+      "Geist for every working label, control, table, and explanation",
+      "Responsive layouts that stack structurally rather than shrinking typography"
+    ],
+    "rules": [
+      { "name": "The Solid Sand Rule", "body": "Page backgrounds are a single sandy color. Never use a beach photograph, faux-paper texture, repeating pattern, or parallax background.", "section": "colors" },
+      { "name": "The One Ocean Rule", "body": "Soundcheck teal is reserved for actions, current selection, focus, and meaningful state. Decorative teal fields are prohibited.", "section": "colors" },
+      { "name": "The Labeled Color Rule", "body": "Coral, gold, green, and the part spectrum always travel with text, iconography, position, or shape. Color alone never carries meaning.", "section": "colors" },
+      { "name": "The Working Type Rule", "body": "Geist is mandatory for controls, navigation, form labels, data, and status text. Display type never enters the working interface.", "section": "typography" },
+      { "name": "The Poster Type Boundary Rule", "body": "Londrina appears only at large scale for a song, member, or part identity. If it fits comfortably inside a button or table cell, it is being used incorrectly.", "section": "typography" },
+      { "name": "The Pressed Object Rule", "body": "A tactile control moves down and loses shadow when pressed. It never grows, bounces, or glows decoratively.", "section": "elevation" },
+      { "name": "The Flat Content Rule", "body": "Lists and data regions remain flat by default. Borders and spacing establish hierarchy before a shadow is added.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use the solid Sand Background for every full-page working surface.",
+      "Do let the pale ocean header, soundcheck teal actions, striped logo, and warm state accents create the beach atmosphere.",
+      "Do keep primary prose within roughly 65 to 75 characters per line and use compact data layouts where scanning benefits from density.",
+      "Do preserve 44-pixel touch targets where practical, visible keyboard focus, reduced-motion behavior, and semantic labels.",
+      "Do show the effective answer first, then explain whether it came from a default, override, direct check-in, or inherited container.",
+      "Do make missing coverage unmistakable with text or icon cues in addition to color.",
+      "Do use predictable grids and stack columns structurally on small screens."
+    ],
+    "donts": [
+      "Don't use the sand photograph or any background texture. It reads as Web 1.0 and competes with the work.",
+      "Don't turn the product into a generic SaaS analytics dashboard.",
+      "Don't use a decorative music-festival aesthetic.",
+      "Don't build a dense enterprise staffing system.",
+      "Don't turn the assignment workflow into a spreadsheet full of repeated records.",
+      "Don't hide coverage behind ornamental cards.",
+      "Don't use gradient text, decorative glassmorphism, or colored side-stripe borders thicker than one pixel.",
+      "Don't use display fonts in labels, buttons, tables, navigation, or data.",
+      "Don't add decorative motion, orchestrated page-load sequences, bounce, or elastic easing.",
+      "Don't use heavy color on inactive states or introduce a second competing action accent."
+    ]
+  }
+}

@@ -22,6 +22,7 @@ This is not the public marketing site and not the full band OS. It is a practica
 - Give every song a separate test mixer at `/songs/[songSlug]/player`.
 - Give administrators a live band assignment table at `/assignments`.
 - Give administrators a percentage-based timing workspace at `/songs/timing` for totaling arbitrary attributes across every song.
+- Give administrators a project contribution workspace that weights steps, tracks dependencies, and rolls contributor shares up in hours and percent.
 - Let administrators create, rename, and delete reusable song tags, assign multiple tags per song, and let members filter their set list by tag.
 - Give every part a detail page at `/parts/[partSlug]`.
 - Upload audio, PDFs, videos, zip files, and related rehearsal files once.
@@ -57,6 +58,7 @@ This is not the public marketing site and not the full band OS. It is a practica
 | `/assignments` | Canonical band-aware live arrangement table with member-ordered instrument and vocal assignments, multi-instrument Trax assignments, original-recording playback, and stem-player shortcuts. |
 | `/songs/inst` | Compatibility redirect to `/assignments`. |
 | `/songs/timing` | All-song timeline workspace for assigning arbitrary attributes to percentage ranges and totaling their seconds across the library. |
+| `/projects` | Admin project contribution workspace with tag filtering, required weighted steps, dependency blocking, contributor splits, duplication, and composite hour/percentage rollups. |
 | `/songs/align` | Admin lyric-alignment library and create flow for a title, pasted lyrics, and source MP3. |
 | `/songs/align/[songSlug]` | Song-specific lyric timing editor with ElevenLabs forced alignment, waveform auditioning, autosave, and source resets. |
 | `/parts/[partSlug]` | Part page showing every song that has assets assigned to that part. |
@@ -169,7 +171,7 @@ Part pages group by song and show only assets assigned to that part for that son
 
 Songs are published by default. An administrator can change the status from the song player without deleting the song document, stems, downloads, rehearsal assets, timing data, or band assignments. Unpublished songs remain visible to administrators but are omitted from public song and part lists, member set lists, and the read-only assignment board. A non-admin opening an unpublished song URL directly receives an unavailable state.
 
-The `/songs` page places song-tag management above the library for administrators. Administrators can create, rename, and delete tag definitions and use a multi-select on every song to assign any number of tags. Deleting a definition also removes its ID from every song without deleting the songs. Members see the tags used by their current set list at the top of `/members/[memberSlug]`; selecting more than one tag matches songs carrying any selected tag.
+The `/songs` page places song-tag management above the library for administrators. Administrators can create, rename, and delete tag definitions, mark one or more tags as filtered by default, and use a multi-select on every song to assign any number of tags. Deleting a definition also removes its ID from every song without deleting the songs. Members see the tags used by their current set list at the top of `/members/[memberSlug]`; selecting more than one tag matches songs carrying any selected tag. On initial page or band load, used tags marked as defaults begin selected. Members can still clear those defaults or choose any other filter combination.
 
 ### `songTags/{tagId}`
 
@@ -177,6 +179,7 @@ The `/songs` page places song-tag management above the library for administrator
 {
   label: string;
   sortLabel: string; // whitespace-normalized, lower-case label used for uniqueness and sorting
+  filteredByDefault: boolean; // absent on legacy documents means false
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -1429,7 +1432,7 @@ Machine-readable labels preserve the same identity as an optional fallback. A Co
 
 Every asset can use either of two portrait 1 × 1.5 inch label designs on the DYMO LabelWriter 450 Turbo. This physical format is called the **gear label** for non-cables and the **cable barrel label** for cables. Non-cable gear defaults to QR; cables default to Barcode, and the administrator can switch either asset to the other design before printing. Both begin below a 4.5 mm blank leading-edge safe zone so the printer does not clip the artwork when the roll registers slightly before the printable label face. The QR design places a large level-Q QR code below the number and encodes the full canonical URL `https://theswell.live/g/{four-digit-code}` with the standard four-module quiet zone so the iPhone Camera app can recognize it, tolerate modest label damage, and open the check-in page directly. Regular 2.25 mm Arial `www.TheSwell.live` marks run vertically from the divider toward the bottom along both sides, with bold applied only to `TheSwell` and both `www.` and `.live` reduced to 1.85 mm. They are inset 1.25 mm from the label edges with each line's baseline facing its nearest outside edge, and they stay outside the QR quiet zone. The Barcode design begins with an 18.5 mm-tall numeric Code 128C barcode that encodes only the four digits. It expands across the full 1-inch axis, including the required 10-module quiet zones, so the label can wrap around a cable-end barrel along its 1.5-inch axis without bending the barcode across its width; the extra bar height preserves a larger readable slice when a thin barrel wraps over part of it. A spaced four-digit ID follows the barcode. On cables, the formatted length occupies its own larger bold line, the end types fit on one smaller condensed line, and horizontal `www.TheSwell.live` text closes the centered bottom block. Non-cable barcode labels retain their compact asset-name treatment. Printing uses a 25.4 × 38.1 mm page at 100% scale with zero margins.
 
-Implementation status, 2026-08-06: `/gear` supports batched cable labels on MR610-MAC Letter-size self-laminating stock. The asset editor always offers the canonical `Cables` inventory tag, and only assets carrying that tag are eligible for the sheet-label queue. A compact queue button and pending-label count remain on the Assets tab; the full placement, calibration, print-order, and printing interface opens in a wide scrollable dialog so it does not consume page space between uses. Administrators queue those cable records in print order, choose any of the sheet's 4 rows and 8 columns as the first unused cell, and print the queue across cells in row-major order. Only the 1.00 × 0.752 inch upper box receives ink. Its selected centered hierarchy uses a 15.5 pt four-digit ID, a separate 12.2 pt bold length, end types on one condensed line at up to 7.2 pt, and `www.TheSwell.live` at 7.3 pt with only `TheSwell` bold. The whole block aligns against the laminate boundary, leaving the 1.50 inch laminate below blank. These self-laminating cable labels intentionally omit a machine-readable code; their large printed number supports rapid spoken or numeric check-in, while the separate 1 × 1.5 inch cable barrel label retains the tall Code 128 barcode. The print tool includes a plain-paper alignment sheet plus saved horizontal and vertical millimeter offsets so a specific printer can be calibrated without changing code.
+All gear and cable labels print individually through the asset editor on the DYMO LabelWriter 450 Turbo. `/gear` does not maintain a cable-label queue or provide Letter-size sheet-label printing.
 
 Owners and setup providers use one open-ended `Party` registry rather than hardcoded enums. A party can be a band member, hired musician, venue, backline company, or other person or organization. The same party can own physical assets and be responsible for supplying them to a setup.
 
@@ -1478,7 +1481,7 @@ Moving a container does not create fake direct-scan events for every child. Chil
 
 Containers may nest, such as pouch to duffle to car. The system rejects containment cycles and initially limits nesting depth to keep resolution and descendant updates predictable.
 
-Before any item can be checked into a container, that container must receive a fresh direct check-in to a named location. The confirmation surface leads with its current effective location and observation age, offers recently used locations, and provides full location search. A container destination older than the confirmation window is rejected by the repository as well as blocked by the UI. This prevents a newly packed item from inheriting a stale location snapshot.
+Before any item can be checked into a container, that container must receive a fresh direct check-in to a named location. In single-item check-in, submitting a container destination advances to an intermediate confirmation instead of surfacing the repository safeguard as an error. The dialog asks whether the container is still at its current effective location. **Yes, continue** records a fresh container check-in and then automatically finishes the pending item check-in. **No, choose another location** opens location search, updates the container, and then finishes the same pending item check-in. Batch and packing confirmation surfaces lead with the current effective location and observation age, offer recently used locations, and provide full location search. The repository still rejects an unconfirmed or stale container as a final integrity safeguard. This prevents newly packed gear from inheriting a stale location snapshot without turning confirmation into a dead end.
 
 ### 18.7 Check-In Events and Location History
 
@@ -1649,6 +1652,53 @@ Every free connector in a connected set can be marked **Input in SIGNAL**, **Out
 
 Within one setup, an `inventoryAsset` may fulfill only one equipment node. The invariant applies to every individually reserved lifecycle state, including planned, cart, ordered, in transit, awaiting check-in, and active. The node editor identifies assets already assigned elsewhere and requires explicit confirmation before transferring one; graph persistence rejects any duplicate asset IDs that remain as a final integrity check. Two required units therefore require two distinct asset records, even before purchase.
 
-Current receiving supports manual single-item check-in, individual QR landing-page check-in, and an authenticated multi-item session with Voice, Number, and Camera modes. Each session locks one named `gearLocation` or freshly confirmed container, suppresses repeat IDs, shares one `operationId`, and ends with a checked-in item summary. Voice mode incrementally parses browser speech-recognition or iPhone keyboard-dictation text into a local, inventory-resolved confirmation queue; only the green row action appends the `manual_bulk` event. Number mode offers a persistent numeric field and large Enter button with automatic zero padding. Submitting clears the current digits immediately without disabling or blurring the field, keeps the phone keyboard open, and queues rapid check-ins in entry order so an operator can type `2`, Enter, `34`, Enter, `21`, Enter without touching the field between items. Camera mode decodes Swell QR URLs plus bare Data Matrix, Code 128, or Code 39 asset tags on the device and appends `qr_camera` events. Printable cable-label sheets, actual container inheritance, nested location chains, the Pack a Bag search/camera workflow, container-level expected contents, and missing/unexpected comparison are implemented; manual bulk selection and discrepancy-correction workflows remain later slices built on the same append-only event model.
+Current receiving supports manual single-item check-in, individual QR landing-page check-in, and an authenticated multi-item session with Voice, Number, and Camera modes. Each session locks one named `gearLocation` or freshly confirmed container, suppresses repeat IDs, shares one `operationId`, and ends with a checked-in item summary. Voice mode incrementally parses browser speech-recognition or iPhone keyboard-dictation text into a local, inventory-resolved confirmation queue; only the green row action appends the `manual_bulk` event. Number mode offers a persistent numeric field and large Enter button with automatic zero padding. Submitting clears the current digits immediately without disabling or blurring the field, keeps the phone keyboard open, and queues rapid check-ins in entry order so an operator can type `2`, Enter, `34`, Enter, `21`, Enter without touching the field between items. Camera mode decodes Swell QR URLs plus bare Data Matrix, Code 128, or Code 39 asset tags on the device and appends `qr_camera` events. Individual DYMO cable-label printing, actual container inheritance, nested location chains, the Pack a Bag search/camera workflow, container-level expected contents, and missing/unexpected comparison are implemented; manual bulk selection and discrepancy-correction workflows remain later slices built on the same append-only event model.
 
 Checking in any member of a connected set appends one immutable check-in event for every member with the same operation ID, destination, method, actor, coordinates, and notes. Each member still has its own history and latest-location snapshot. The check-in UI previews the other permanent IDs that will move with the scanned or selected item, and successful batch, QR, and single-item check-ins report all affected IDs.
+
+## 19. Project Contribution Planning
+
+`/projects` is an authenticated-administrator-only workspace for estimating how much each contributor supplies to a self-contained project. The route redirects signed-out and non-admin visitors before reading project data, and its primary-navigation entry is rendered only for a signed-in administrator. The `?demo=1` compatibility flag does not grant access to this workspace. A project begins with Ike, Cron, and Josh, but stores its own open-ended contributor list so another person can be added without changing the global member or band models. Projects may be marked one-off, ongoing, or complete and may be duplicated with their complete structure and allocations as the starting point for similar work. Each project can store up to 12 tags; tags are trimmed, compared case-insensitively for duplicates, copied with duplicated projects, and exposed as multi-select project filters. Selecting multiple tags matches a project with any selected tag.
+
+Every project is composed of steps; there is no direct-allocation mode or steps toggle. The project accordion stores a weight for each step in one of two modes:
+
+- **Hours:** each step's hours are divided by the sum of all step hours to derive its project weight. The hour total is the project's total estimated time.
+- **Percent:** entered weights remain literal and should total 100%. A separate project-hour estimate is optional but required to convert the composite percentages into hour totals.
+
+Every step independently chooses contributor hours or contributor percentages. Contributor hours define relative shares and normalize automatically. For example, 5, 5, and 10 hours become 25%, 25%, and 50%, even when the weighted step itself represents 15 project hours; those normalized shares receive 3.75, 3.75, and 7.5 hours of the project total. Entered contributor percentages remain literal and the interface warns when they do not total 100%.
+
+Each step stores one workflow status: planning, in progress, or done. It may optionally depend on another project or on a step in this or another project. A project dependency is satisfied only when the target project is Complete; a step dependency is satisfied only when the target step's effective status is Done. Until then, the dependent step's effective status is Blocked. Missing targets and dependency cycles also remain visibly blocked. A blocked step cannot be marked Done. Internal step dependencies are remapped to the duplicated steps when a whole project is duplicated; external dependencies continue pointing to their original targets.
+
+The composite contributor share is the sum of each step's project-weight fraction multiplied by that step's contributor fraction. Composite hours equal the project-hour total multiplied by the composite contributor share. An allocation below or above 100% remains visible as incomplete or over-allocated instead of being silently normalized.
+
+### 19.1 Firestore Data Model
+
+Each project remains one independently duplicable document:
+
+```ts
+// contributionProjects/{projectId}
+{
+  title: string;
+  status: "one_off" | "ongoing" | "complete";
+  tags: string[];
+  contributors: Array<{ id: string; name: string }>;
+  weightMode: "hours" | "percent";
+  projectHours: number | null;
+  steps: Array<{
+    id: string;
+    title: string;
+    status: "planning" | "in_progress" | "done";
+    dependency:
+      | { kind: "project"; projectId: string }
+      | { kind: "step"; projectId: string; stepId: string }
+      | null;
+    weightValue: number;
+    contributorMode: "hours" | "percent";
+    contributorValues: Record<string, number>;
+  }>;
+  createdAt: number;
+  updatedAt: Timestamp;
+}
+```
+
+The collection is readable and writable only by authenticated administrators. Existing documents migrate in memory when read: legacy sub-project arrays become steps, and a legacy direct allocation becomes one `Project work` step so its contributor split is preserved. The next save writes only the canonical steps model. When Firebase is not configured, the repository retains a browser-local worked example for development, but the route still requires a signed-in administrator before it will render or read project data.

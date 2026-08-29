@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Combobox,
   ComboboxChip,
@@ -40,12 +41,14 @@ export function SongTagManager({
   songs,
   tags,
   onCreate,
+  onDefaultFilterChange,
   onDelete,
   onRename,
 }: {
   songs: Song[];
   tags: SongTag[];
   onCreate: (label: string) => Promise<void>;
+  onDefaultFilterChange: (tag: SongTag, filteredByDefault: boolean) => Promise<void>;
   onDelete: (tag: SongTag) => Promise<void>;
   onRename: (tag: SongTag, label: string) => Promise<void>;
 }) {
@@ -97,13 +100,27 @@ export function SongTagManager({
     }
   }
 
+  async function handleDefaultFilterChange(tag: SongTag, filteredByDefault: boolean) {
+    if (busyAction) return;
+    setBusyAction(`default-${tag.id}`);
+    try {
+      await onDefaultFilterChange(tag, filteredByDefault);
+    } catch {
+      // The parent reports the error and leaves the saved value unchanged.
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
   return (
     <section aria-labelledby="song-tag-manager-title" className="flex flex-col gap-3 rounded-lg bg-muted/45 p-3">
       <div className="flex items-start gap-2">
         <TagsIcon aria-hidden />
         <div>
           <h2 id="song-tag-manager-title" className="text-sm font-semibold">Song tags</h2>
-          <p className="text-xs text-muted-foreground">Create tags here, then assign any number to each song.</p>
+          <p className="text-xs text-muted-foreground">
+            Create tags, choose which filters start selected on member pages, then assign tags to songs.
+          </p>
         </div>
       </div>
 
@@ -127,9 +144,9 @@ export function SongTagManager({
       </form>
 
       {tags.length ? (
-        <div className="flex flex-wrap gap-2" aria-label="Available song tags">
+        <div className="grid gap-2 md:grid-cols-2" aria-label="Available song tags">
           {tags.map((tag) => (
-            <span key={tag.id} className="flex items-center gap-0.5">
+            <div key={tag.id} className="flex min-w-0 items-center gap-2 rounded-md border bg-background px-2 py-1.5">
               <Badge
                 render={(
                   <button
@@ -147,6 +164,19 @@ export function SongTagManager({
                 {tag.label}
                 <PencilIcon aria-hidden />
               </Badge>
+              <Field className="ml-auto w-auto gap-1.5" orientation="horizontal">
+                <Checkbox
+                  checked={tag.filteredByDefault}
+                  disabled={Boolean(busyAction)}
+                  id={`default-song-tag-${tag.id}`}
+                  onCheckedChange={(checked) => {
+                    void handleDefaultFilterChange(tag, checked === true);
+                  }}
+                />
+                <FieldLabel className="text-xs font-normal" htmlFor={`default-song-tag-${tag.id}`}>
+                  Filtered by default
+                </FieldLabel>
+              </Field>
               <Button
                 aria-label={`Delete ${tag.label}`}
                 disabled={Boolean(busyAction)}
@@ -157,7 +187,7 @@ export function SongTagManager({
               >
                 <XIcon />
               </Button>
-            </span>
+            </div>
           ))}
         </div>
       ) : (

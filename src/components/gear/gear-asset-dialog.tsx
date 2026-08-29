@@ -1,8 +1,8 @@
 "use client";
 
-import { BoxesIcon, CableIcon, CameraIcon, CopyPlusIcon, ExternalLinkIcon, LoaderCircleIcon, PackageIcon, PackagePlusIcon, PlusIcon, SaveIcon, SparklesIcon, XIcon } from "lucide-react";
+import { BoxesIcon, CableIcon, CopyPlusIcon, ExternalLinkIcon, ImagePlusIcon, LoaderCircleIcon, PackageIcon, PackagePlusIcon, PlusIcon, SaveIcon, SparklesIcon, XIcon } from "lucide-react";
 import Image from "next/image";
-import { FormEvent, useMemo, useState } from "react";
+import { type DragEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { GearLabelPrinter } from "@/components/gear/gear-label-printer";
 import { CableColorSwatch } from "@/components/gear/cable-color-swatch";
@@ -56,11 +56,13 @@ import { resolvePowerDependencies, type EquipmentTemplate, type ImportedEquipmen
 import { downloadEquipmentReferenceImages, researchEquipmentUrl } from "@/lib/setup-designer/equipment-research-client";
 import { portGroupDisplayName, summarizePortGroups } from "@/lib/setup-designer/ports";
 import { createEquipmentTemplate, updateEquipmentTemplateImages } from "@/lib/setup-designer/repository";
+import { cn } from "@/lib/utils";
 
 const ACCEPTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const NO_DEFINITION_VALUE = "__no_definition__";
 const CREATE_DEFINITION_VALUE = "__create_definition__";
+const LAST_CABLE_DEFINITION_STORAGE_KEY = "swell-parts:last-cable-definition";
 export type GearRegistrationKind = "gear" | "cables" | "container";
 
 export function GearAssetDialog({
@@ -97,13 +99,18 @@ export function GearAssetDialog({
   onSaved: (asset: InventoryAsset) => void;
 }) {
   const firstGearDefinition = definitions.find((item) => !isCableDefinition(item));
+  const firstCableDefinition = definitions.find((item) => isCableDefinition(item));
   const shouldStartAsContainer = asset?.canContainAssets === true
     || duplicateFrom?.canContainAssets === true
     || (!asset && !duplicateFrom && initialRegistrationKind === "container");
   const startingDefinitionId = asset?.definitionId
     ?? duplicateFrom?.definitionId
     ?? initialDefinitionId
-    ?? (shouldStartAsContainer ? "" : firstGearDefinition?.id ?? "");
+    ?? (shouldStartAsContainer
+      ? ""
+      : initialRegistrationKind === "cables"
+        ? firstCableDefinition?.id ?? ""
+        : firstGearDefinition?.id ?? "");
   const startingDefinition = definitions.find((item) => item.id === startingDefinitionId);
   const startingPowerDependencies = resolvePowerDependencies(asset ?? duplicateFrom ?? {}, startingDefinition);
   const existingAssetTags = assets.filter((item) => item.id !== asset?.id).map((item) => item.assetTag);
@@ -157,6 +164,9 @@ export function GearAssetDialog({
   const [tagDraft, setTagDraft] = useState("");
   const [tagError, setTagError] = useState<string | null>(null);
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [photoDropActive, setPhotoDropActive] = useState(false);
+  const photoDragDepth = useRef(0);
+  const restoredCableDefinitionPreference = useRef(false);
   const [productUrl, setProductUrl] = useState("");
   const [researchResult, setResearchResult] = useState<ImportedEquipmentDraft | null>(null);
   const [selectedReferenceUrls, setSelectedReferenceUrls] = useState<Set<string>>(new Set());
@@ -171,6 +181,26 @@ export function GearAssetDialog({
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (restoredCableDefinitionPreference.current || asset || duplicateFrom || initialDefinitionId || !startsAsCable || !definitions.length) return;
+    const preferredDefinition = preferredCableDefinition(definitions);
+    if (!preferredDefinition || preferredDefinition.id === startingDefinitionId) {
+      restoredCableDefinitionPreference.current = true;
+      return;
+    }
+    const previousDefault = startingDefinition ? `${startingDefinition.name}${initialLifecycle === "planned" ? " · planned" : ""}` : "";
+    const nextDefault = `${preferredDefinition.name}${initialLifecycle === "planned" ? " · planned" : ""}`;
+    const timeout = window.setTimeout(() => {
+      restoredCableDefinitionPreference.current = true;
+      setDefinitionId(preferredDefinition.id);
+      setLabel((current) => !current || current === previousDefault ? nextDefault : current);
+      setStageOnly(false);
+      setNeedsPowerSource(false);
+      setNeedsPowerAdapter(false);
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [asset, definitions, duplicateFrom, initialDefinitionId, initialLifecycle, startingDefinition, startingDefinitionId, startsAsCable]);
 
   const cableAssetSelected = registrationKind === "cables";
   const containerAssetSelected = registrationKind === "container";
@@ -230,7 +260,9 @@ export function GearAssetDialog({
     const nextIsContainer = value === "container";
     const nextDefinition = nextIsContainer
       ? undefined
-      : definitions.find((item) => isCableDefinition(item) === nextIsCable);
+      : nextIsCable
+        ? preferredCableDefinition(definitions)
+        : definitions.find((item) => !isCableDefinition(item));
     const previousDefault = definition ? `${definition.name}${initialLifecycle === "planned" ? " · planned" : ""}` : "";
     const nextDefault = nextDefinition ? `${nextDefinition.name}${initialLifecycle === "planned" ? " · planned" : ""}` : "";
     const nextLabel = !label || label === previousDefault ? nextDefault : label;
@@ -400,13 +432,47 @@ export function GearAssetDialog({
 
   function choosePhotos(files: FileList | null) {
     const next = Array.from(files ?? []);
+    if (!next.length) return;
     const invalid = next.find((file) => !ACCEPTED_IMAGE_TYPES.has(file.type) || file.size > MAX_IMAGE_BYTES);
     if (invalid) {
       setError("Physical-item photos must be JPEG, PNG, or WebP files smaller than 10 MB each.");
       return;
     }
     setError(null);
-    setPhotoFiles(next);
+    setPhotoFiles((current) => {
+      const existingKeys = new Set(current.map(photoFileKey));
+      const additions = next.filter((file) => {
+        const key = photoFileKey(file);
+        if (existingKeys.has(key)) return false;
+        existingKeys.add(key);
+        return true;
+      });
+      return [...current, ...additions];
+    });
+  }
+
+  function enterPhotoDropZone(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    if (saving) {
+      event.dataTransfer.dropEffect = "none";
+      return;
+    }
+    photoDragDepth.current += 1;
+    event.dataTransfer.dropEffect = "copy";
+    setPhotoDropActive(true);
+  }
+
+  function leavePhotoDropZone(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    photoDragDepth.current = Math.max(0, photoDragDepth.current - 1);
+    if (!photoDragDepth.current) setPhotoDropActive(false);
+  }
+
+  function dropPhotos(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    photoDragDepth.current = 0;
+    setPhotoDropActive(false);
+    if (!saving) choosePhotos(event.dataTransfer.files);
   }
 
   function addTags(rawValue = tagDraft) {
@@ -547,6 +613,7 @@ export function GearAssetDialog({
           createdAt: previousConnectionSet?.createdAt ?? draft?.createdAt,
         });
       }
+      if (cableAssetSelected && resolvedDefinitionId) rememberCableDefinition(resolvedDefinitionId);
       onSaved(saved);
       onOpenChange(false);
     } catch (caught) {
@@ -1035,10 +1102,42 @@ export function GearAssetDialog({
 
           <Field>
             <FieldLabel htmlFor="gear-asset-photos">Photos of this physical item</FieldLabel>
-            <label htmlFor="gear-asset-photos" className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-muted/25 px-4 py-5 text-center text-sm font-medium hover:bg-muted/50">
-              <CameraIcon aria-hidden />
-              {photoFiles.length ? `${photoFiles.length} new photo${photoFiles.length === 1 ? "" : "s"} selected` : "Choose physical-item photos"}
-              <input id="gear-asset-photos" className="sr-only" type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={(event) => choosePhotos(event.target.files)} disabled={saving} />
+            <label
+              htmlFor="gear-asset-photos"
+              className={cn(
+                "flex min-h-32 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-muted/25 px-4 py-6 text-center transition-colors hover:bg-muted/50 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
+                photoDropActive && "border-primary bg-primary/10 text-primary",
+                saving && "pointer-events-none cursor-not-allowed opacity-50",
+              )}
+              onDragEnter={enterPhotoDropZone}
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = saving ? "none" : "copy";
+              }}
+              onDragLeave={leavePhotoDropZone}
+              onDrop={dropPhotos}
+            >
+              <ImagePlusIcon className="size-7" aria-hidden />
+              <span className="font-medium" aria-live="polite">
+                {photoDropActive
+                  ? "Release to add photos"
+                  : photoFiles.length
+                    ? `${photoFiles.length} new photo${photoFiles.length === 1 ? "" : "s"} selected`
+                    : "Drop photos here or click to browse"}
+              </span>
+              <span className="text-xs font-normal text-muted-foreground">JPEG, PNG, or WebP, up to 10 MB each</span>
+              <input
+                id="gear-asset-photos"
+                className="sr-only"
+                type="file"
+                multiple
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(event) => {
+                  choosePhotos(event.target.files);
+                  event.currentTarget.value = "";
+                }}
+                disabled={saving}
+              />
             </label>
             <FieldDescription>These document the exact item. They stay separate from the product icon and reusable reference photos.</FieldDescription>
             {inheritedPhotos.length ? (
@@ -1182,4 +1281,27 @@ function positiveNumberOrUndefined(value: string) {
 
 function measurementInputValue(value: number) {
   return String(Math.round(value * 10000) / 10000);
+}
+
+function photoFileKey(file: File) {
+  return `${file.name}:${file.size}:${file.lastModified}`;
+}
+
+function preferredCableDefinition(definitions: EquipmentTemplate[]) {
+  const fallback = definitions.find((item) => isCableDefinition(item));
+  if (typeof window === "undefined") return fallback;
+  try {
+    const preferredId = window.localStorage.getItem(LAST_CABLE_DEFINITION_STORAGE_KEY);
+    return definitions.find((item) => item.id === preferredId && isCableDefinition(item)) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function rememberCableDefinition(definitionId: string) {
+  try {
+    window.localStorage.setItem(LAST_CABLE_DEFINITION_STORAGE_KEY, definitionId);
+  } catch {
+    // Browsers can disable local storage; the normal first-definition fallback remains available.
+  }
 }

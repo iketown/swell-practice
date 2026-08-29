@@ -83,6 +83,7 @@ export interface Song {
 export interface SongTag {
   id: string;
   label: string;
+  filteredByDefault: boolean;
 }
 
 export function isSongPublished(song: Pick<Song, "published">) {

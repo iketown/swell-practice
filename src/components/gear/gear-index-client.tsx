@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  BarcodeIcon,
   BoxesIcon,
   CableIcon,
   CopyPlusIcon,
@@ -31,11 +30,9 @@ import { GearCheckInDialog } from "@/components/gear/gear-check-in-dialog";
 import { GearDirectoryDialog } from "@/components/gear/gear-directory-dialog";
 import { GearDefinitionDeleteDialog } from "@/components/gear/gear-definition-delete-dialog";
 import { GearOrderDialog } from "@/components/gear/gear-order-dialog";
-import { GearSheetLabelPrinter } from "@/components/gear/gear-sheet-label-printer";
 import { EquipmentTemplateDialog } from "@/components/setup-designer/equipment-template-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -45,13 +42,11 @@ import { useAdmin } from "@/hooks/use-admin";
 import {
   CABLE_INVENTORY_TAG,
   cableColorLabel,
-  formatCableAssetLabel,
   formatCableLength,
   inventoryAssetLocationChain,
   isCableInventoryAsset,
   isContainerInventoryAsset,
   lifecycleLabel,
-  normalizeCableLengthInches,
   normalizeInventoryTags,
   normalizeGearSearchText,
   paymentStatusLabel,
@@ -72,7 +67,6 @@ import {
   listPurchaseOrders,
   syncPublicGearAssetRecords,
 } from "@/lib/gear/repository";
-import type { GearSheetLabelItem } from "@/lib/gear/labels";
 import { cableEndImagePath } from "@/lib/setup-designer/cable-end-images";
 import { formatCableDefinitionEnd, isCableDefinition } from "@/lib/setup-designer/cable-definitions";
 import { powerDependencyLabel, resolvePowerDependencies, type EquipmentTemplate } from "@/lib/setup-designer/domain";
@@ -108,7 +102,6 @@ export function GearIndexClient({ initialQuery = "" }: { initialQuery?: string }
   const [checkingIn, setCheckingIn] = useState<InventoryAsset | null>(null);
   const [partyDialogOpen, setPartyDialogOpen] = useState(false);
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
-  const [sheetLabelQueue, setSheetLabelQueue] = useState<GearSheetLabelItem[]>([]);
 
   useEffect(() => {
     if (!admin.loading && !admin.isAdmin) router.replace("/");
@@ -186,17 +179,6 @@ export function GearIndexClient({ initialQuery = "" }: { initialQuery?: string }
   const purchaseQueue = matchingAssets.filter((item) => !["active", "retired", "cancelled"].includes(item.lifecycleStatus));
   const allPurchaseQueue = assets.filter((item) => !["active", "retired", "cancelled"].includes(item.lifecycleStatus));
   const inTransitCount = assets.filter((item) => item.lifecycleStatus === "in_transit").length;
-  const printableCableAssetIds = useMemo(() => new Set(assets
-    .filter((item) => isCableInventoryAsset(item) && normalizeCableLengthInches(item.cableLengthInches))
-    .map((item) => item.id)), [assets]);
-  const eligibleSheetLabelQueue = useMemo(() => sheetLabelQueue.filter((item) => printableCableAssetIds.has(item.id)), [printableCableAssetIds, sheetLabelQueue]);
-  const sheetLabelQueueIds = useMemo(() => new Set(eligibleSheetLabelQueue.map((item) => item.id)), [eligibleSheetLabelQueue]);
-  const visibleSheetLabelAssets = useMemo(() => {
-    const visible = [...purchaseQueue, ...activeAssets];
-    return visible
-      .filter((asset, index) => printableCableAssetIds.has(asset.id) && visible.findIndex((item) => item.id === asset.id) === index)
-      .map(toSheetLabelItem);
-  }, [activeAssets, printableCableAssetIds, purchaseQueue]);
 
   function beginCreateAsset(lifecycle: "planned" | "active") {
     setEditingAsset(undefined);
@@ -239,54 +221,10 @@ export function GearIndexClient({ initialQuery = "" }: { initialQuery?: string }
       });
       return lines.length ? [{ ...order, lines }] : [];
     }));
-    setSheetLabelQueue((current) => current.filter((item) => !deletedAssetIds.has(item.id)));
     if (editingDefinition?.id === definition.id) setEditingDefinition(null);
     toast.success(linkedAssets.length
       ? `${definition.name} and ${linkedAssets.length} linked item${linkedAssets.length === 1 ? "" : "s"} deleted.`
       : `${definition.name} deleted.`);
-  }
-
-  function toggleSheetLabel(asset: InventoryAsset) {
-    if (!isCableInventoryAsset(asset)) {
-      toast.error(`Add the ${CABLE_INVENTORY_TAG} tag before queueing this label.`);
-      return;
-    }
-    if (!normalizeCableLengthInches(asset.cableLengthInches)) {
-      toast.error("Add the cable length before queueing this label.");
-      return;
-    }
-    setSheetLabelQueue((current) => {
-      const eligible = current.filter((item) => printableCableAssetIds.has(item.id));
-      if (eligible.some((item) => item.id === asset.id)) return eligible.filter((item) => item.id !== asset.id);
-      if (eligible.length >= 32) {
-        toast.error("One MR610-MAC sheet holds 32 labels. Remove a queued label before adding another.");
-        return eligible;
-      }
-      return [...eligible, toSheetLabelItem(asset)];
-    });
-  }
-
-  function queueSheetLabels(items: GearSheetLabelItem[]) {
-    setSheetLabelQueue((current) => {
-      const eligible = current.filter((item) => printableCableAssetIds.has(item.id));
-      const existingIds = new Set(eligible.map((item) => item.id));
-      const additions = items.filter((item) => printableCableAssetIds.has(item.id) && !existingIds.has(item.id));
-      const next = [...eligible, ...additions].slice(0, 32);
-      if (eligible.length + additions.length > 32) toast.error("Only the first 32 labels fit on one sheet.");
-      return next;
-    });
-  }
-
-  function moveSheetLabel(id: string, direction: -1 | 1) {
-    setSheetLabelQueue((current) => {
-      const eligible = current.filter((item) => printableCableAssetIds.has(item.id));
-      const index = eligible.findIndex((item) => item.id === id);
-      const destination = index + direction;
-      if (index < 0 || destination < 0 || destination >= eligible.length) return eligible;
-      const next = [...eligible];
-      [next[index], next[destination]] = [next[destination], next[index]];
-      return next;
-    });
   }
 
   if (admin.loading || !admin.isAdmin) return null;
@@ -344,34 +282,6 @@ export function GearIndexClient({ initialQuery = "" }: { initialQuery?: string }
             </TabsList>
 
             <TabsContent value="assets" className="flex flex-col gap-6 pt-4">
-              <div className="flex justify-end">
-                <Dialog>
-                  <DialogTrigger
-                    render={
-                      <Button type="button" variant={eligibleSheetLabelQueue.length ? "secondary" : "outline"} size="sm">
-                        <BarcodeIcon data-icon="inline-start" />
-                        Show cable label print queue ({eligibleSheetLabelQueue.length})
-                      </Button>
-                    }
-                  />
-                  <DialogContent className="max-h-[calc(100dvh-2rem)] w-[min(88rem,calc(100%-2rem))] grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:max-w-none">
-                    <DialogHeader className="sr-only">
-                      <DialogTitle>Cable label print queue</DialogTitle>
-                      <DialogDescription>Arrange and print Cables-tagged asset labels on MR610-MAC sheets.</DialogDescription>
-                    </DialogHeader>
-                    <div className="min-h-0 overflow-y-auto">
-                      <GearSheetLabelPrinter
-                        queue={eligibleSheetLabelQueue}
-                        queueableAssets={visibleSheetLabelAssets}
-                        onQueueAssets={queueSheetLabels}
-                        onRemove={(id) => setSheetLabelQueue((current) => current.filter((item) => item.id !== id))}
-                        onMove={moveSheetLabel}
-                        onClear={() => setSheetLabelQueue([])}
-                      />
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
               <AssetSection
                 title="Purchase queue"
                 description="Permanent asset records that exist in the plan but are not yet checked into physical inventory."
@@ -386,8 +296,6 @@ export function GearIndexClient({ initialQuery = "" }: { initialQuery?: string }
                 onEdit={beginEditAsset}
                 onDuplicate={beginDuplicateAsset}
                 onCheckIn={setCheckingIn}
-                sheetLabelQueueIds={sheetLabelQueueIds}
-                onToggleSheetLabel={toggleSheetLabel}
               />
               <AssetSection
                 title="On-hand inventory"
@@ -406,8 +314,6 @@ export function GearIndexClient({ initialQuery = "" }: { initialQuery?: string }
                 onEdit={beginEditAsset}
                 onDuplicate={beginDuplicateAsset}
                 onCheckIn={setCheckingIn}
-                sheetLabelQueueIds={sheetLabelQueueIds}
-                onToggleSheetLabel={toggleSheetLabel}
               />
             </TabsContent>
 
@@ -537,9 +443,6 @@ export function GearIndexClient({ initialQuery = "" }: { initialQuery?: string }
         onDefinitionCreated={(definition) => setDefinitions((current) => [...current.filter((item) => item.id !== definition.id), definition].sort((a, b) => a.name.localeCompare(b.name)))}
         onSaved={(saved) => {
           setAssets((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
-          setSheetLabelQueue((current) => isCableInventoryAsset(saved)
-            ? current.map((item) => item.id === saved.id ? toSheetLabelItem(saved) : item)
-            : current.filter((item) => item.id !== saved.id));
           toast.success(editingAsset ? "Gear asset updated." : duplicatingAsset ? "Gear asset duplicated." : saved.lifecycleStatus === "planned" ? "Planned gear added to the purchase queue." : "Physical gear registered.");
           void refresh();
         }}
@@ -576,6 +479,14 @@ export function GearIndexClient({ initialQuery = "" }: { initialQuery?: string }
             description: checkedInAssets.map((item) => item.assetTag).join(" + "),
           });
         }}
+        onContainerConfirmed={(confirmedAssets, location) => {
+          const confirmedById = new Map(confirmedAssets.map((item) => [item.id, item]));
+          setAssets((current) => current.map((asset) => confirmedById.get(asset.id) ?? asset));
+          setLocations((current) => current.map((item) => item.id === location.id ? {
+            ...item,
+            lastCheckInAt: Date.now(),
+          } : item));
+        }}
       />
       <GearDirectoryDialog open={partyDialogOpen} onOpenChange={setPartyDialogOpen} kind="party" onPartyCreated={(party) => { setParties((current) => [...current, party].sort((a, b) => a.name.localeCompare(b.name))); toast.success("Owner or provider added."); }} />
       <GearDirectoryDialog open={locationDialogOpen} onOpenChange={setLocationDialogOpen} kind="location" onLocationCreated={(location) => { setLocations((current) => [...current, location].sort((a, b) => a.name.localeCompare(b.name))); toast.success("Location added."); }} />
@@ -610,8 +521,6 @@ function AssetSection({
   onEdit,
   onDuplicate,
   onCheckIn,
-  sheetLabelQueueIds,
-  onToggleSheetLabel,
 }: {
   title: string;
   description: string;
@@ -629,8 +538,6 @@ function AssetSection({
   onEdit: (asset: InventoryAsset) => void;
   onDuplicate: (asset: InventoryAsset) => void;
   onCheckIn: (asset: InventoryAsset) => void;
-  sheetLabelQueueIds: Set<string>;
-  onToggleSheetLabel: (asset: InventoryAsset) => void;
 }) {
   return (
     <section>
@@ -667,7 +574,6 @@ function AssetSection({
             const previewUrl = asset.photos[0]?.downloadUrl ?? definition?.image?.downloadUrl ?? definition?.detailImages?.[0]?.downloadUrl ?? definition?.referenceImages[0]?.url;
             const isCable = isCableInventoryAsset(asset);
             const cableLength = isCable ? formatCableLength(asset.cableLengthInches) : "";
-            const canQueueCableLabel = Boolean(cableLength);
             const powerLabel = isCable ? undefined : powerDependencyLabel(resolvePowerDependencies(asset, definition));
             return (
               <article key={asset.id} className="grid gap-3 border-b p-4 last:border-b-0 md:grid-cols-[3.5rem_minmax(0,1fr)_minmax(12rem,0.7fr)_auto] md:items-center">
@@ -692,12 +598,6 @@ function AssetSection({
                   {order ? <div className="flex min-w-0 items-baseline gap-2"><dt className="shrink-0 text-muted-foreground">Order:</dt><dd className="min-w-0 truncate font-medium">{order.vendor}</dd></div> : null}
                 </dl>
                 <div className="flex flex-wrap gap-2 md:justify-end">
-                  {isCable ? (
-                    <Button variant={sheetLabelQueueIds.has(asset.id) ? "secondary" : "outline"} size="sm" onClick={() => onToggleSheetLabel(asset)} aria-pressed={sheetLabelQueueIds.has(asset.id)} disabled={!canQueueCableLabel}>
-                      <BarcodeIcon data-icon="inline-start" />
-                      {sheetLabelQueueIds.has(asset.id) ? "Queued" : canQueueCableLabel ? "Queue label" : "Add length first"}
-                    </Button>
-                  ) : null}
                   <Button variant="outline" size="sm" onClick={() => onEdit(asset)}><PencilIcon data-icon="inline-start" />Edit</Button>
                   <Button variant="outline" size="sm" onClick={() => onDuplicate(asset)}><CopyPlusIcon data-icon="inline-start" />Duplicate</Button>
                   <Button size="sm" onClick={() => onCheckIn(asset)}><MapPinIcon data-icon="inline-start" />Check in</Button>
@@ -714,12 +614,4 @@ function AssetSection({
 function formatDate(value: string) {
   const date = new Date(`${value}T12:00:00`);
   return Number.isNaN(date.valueOf()) ? value : new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(date);
-}
-
-function toSheetLabelItem(asset: InventoryAsset): GearSheetLabelItem {
-  return {
-    id: asset.id,
-    assetTag: asset.assetTag,
-    assetName: formatCableAssetLabel(asset.label, asset.cableLengthInches),
-  };
 }

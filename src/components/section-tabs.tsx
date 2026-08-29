@@ -28,6 +28,7 @@ export function SectionTabs() {
   const tabs = admin.isAdmin
     ? [
         ...baseTabs,
+        ...(admin.user ? [{ href: "/projects", label: "Projects" }] : []),
         { href: "/setups", label: "Setups" },
         { href: "/gear", label: "Gear" },
         { href: "/docs", label: "Docs" },

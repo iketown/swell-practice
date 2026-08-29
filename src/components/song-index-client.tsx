@@ -26,6 +26,7 @@ import {
   deleteSongTag,
   listSongTags,
   updateSongTag,
+  updateSongTagFilteredByDefault,
   updateSongTagIds,
 } from "@/lib/song-tags";
 import { cn } from "@/lib/utils";
@@ -73,13 +74,30 @@ export function SongIndexClient() {
 
   async function handleRenameTag(tag: SongTag, label: string) {
     try {
-      const updatedTag = await updateSongTag(tag.id, label);
+      const updatedTag = await updateSongTag(tag, label);
       setTags((current) => current
         .map((item) => item.id === tag.id ? updatedTag : item)
         .sort((left, right) => left.label.localeCompare(right.label)));
       toast.success(`Renamed “${tag.label}” to “${updatedTag.label}”.`);
     } catch (caught) {
       toast.error(caught instanceof Error ? caught.message : "Could not rename that tag.");
+      throw caught;
+    }
+  }
+
+  async function handleDefaultFilterChange(tag: SongTag, filteredByDefault: boolean) {
+    try {
+      await updateSongTagFilteredByDefault(tag.id, filteredByDefault);
+      setTags((current) => current.map((item) => (
+        item.id === tag.id ? { ...item, filteredByDefault } : item
+      )));
+      toast.success(
+        filteredByDefault
+          ? `“${tag.label}” will be selected by default on member pages.`
+          : `“${tag.label}” will no longer be selected by default.`,
+      );
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : "Could not update the default filter.");
       throw caught;
     }
   }
@@ -139,6 +157,7 @@ export function SongIndexClient() {
         {admin.isAdmin ? (
           <SongTagManager
             onCreate={handleCreateTag}
+            onDefaultFilterChange={handleDefaultFilterChange}
             onDelete={handleDeleteTag}
             onRename={handleRenameTag}
             songs={songs}
