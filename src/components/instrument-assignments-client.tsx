@@ -25,6 +25,8 @@ import Image from "next/image";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { SongTagBadges } from "@/components/song-tag-controls";
+import { listSongTags } from "@/lib/song-tags";
 import { AppShell } from "@/components/app-shell";
 import { Alert, AlertTitle } from "@/components/ui/alert";
 import {
@@ -81,6 +83,7 @@ import {
   type BandSongArrangement,
   type InstrumentId,
   type Song,
+  type SongTag,
   type SongInstrumentAssignment,
   type SongInstrumentAssignments,
   type SongInstrumentNote,
@@ -1198,6 +1201,7 @@ function TrashDropZone({ disabled }: { disabled: boolean }) {
 
 function InstrumentAssignmentRow({
   song,
+  tags,
   columns,
   vocalState,
   canEdit,
@@ -1217,6 +1221,7 @@ function InstrumentAssignmentRow({
   onRestoreDefaultVocal,
 }: {
   song: Song;
+  tags: SongTag[];
   columns: BandColumn[];
   vocalState: VocalArrangementState;
   canEdit: boolean;
@@ -1297,6 +1302,7 @@ function InstrumentAssignmentRow({
                 </Badge>
               ) : null}
             </div>
+            <SongTagBadges tagIds={song.tagIds} tags={tags} />
             <div className="flex items-center gap-1.5">
               {song.originalRecording ? (
                 <Button type="button" size="xs" variant="secondary" onClick={onPlay}>
@@ -1451,6 +1457,8 @@ export function InstrumentAssignmentsClient() {
   const admin = useAdmin();
   const [assignmentSessionId] = useState(() => crypto.randomUUID());
   const [songs, setSongs] = useState<Song[]>([]);
+  const [tags, setTags] = useState<SongTag[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [songsLoading, setSongsLoading] = useState(true);
   const [stemPartsBySongId, setStemPartsBySongId] =
     useState<Map<string, Set<string>>>(new Map());
@@ -1516,10 +1524,18 @@ export function InstrumentAssignmentsClient() {
     () => columnsForBand(selectedBand, members),
     [members, selectedBand],
   );
-  const visibleSongs = useMemo(
+  const availableSongs = useMemo(
     () => admin.isAdmin ? songs : songs.filter(isSongPublished),
     [admin.isAdmin, songs],
   );
+  const usedTags = useMemo(() => {
+    const usedIds = new Set(availableSongs.flatMap((song) => song.tagIds));
+    return tags.filter((tag) => usedIds.has(tag.id));
+  }, [availableSongs, tags]);
+  const activeTagIds = selectedTagIds.filter((id) => usedTags.some((tag) => tag.id === id));
+  const visibleSongs = activeTagIds.length
+    ? availableSongs.filter((song) => activeTagIds.some((id) => song.tagIds.includes(id)))
+    : availableSongs;
   const songIdsKey = useMemo(
     () => songs.map((song) => song.id).sort().join(","),
     [songs],
@@ -1538,6 +1554,14 @@ export function InstrumentAssignmentsClient() {
     setSongs(fallbackSongs);
     setSelectedBandId(bandId);
   }
+
+  useEffect(() => {
+    let active = true;
+    void listSongTags().then((items) => {
+      if (active) setTags(items);
+    });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -2586,6 +2610,46 @@ export function InstrumentAssignmentsClient() {
                 </>
               ) : null}
             </ul>
+            {usedTags.length ? (
+              <div className="flex flex-col gap-2" role="group" aria-label="Filter songs by tag">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <span className="font-semibold">Filter by tags</span>
+                  <span aria-live="polite">{visibleSongs.length} of {availableSongs.length} songs</span>
+                  {activeTagIds.length ? <span>Matching any selected tag</span> : null}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={activeTagIds.length ? "outline" : "default"}
+                    aria-pressed={!activeTagIds.length}
+                    disabled={assignmentInProgress}
+                    onClick={() => setSelectedTagIds([])}
+                  >
+                    All songs
+                  </Button>
+                  {usedTags.map((tag) => {
+                    const selected = activeTagIds.includes(tag.id);
+                    return (
+                      <Button
+                        key={tag.id}
+                        type="button"
+                        size="sm"
+                        variant={selected ? "default" : "outline"}
+                        aria-pressed={selected}
+                        disabled={assignmentInProgress}
+                        onClick={() => setSelectedTagIds(selected
+                          ? activeTagIds.filter((id) => id !== tag.id)
+                          : [...activeTagIds, tag.id])}
+                      >
+                        {selected ? <CheckIcon data-icon="inline-start" /> : null}
+                        {tag.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="relative min-h-0 flex-1">
@@ -2679,6 +2743,7 @@ export function InstrumentAssignmentsClient() {
                     <InstrumentAssignmentRow
                       key={song.id}
                       song={song}
+                      tags={tags}
                       columns={columns}
                       vocalState={vocalStateForSong(song.id)}
                       canEdit={admin.isAdmin}
