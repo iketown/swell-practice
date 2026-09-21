@@ -25,7 +25,7 @@ import Image from "next/image";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { SongTagBadges } from "@/components/song-tag-controls";
+import { SongTagBadges, SongTagFilter } from "@/components/song-tag-controls";
 import { listSongTags } from "@/lib/song-tags";
 import { AppShell } from "@/components/app-shell";
 import { Alert, AlertTitle } from "@/components/ui/alert";
@@ -2610,46 +2610,14 @@ export function InstrumentAssignmentsClient() {
                 </>
               ) : null}
             </ul>
-            {usedTags.length ? (
-              <div className="flex flex-col gap-2" role="group" aria-label="Filter songs by tag">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  <span className="font-semibold">Filter by tags</span>
-                  <span aria-live="polite">{visibleSongs.length} of {availableSongs.length} songs</span>
-                  {activeTagIds.length ? <span>Matching any selected tag</span> : null}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={activeTagIds.length ? "outline" : "default"}
-                    aria-pressed={!activeTagIds.length}
-                    disabled={assignmentInProgress}
-                    onClick={() => setSelectedTagIds([])}
-                  >
-                    All songs
-                  </Button>
-                  {usedTags.map((tag) => {
-                    const selected = activeTagIds.includes(tag.id);
-                    return (
-                      <Button
-                        key={tag.id}
-                        type="button"
-                        size="sm"
-                        variant={selected ? "default" : "outline"}
-                        aria-pressed={selected}
-                        disabled={assignmentInProgress}
-                        onClick={() => setSelectedTagIds(selected
-                          ? activeTagIds.filter((id) => id !== tag.id)
-                          : [...activeTagIds, tag.id])}
-                      >
-                        {selected ? <CheckIcon data-icon="inline-start" /> : null}
-                        {tag.label}
-                      </Button>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : null}
+            <SongTagFilter
+              tags={usedTags}
+              selectedTagIds={activeTagIds}
+              onChange={setSelectedTagIds}
+              songCount={visibleSongs.length}
+              totalSongCount={availableSongs.length}
+              disabled={assignmentInProgress}
+            />
           </div>
 
           <div className="relative min-h-0 flex-1">

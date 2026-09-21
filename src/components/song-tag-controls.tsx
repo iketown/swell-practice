@@ -1,6 +1,6 @@
 "use client";
 
-import { PencilIcon, PlusIcon, TagsIcon, XIcon } from "lucide-react";
+import { CheckIcon, PencilIcon, PlusIcon, TagsIcon, XIcon } from "lucide-react";
 import { FormEvent, useId, useMemo, useState } from "react";
 
 import {
@@ -342,6 +342,65 @@ export function SongTagBadges({ tagIds, tags }: { tagIds: string[]; tags: SongTa
   return (
     <div className="flex flex-wrap gap-1.5" aria-label="Song tags">
       {assignedTags.map((tag) => <Badge key={tag.id} variant="secondary">{tag.label}</Badge>)}
+    </div>
+  );
+}
+
+export function SongTagFilter({
+  tags,
+  selectedTagIds,
+  onChange,
+  songCount,
+  totalSongCount,
+  disabled = false,
+}: {
+  tags: SongTag[];
+  selectedTagIds: string[];
+  onChange: (tagIds: string[]) => void;
+  songCount: number;
+  totalSongCount: number;
+  disabled?: boolean;
+}) {
+  if (!tags.length) return null;
+
+  return (
+    <div className="flex flex-col gap-2" role="group" aria-label="Filter songs by tag">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+        <span className="font-semibold">Filter by tags</span>
+        <span aria-live="polite">{songCount} of {totalSongCount} songs</span>
+        {selectedTagIds.length ? <span>Matching any selected tag</span> : null}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant={selectedTagIds.length ? "outline" : "default"}
+          aria-pressed={!selectedTagIds.length}
+          disabled={disabled}
+          onClick={() => onChange([])}
+        >
+          All songs
+        </Button>
+        {tags.map((tag) => {
+          const selected = selectedTagIds.includes(tag.id);
+          return (
+            <Button
+              key={tag.id}
+              type="button"
+              size="sm"
+              variant={selected ? "default" : "outline"}
+              aria-pressed={selected}
+              disabled={disabled}
+              onClick={() => onChange(selected
+                ? selectedTagIds.filter((id) => id !== tag.id)
+                : [...selectedTagIds, tag.id])}
+            >
+              {selected ? <CheckIcon data-icon="inline-start" /> : null}
+              {tag.label}
+            </Button>
+          );
+        })}
+      </div>
     </div>
   );
 }

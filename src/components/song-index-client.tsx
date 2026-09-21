@@ -10,6 +10,7 @@ import { SongFilterInput } from "@/components/song-filter-input";
 import {
   SongTagAssignmentField,
   SongTagBadges,
+  SongTagFilter,
   SongTagManager,
 } from "@/components/song-tag-controls";
 import { buttonVariants } from "@/components/ui/button";
@@ -37,10 +38,17 @@ export function SongIndexClient() {
   const [tags, setTags] = useState<SongTag[]>([]);
   const [loading, setLoading] = useState(true);
   const [songQuery, setSongQuery] = useState("");
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const visibleSongs = admin.isAdmin
     ? songs
     : songs.filter(isSongPublished);
-  const rankedSongs = rankSongsForQuery(visibleSongs, songQuery);
+  const usedTagIds = new Set(visibleSongs.flatMap((song) => song.tagIds));
+  const usedTags = tags.filter((tag) => usedTagIds.has(tag.id));
+  const activeTagIds = selectedTagIds.filter((id) => usedTags.some((tag) => tag.id === id));
+  const filteredSongs = activeTagIds.length
+    ? visibleSongs.filter((song) => activeTagIds.some((id) => song.tagIds.includes(id)))
+    : visibleSongs;
+  const rankedSongs = rankSongsForQuery(filteredSongs, songQuery);
   const matchingSongCount = rankedSongs.filter((item) => item.matchesQuery).length;
 
   useEffect(() => {
@@ -153,7 +161,14 @@ export function SongIndexClient() {
             </Badge>
           </div>
         </div>
-        <SongFilterInput id="public-song-search" songs={visibleSongs} value={songQuery} onChange={setSongQuery} matchCount={matchingSongCount} />
+        <SongFilterInput id="public-song-search" songs={filteredSongs} value={songQuery} onChange={setSongQuery} matchCount={matchingSongCount} />
+        <SongTagFilter
+          tags={usedTags}
+          selectedTagIds={activeTagIds}
+          onChange={setSelectedTagIds}
+          songCount={filteredSongs.length}
+          totalSongCount={visibleSongs.length}
+        />
         {admin.isAdmin ? (
           <SongTagManager
             onCreate={handleCreateTag}
