@@ -21,15 +21,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useAdmin } from "@/hooks/use-admin";
 import { createMember, deleteMember, listMembers, saveMemberHeadshot, updateMember } from "@/lib/assignments";
 import type { BandMember } from "@/lib/domain";
 
-type MemberInput = Pick<BandMember, "firstName" | "lastName" | "displayName" | "email" | "phone" | "notes">;
+type MemberInput = Pick<BandMember, "firstName" | "lastName" | "displayName" | "email" | "phone" | "notes" | "hidden">;
 
 const emptyMember: MemberInput = {
   firstName: "",
@@ -38,12 +39,14 @@ const emptyMember: MemberInput = {
   email: "",
   phone: "",
   notes: "",
+  hidden: false,
 };
 
 export function MemberAdminClient() {
   const admin = useAdmin();
   const router = useRouter();
   const [members, setMembers] = useState<BandMember[]>([]);
+  const [showHidden, setShowHidden] = useState(false);
   const [loading, setLoading] = useState(true);
   const [editingMember, setEditingMember] = useState<BandMember | "new" | null>(null);
   const [form, setForm] = useState<MemberInput>(emptyMember);
@@ -89,6 +92,7 @@ export function MemberAdminClient() {
       email: member.email ?? "",
       phone: member.phone ?? "",
       notes: member.notes ?? "",
+      hidden: member.hidden ?? false,
     } : emptyMember);
     setPendingHeadshot(null);
     setError(null);
@@ -100,7 +104,7 @@ export function MemberAdminClient() {
     setError(null);
   }
 
-  function updateField(field: keyof MemberInput, value: string) {
+  function updateField<K extends keyof MemberInput>(field: K, value: MemberInput[K]) {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
@@ -131,6 +135,9 @@ export function MemberAdminClient() {
 
   if (admin.loading || !admin.isAdmin) return null;
 
+  const hiddenCount = members.filter((member) => member.hidden).length;
+  const visibleMembers = members.filter((member) => showHidden || !member.hidden);
+
   return (
     <AppShell>
       <section className="swell-panel flex flex-wrap items-start justify-between gap-4 p-4 sm:p-5">
@@ -152,7 +159,11 @@ export function MemberAdminClient() {
       <Card>
         <CardHeader>
           <CardTitle>Roster</CardTitle>
-          <CardDescription>{loading ? "Loading members" : `${members.length} people available for band lineups`}</CardDescription>
+          <CardDescription>{loading ? "Loading members" : `${members.length - hiddenCount} visible members${hiddenCount ? ` · ${hiddenCount} hidden` : ""}`}</CardDescription>
+          <Field orientation="horizontal" className="w-auto">
+            <Switch id="show-hidden-members" checked={showHidden} onCheckedChange={setShowHidden} />
+            <FieldLabel htmlFor="show-hidden-members">Show hidden members</FieldLabel>
+          </Field>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -160,9 +171,9 @@ export function MemberAdminClient() {
               <Skeleton className="h-20 w-full" />
               <Skeleton className="h-20 w-full" />
             </div>
-          ) : members.length ? (
+          ) : visibleMembers.length ? (
             <div className="divide-y rounded-lg border bg-card">
-              {members.map((member) => (
+              {visibleMembers.map((member) => (
                 <article key={member.id} className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
                   <div className="flex min-w-0 items-center gap-3">
                     <MemberAvatar displayName={member.displayName} photoUrl={member.photoUrl} className="size-12 text-sm" />
@@ -171,6 +182,7 @@ export function MemberAdminClient() {
                         <h2 className="font-semibold">{member.displayName}</h2>
                         <span className="text-sm text-muted-foreground">{member.firstName} {member.lastName}</span>
                         <Badge variant="secondary">/{member.slug}</Badge>
+                        {member.hidden ? <Badge variant="outline">Hidden</Badge> : null}
                       </div>
                       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                         {member.email ? <span className="inline-flex items-center gap-1"><MailIcon aria-hidden className="size-3.5" />{member.email}</span> : null}
@@ -200,8 +212,8 @@ export function MemberAdminClient() {
             <Empty>
               <EmptyHeader>
                 <EmptyMedia variant="icon"><UsersIcon aria-hidden /></EmptyMedia>
-                <EmptyTitle>No members yet</EmptyTitle>
-                <EmptyDescription>Add the first person, then include them in a band.</EmptyDescription>
+                <EmptyTitle>{hiddenCount ? "No visible members" : "No members yet"}</EmptyTitle>
+                <EmptyDescription>{hiddenCount ? "Turn on Show hidden members to view or restore them." : "Add the first person, then include them in a band."}</EmptyDescription>
               </EmptyHeader>
             </Empty>
           )}
@@ -223,6 +235,21 @@ export function MemberAdminClient() {
               disabled={saving}
             />
             <FieldGroup className="sm:grid sm:grid-cols-2">
+              <Field orientation="horizontal" className="sm:col-span-2" data-disabled={saving}>
+                <FieldContent>
+                  <FieldLabel htmlFor="member-hidden">Hide from members page</FieldLabel>
+                  <FieldDescription id="member-hidden-description">
+                    Keeps contact details and assignments. You can show this member again here anytime.
+                  </FieldDescription>
+                </FieldContent>
+                <Switch
+                  id="member-hidden"
+                  checked={form.hidden ?? false}
+                  onCheckedChange={(checked) => updateField("hidden", checked)}
+                  aria-describedby="member-hidden-description"
+                  disabled={saving}
+                />
+              </Field>
               <Field>
                 <FieldLabel htmlFor="member-first-name">First name</FieldLabel>
                 <Input id="member-first-name" value={form.firstName} onChange={(event) => updateField("firstName", event.target.value)} required />

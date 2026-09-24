@@ -18,7 +18,7 @@ export function MemberIndexClient() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    listMembers().then(setMembers).finally(() => setLoading(false));
+    listMembers().then((items) => setMembers(items.filter((member) => !member.hidden))).finally(() => setLoading(false));
   }, []);
 
   return (

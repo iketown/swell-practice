@@ -427,6 +427,7 @@ For administrators, changing volume, pan, or mute in a stem’s live accordion w
   lastName: string;
   displayName: string;
   slug: string;
+  hidden?: boolean; // absent on legacy documents means false
   photoUrl?: string;
   photoStoragePath?: string;
   createdAt: Timestamp;
@@ -447,6 +448,8 @@ For administrators, changing volume, pan, or mute in a stem’s live accordion w
 ```
 
 The public member document contains only the fields required for navigation and assignment views, including an optional square headshot. Contact details and admin notes are isolated in an admin-only document because member pages are accessible by URL in v1.
+
+Administrators can toggle “Hide from members page” in the member form. Hidden members are omitted from `/members` and the default `/admin/members` roster. Show hidden members in the admin roster reveals them with a Hidden badge so administrators can edit their contact details or restore visibility. Hiding preserves contact details, headshots, band membership, and assignments. Direct member URLs remain accessible; this is a directory visibility setting, not an access restriction. Existing members remain visible until explicitly hidden.
 
 ### `bands/{bandId}`
 

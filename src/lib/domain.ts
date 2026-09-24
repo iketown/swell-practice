@@ -413,6 +413,7 @@ export interface BandMember {
   lastName: string;
   displayName: string;
   slug: string;
+  hidden?: boolean;
   photoUrl?: string;
   photoStoragePath?: string;
   email?: string;

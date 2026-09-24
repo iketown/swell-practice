@@ -123,6 +123,7 @@ function memberFromDoc(id: string, data: Record<string, unknown>): BandMember {
     lastName: String(data.lastName ?? ""),
     displayName: String(data.displayName ?? data.firstName ?? ""),
     slug: String(data.slug ?? id),
+    hidden: data.hidden === true,
     photoUrl: typeof data.photoUrl === "string" ? data.photoUrl : undefined,
     photoStoragePath: typeof data.photoStoragePath === "string" ? data.photoStoragePath : undefined,
     email: typeof data.email === "string" ? data.email : undefined,
@@ -283,7 +284,7 @@ export async function createMember(input: Omit<BandMember, "id" | "slug">) {
 
   const firestore = requireDb();
   const memberRef = doc(collection(firestore, "members"));
-  const member = { firstName: input.firstName, lastName: input.lastName, displayName, slug };
+  const member = { firstName: input.firstName, lastName: input.lastName, displayName, slug, hidden: input.hidden === true };
   const batch = writeBatch(firestore);
   batch.set(memberRef, { ...member, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
   batch.set(doc(firestore, "memberPrivate", memberRef.id), {
@@ -304,7 +305,7 @@ export async function updateMember(member: BandMember, input: Omit<BandMember, "
   if (isDemoAssignments() || !db) {
     const store = readDemoStore();
     store.members = store.members.map((item) =>
-      item.id === member.id ? { ...input, id: member.id, displayName, slug } : item,
+      item.id === member.id ? { ...item, ...input, id: member.id, displayName, slug } : item,
     );
     writeDemoStore(store);
     return;
@@ -317,6 +318,7 @@ export async function updateMember(member: BandMember, input: Omit<BandMember, "
     lastName: input.lastName,
     displayName,
     slug,
+    hidden: input.hidden ?? member.hidden ?? false,
     updatedAt: serverTimestamp(),
   });
   batch.set(doc(firestore, "memberPrivate", member.id), {
