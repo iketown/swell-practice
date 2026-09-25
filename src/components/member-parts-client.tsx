@@ -28,6 +28,80 @@ function defaultTagIdsForPage(data: MemberAssignmentPageData | null) {
     .map((tag) => tag.id);
 }
 
+function MemberSongList({ rows, isAdmin, memberSlug }: {
+  rows: MemberAssignmentPageData["rows"];
+  isAdmin: boolean;
+  memberSlug: string;
+}) {
+  return (
+    <ul className="divide-y">
+      {rows.map((row) => (
+        <li
+          key={row.song.id}
+          className="flex min-h-16 flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="truncate font-semibold" title={row.song.title}>
+                {row.song.title}
+              </p>
+              {isAdmin && !isSongPublished(row.song) ? (
+                <Badge variant="outline">
+                  <EyeOffIcon aria-hidden />
+                  Unpublished
+                </Badge>
+              ) : null}
+            </div>
+            {!row.partSlugs.length ? (
+              <p className="text-sm text-muted-foreground">No assignment for this song</p>
+            ) : null}
+          </div>
+          {row.partSlugs.length ? (
+            <div className="flex flex-wrap gap-2 sm:justify-end">
+              {row.partSlugs.map((partSlug) => {
+                const mix = partSlug.startsWith("voc_") ? "voc" : "inst";
+                return (
+                  <Button
+                    key={partSlug}
+                    render={<Link href={`/songs/${row.song.slug}?mix=${mix}&part=${partSlug}&member=${memberSlug}`} />}
+                    variant="secondary"
+                    size="sm"
+                    nativeButton={false}
+                  >
+                    {partLabel(partSlug)}
+                  </Button>
+                );
+              })}
+            </div>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function tagFilterStorageKey(data: MemberAssignmentPageData) {
+  return `swell:member-tag-filters:${data.member.slug}:${data.selectedBand.id}`;
+}
+
+function restoredTagIdsForPage(data: MemberAssignmentPageData | null) {
+  if (!data) return [];
+  try {
+    const stored = window.localStorage.getItem(tagFilterStorageKey(data));
+    if (stored !== null) {
+      const parsed: unknown = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.every((id) => typeof id === "string")) {
+        const usedTagIds = new Set(data.rows.flatMap((row) => row.song.tagIds));
+        const validTagIds = new Set(data.tags.map((tag) => tag.id));
+        return parsed.filter((id) => validTagIds.has(id) && usedTagIds.has(id));
+      }
+    }
+  } catch {
+    // Storage may be unavailable or contain malformed data; use page defaults.
+  }
+  return defaultTagIdsForPage(data);
+}
+
 export function MemberPartsClient({ memberSlug }: { memberSlug: string }) {
   const admin = useAdmin();
   const [data, setData] = useState<MemberAssignmentPageData | null>(null);
@@ -41,7 +115,7 @@ export function MemberPartsClient({ memberSlug }: { memberSlug: string }) {
     try {
       const next = await getMemberAssignmentPage(memberSlug, bandId);
       setData(next);
-      setSelectedTagIds(defaultTagIdsForPage(next));
+      setSelectedTagIds(restoredTagIdsForPage(next));
       if (!next) setError("This member is not part of a saved band yet.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load these parts.");
@@ -56,7 +130,7 @@ export function MemberPartsClient({ memberSlug }: { memberSlug: string }) {
       .then((next) => {
         if (!active) return;
         setData(next);
-        setSelectedTagIds(defaultTagIdsForPage(next));
+        setSelectedTagIds(restoredTagIdsForPage(next));
         if (!next) setError("This member is not part of a saved band yet.");
       })
       .catch((caught) => {
@@ -89,6 +163,25 @@ export function MemberPartsClient({ memberSlug }: { memberSlug: string }) {
       : visibleRows,
     [selectedTagIds, visibleRows],
   );
+
+  const excludedRows = useMemo(
+    () => selectedTagIds.length
+      ? visibleRows.filter((row) => !selectedTagIds.some((tagId) => row.song.tagIds.includes(tagId)))
+      : [],
+    [selectedTagIds, visibleRows],
+  );
+
+  function updateSelectedTagIds(tagIds: string[]) {
+    setSelectedTagIds(tagIds);
+    if (!data) return;
+    try {
+      // Save immediately so navigation cannot interrupt persistence. An empty
+      // array remembers Show All instead of restoring the default tags.
+      window.localStorage.setItem(tagFilterStorageKey(data), JSON.stringify(tagIds));
+    } catch {
+      // Filtering remains usable when browser storage is unavailable.
+    }
+  }
 
   if (loading && !data) {
     return <AppShell><Skeleton className="h-40 w-full" /><Skeleton className="h-72 w-full" /></AppShell>;
@@ -145,7 +238,7 @@ export function MemberPartsClient({ memberSlug }: { memberSlug: string }) {
                 </div>
               </div>
               {selectedTagIds.length ? (
-                <Button onClick={() => setSelectedTagIds([])} size="xs" type="button" variant="ghost">
+                <Button onClick={() => updateSelectedTagIds([])} size="xs" type="button" variant="ghost">
                   <XIcon data-icon="inline-start" />
                   Clear
                 </Button>
@@ -155,13 +248,19 @@ export function MemberPartsClient({ memberSlug }: { memberSlug: string }) {
               aria-label="Song tag filters"
               className="flex w-full flex-wrap justify-start"
               multiple
-              onValueChange={setSelectedTagIds}
+              onValueChange={updateSelectedTagIds}
               size="sm"
               value={selectedTagIds}
               variant="outline"
             >
               {availableFilterTags.map((tag) => (
-                <ToggleGroupItem key={tag.id} value={tag.id}>{tag.label}</ToggleGroupItem>
+                <ToggleGroupItem
+                  key={tag.id}
+                  value={tag.id}
+                  className="aria-pressed:bg-foreground aria-pressed:text-background aria-pressed:hover:bg-foreground aria-pressed:hover:text-background"
+                >
+                  {tag.label}
+                </ToggleGroupItem>
               ))}
             </ToggleGroup>
           </section>
@@ -179,49 +278,7 @@ export function MemberPartsClient({ memberSlug }: { memberSlug: string }) {
         </header>
         <div className="swell-panel overflow-hidden">
           {filteredRows.length ? (
-            <ul className="divide-y">
-              {filteredRows.map((row) => (
-                <li
-                  key={row.song.id}
-                  className="flex min-h-16 flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="truncate font-semibold" title={row.song.title}>
-                        {row.song.title}
-                      </p>
-                      {admin.isAdmin && !isSongPublished(row.song) ? (
-                        <Badge variant="outline">
-                          <EyeOffIcon aria-hidden />
-                          Unpublished
-                        </Badge>
-                      ) : null}
-                    </div>
-                    {!row.partSlugs.length ? (
-                      <p className="text-sm text-muted-foreground">No assignment for this song</p>
-                    ) : null}
-                  </div>
-                  {row.partSlugs.length ? (
-                    <div className="flex flex-wrap gap-2 sm:justify-end">
-                      {row.partSlugs.map((partSlug) => {
-                        const mix = partSlug.startsWith("voc_") ? "voc" : "inst";
-                        return (
-                          <Button
-                            key={partSlug}
-                            render={<Link href={`/songs/${row.song.slug}?mix=${mix}&part=${partSlug}&member=${data.member.slug}`} />}
-                            variant="secondary"
-                            size="sm"
-                            nativeButton={false}
-                          >
-                            {partLabel(partSlug)}
-                          </Button>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
+            <MemberSongList rows={filteredRows} isAdmin={admin.isAdmin} memberSlug={data.member.slug} />
           ) : (
             <Empty>
               <EmptyHeader>
@@ -241,6 +298,19 @@ export function MemberPartsClient({ memberSlug }: { memberSlug: string }) {
             <EmptyDescription>An admin can add parts from the Band Assignments page.</EmptyDescription>
           </EmptyHeader>
         </Empty>
+      ) : null}
+      {excludedRows.length ? (
+        <section className="flex flex-col gap-4" aria-labelledby="member-filtered-title">
+          <header className="flex items-center gap-3 px-1">
+            <h2 id="member-filtered-title" className="text-xl font-semibold">Filtered</h2>
+            <Button onClick={() => updateSelectedTagIds([])} size="xs" type="button" variant="outline">
+              Show All
+            </Button>
+          </header>
+          <div className="swell-panel overflow-hidden opacity-50">
+            <MemberSongList rows={excludedRows} isAdmin={admin.isAdmin} memberSlug={data.member.slug} />
+          </div>
+        </section>
       ) : null}
     </AppShell>
   );
