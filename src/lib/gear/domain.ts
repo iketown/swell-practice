@@ -83,6 +83,9 @@ export interface PublicGearAsset {
 
 export interface InventoryAsset {
   id: string;
+  /** Original ledger transaction. Codes and links survive financial reversals. */
+  moneyEntryId?: string;
+  detailsNeeded?: boolean;
   assetTag: string;
   assetCodeGroup?: InventoryAssetCodeGroup;
   assetCodeVersion?: number;

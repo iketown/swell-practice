@@ -128,7 +128,15 @@ service cloud.firestore {
     }
 
     match /inventoryAssets/{assetId} {
-      allow read, create, update, delete: if isAdmin();
+      allow read: if isAdmin();
+      allow create: if isAdmin() && !('moneyEntryId' in request.resource.data);
+      allow update: if isAdmin()
+        && request.resource.data.get('moneyEntryId', '') == resource.data.get('moneyEntryId', '')
+        && (!('moneyEntryId' in resource.data) || (
+          request.resource.data.assetTag == resource.data.assetTag
+          && request.resource.data.ownerPartyId == resource.data.ownerPartyId
+        ));
+      allow delete: if isAdmin() && !('moneyEntryId' in resource.data);
 
       match /checkIns/{checkInId} {
         allow read, create: if isAdmin();
@@ -166,6 +174,39 @@ service cloud.firestore {
 
     match /purchaseOrders/{orderId} {
       allow read, create, update, delete: if isAdmin();
+    }
+
+    match /gearCodeRegistry/{registryId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && request.resource.data.keys().hasOnly(['usedCodes'])
+        && request.resource.data.usedCodes is list;
+      allow update: if isAdmin() && request.resource.data.keys().hasOnly(['usedCodes'])
+        && request.resource.data.usedCodes is list
+        && request.resource.data.usedCodes.hasAll(resource.data.usedCodes);
+      allow delete: if false;
+    }
+
+    // The finance API validates every write. These records never use public rules.
+    match /moneyEntries/{entryId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /moneyDrafts/{draftId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /moneyReceipts/{receiptId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /moneyAgentMessages/{messageId} {
+      allow read, write: if false;
+    }
+    match /moneyPlaybookEdits/{editId} {
+      allow read, write: if false;
+    }
+    match /moneySettings/{settingId} {
+      allow read, write: if false;
     }
 
     match /connectorTypes/{connectorTypeId} {

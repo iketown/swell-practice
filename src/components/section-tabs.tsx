@@ -31,6 +31,7 @@ export function SectionTabs() {
         ...(admin.user ? [{ href: "/projects", label: "Projects" }] : []),
         { href: "/setups", label: "Setups" },
         { href: "/gear", label: "Gear" },
+        { href: "/money", label: "Money" },
         { href: "/docs", label: "Docs" },
       ]
     : baseTabs;

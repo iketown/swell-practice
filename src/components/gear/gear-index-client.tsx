@@ -242,6 +242,7 @@ export function GearIndexClient({ initialQuery = "" }: { initialQuery?: string }
             <div className="mt-5 flex flex-wrap gap-2">
               <Link href={scannerHref} className={buttonVariants()}><ScanLineIcon data-icon="inline-start" />Scan gear</Link>
               <Link href={packHref} className={buttonVariants({ variant: "secondary" })}><BoxesIcon data-icon="inline-start" />Pack a bag</Link>
+              <Link href={admin.isDemoAdmin ? "/money?demo=1" : "/money"} className={buttonVariants({ variant: "outline" })}>Money & receipts</Link>
               <Button variant="secondary" onClick={() => beginCreateAsset("planned")}><PackagePlusIcon data-icon="inline-start" />Plan gear</Button>
               <Button variant="outline" onClick={() => beginCreateAsset("active")}><PackageCheckIcon data-icon="inline-start" />Register owned gear</Button>
               <Button variant="outline" onClick={() => setCreatingDefinition(true)}><PlusIcon data-icon="inline-start" />New definition</Button>
@@ -591,6 +592,8 @@ function AssetSection({
                   <div className="flex flex-wrap items-center gap-2"><h3 className="truncate font-semibold">{asset.label}</h3><Badge variant={asset.lifecycleStatus === "active" ? "secondary" : "outline"}>{lifecycleLabel(asset.lifecycleStatus)}</Badge>{isContainerInventoryAsset(asset) ? <Badge variant="secondary">Container</Badge> : null}{isCable ? <Badge variant="outline">{CABLE_INVENTORY_TAG}</Badge> : null}{asset.cableManufacturer ? <Badge variant="outline">{asset.cableManufacturer}</Badge> : null}{isCable && asset.cableColor ? <Badge variant="outline"><CableColorSwatch color={asset.cableColor} />{cableColorLabel(asset.cableColor)}</Badge> : null}{cableLength ? <Badge variant="outline">{cableLength} · {asset.cableLengthInches} in</Badge> : null}{powerLabel ? <Badge variant="outline">{powerLabel}</Badge> : null}{!isCable && asset.stageOnly ? <Badge variant="outline">STAGE only</Badge> : null}</div>
                   <p className="truncate text-sm text-muted-foreground">{definition ? isCable ? definition.name : [definition.manufacturer, definition.model || definition.name].filter(Boolean).join(" · ") : "No reusable definition"}</p>
                   <code className="mt-1 block text-xs text-muted-foreground">{asset.assetTag}</code>
+                  {asset.detailsNeeded ? <Badge variant="outline">Details needed</Badge> : null}
+                  {asset.moneyEntryId ? <Link className="mt-1 block text-sm text-primary underline underline-offset-4" href={`/money/${asset.moneyEntryId}${typeof window !== "undefined" && new URLSearchParams(window.location.search).get("demo") === "1" ? "?demo=1" : ""}`}>Purchase & reimbursement</Link> : null}
                 </div>
                 <dl className="grid gap-1 text-sm">
                   <div className="flex min-w-0 items-baseline gap-2"><dt className="shrink-0 text-muted-foreground">Owner:</dt><dd className="min-w-0 truncate font-medium">{owner?.name ?? "Unassigned"}</dd></div>

@@ -68,5 +68,10 @@ service firebase.storage {
         ];
       allow delete: if isAdmin();
     }
+
+    // Receipt bytes are served through the authenticated finance API only.
+    match /money-receipts/{filePath=**} {
+      allow read, write: if false;
+    }
   }
 }

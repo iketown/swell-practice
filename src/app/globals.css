@@ -162,6 +162,36 @@
 }
 
 @layer components {
+  .money-review-row[data-review-state="pending"] {
+    background-color: color-mix(in oklch, var(--swell-gold) 22%, var(--card));
+    border-color: color-mix(in oklch, var(--swell-gold) 55%, var(--border));
+  }
+
+  .money-review-row[data-review-state="complete"] {
+    background-color: color-mix(in oklch, var(--swell-success) 16%, var(--card));
+    border-color: color-mix(in oklch, var(--swell-success) 48%, var(--border));
+  }
+
+  .money-review-row[data-review-state="pending"] .money-review-status {
+    background-color: color-mix(in oklch, var(--swell-gold) 18%, var(--card));
+    border-color: color-mix(in oklch, var(--swell-gold) 60%, var(--border));
+    color: oklch(0.4 0.1 74);
+  }
+
+  .money-review-row[data-review-state="complete"] .money-review-status {
+    background-color: color-mix(in oklch, var(--swell-success) 15%, var(--card));
+    border-color: color-mix(in oklch, var(--swell-success) 54%, var(--border));
+    color: oklch(0.38 0.13 146);
+  }
+
+  .dark .money-review-row[data-review-state="pending"] .money-review-status {
+    color: oklch(0.88 0.11 82);
+  }
+
+  .dark .money-review-row[data-review-state="complete"] .money-review-status {
+    color: oklch(0.86 0.15 146);
+  }
+
   .swell-shell {
     background-color: var(--background);
   }

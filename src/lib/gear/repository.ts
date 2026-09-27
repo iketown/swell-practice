@@ -197,7 +197,7 @@ function isDemoMode() {
   return !hasFirebaseConfig || (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("demo") === "1");
 }
 
-function readDemoStore() {
+export function readDemoStore() {
   if (typeof window === "undefined") return seedDemoStore();
   const stored = window.localStorage.getItem(DEMO_STORE_KEY);
   if (!stored) {
@@ -254,7 +254,7 @@ function readDemoStore() {
   }
 }
 
-function writeDemoStore(store: GearDemoStore) {
+export function writeDemoStore(store: GearDemoStore) {
   window.localStorage.setItem(DEMO_STORE_KEY, JSON.stringify(store));
 }
 
@@ -415,6 +415,8 @@ function assetFromData(id: string, value: Record<string, unknown>): InventoryAss
   const effectiveLocationId = stringValue(value.effectiveLocationId) ?? legacyLocationId;
   return {
     id,
+    moneyEntryId: stringValue(value.moneyEntryId),
+    detailsNeeded: value.detailsNeeded === true,
     assetTag: String(value.assetTag ?? id),
     assetCodeGroup: normalizeInventoryAssetCodeGroup(value.assetCodeGroup),
     assetCodeVersion: typeof value.assetCodeVersion === "number" && Number.isInteger(value.assetCodeVersion)
@@ -645,18 +647,27 @@ async function assignMissingInventoryAssetCodes(
   }
 
   const changedAssets = migrated.filter((asset) => replacements.has(asset.id));
+  const firestore = db;
   for (let start = 0; start < changedAssets.length; start += 400) {
-    const batch = writeBatch(db);
-    for (const asset of changedAssets.slice(start, start + 400)) {
-      const replacement = replacements.get(asset.id)!;
-      batch.update(doc(db, "inventoryAssets", asset.id), {
-        assetTag: replacement.code,
-        assetCodeGroup: replacement.group,
-        assetCodeVersion: INVENTORY_ASSET_CODE_SCHEME_VERSION,
-        updatedAt: serverTimestamp(),
-      });
-    }
-    await batch.commit();
+    const slice = changedAssets.slice(start, start + 400);
+    const assigned = await runTransaction(firestore, async (transaction) => {
+      const registryRef = doc(firestore, "gearCodeRegistry", "current");
+      const registry = await transaction.get(registryRef);
+      const fresh = await Promise.all(slice.map(asset => transaction.get(doc(firestore, "inventoryAssets", asset.id))));
+      const reserved = new Set<string>([...(registry.data()?.usedCodes ?? []), ...assets.map(asset => asset.assetTag).filter(isInventoryAssetCode)]);
+      const result = new Map<string, string>();
+      for (const record of fresh) {
+        if (!record.exists()) continue;
+        const old = record.data(), replacement = replacements.get(record.id)!;
+        const code = isInventoryAssetCode(old.assetTag) && old.assetCodeVersion === INVENTORY_ASSET_CODE_SCHEME_VERSION
+          ? old.assetTag : createInventoryAssetCode(reserved, replacement.group);
+        reserved.add(code); result.set(record.id, code);
+        transaction.update(record.ref, { assetTag: code, assetCodeGroup: replacement.group, assetCodeVersion: INVENTORY_ASSET_CODE_SCHEME_VERSION, updatedAt: serverTimestamp() });
+      }
+      transaction.set(registryRef, { usedCodes: [...reserved] });
+      return result;
+    });
+    for (const asset of migrated) if (assigned.has(asset.id)) asset.assetTag = assigned.get(asset.id)!;
   }
   await syncPublicGearAssetRecords(migrated);
   return migrated;
@@ -690,10 +701,12 @@ export async function syncPublicGearAssetRecords(assets: InventoryAsset[]) {
   if (isDemoMode() || !db) return;
   const existingSnapshots = await getDocs(collection(db, "gearPublicAssets"));
   const existing = new Map(existingSnapshots.docs.map((item) => [item.id, publicGearAssetFromData(item.data())]));
-  const currentTags = new Set(assets.map((asset) => canonicalizeAssetTag(asset.assetTag)));
   const obsoleteSnapshots = existingSnapshots.docs.filter((item) => {
     const storedTag = canonicalizeAssetTag(String(item.data().assetTag ?? ""));
-    return !isInventoryAssetCode(storedTag) || !currentTags.has(storedTag);
+    // Callers may supply just one edited item or a snapshot taken before a new
+    // receipt created gear. Never delete another item's numeric QR record here.
+    // Explicit inventory deletion already removes its own public record.
+    return !isInventoryAssetCode(storedTag);
   });
   for (let start = 0; start < obsoleteSnapshots.length; start += 400) {
     const batch = writeBatch(db);
@@ -755,6 +768,8 @@ async function uploadAssetPhoto(assetId: string, file: File, onProgress?: (progr
 
 function assetDocumentValue(asset: InventoryAsset) {
   return {
+    ...(asset.moneyEntryId ? { moneyEntryId: asset.moneyEntryId } : {}),
+    detailsNeeded: asset.detailsNeeded === true,
     assetTag: asset.assetTag,
     assetCodeGroup: asset.assetCodeGroup ?? "general",
     assetCodeVersion: asset.assetCodeVersion ?? INVENTORY_ASSET_CODE_SCHEME_VERSION,
@@ -810,7 +825,7 @@ export async function saveInventoryAsset(
   const cableColor = isCable ? normalizeCableColor(input.cableColor) ?? "black" : undefined;
   const purchaseUrlInput = input.purchaseUrl?.trim() ?? "";
   const purchaseUrl = purchaseUrlInput ? normalizeAssetPurchaseUrl(purchaseUrlInput) : undefined;
-  if (isCable && !cableLengthInches) throw new Error("Enter the cable length in feet or inches.");
+  if (isCable && !cableLengthInches && !previousAsset?.moneyEntryId) throw new Error("Enter the cable length in feet or inches.");
   if (purchaseUrlInput && !purchaseUrl) throw new Error("Use a complete http:// or https:// purchase URL.");
   const existingAssetTags = existingAssets.filter((item) => item.id !== id).map((item) => item.assetTag);
   const assetCodeGroup = input.assetCodeGroup
@@ -842,6 +857,8 @@ export async function saveInventoryAsset(
     : previousAsset?.effectiveLocationId ?? previousAsset?.currentLocationId;
   const asset: InventoryAsset = {
     id,
+    moneyEntryId: previousAsset?.moneyEntryId,
+    detailsNeeded: Boolean(previousAsset?.moneyEntryId) && (!input.definitionId || (isCable && !cableLengthInches)),
     assetTag,
     assetCodeGroup,
     assetCodeVersion: INVENTORY_ASSET_CODE_SCHEME_VERSION,
@@ -892,11 +909,27 @@ export async function saveInventoryAsset(
     purchaseOrderId: existingAsset?.purchaseOrderId,
     purchaseOrderLineId: existingAsset?.purchaseOrderLineId,
   };
-  await setDoc(doc(firestoreOrThrow(), "inventoryAssets", id), {
-    ...assetDocumentValue(storedAsset),
-    createdAt: existingAsset ? existingData?.createdAt ?? serverTimestamp() : serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  }, { merge: true });
+  await runTransaction(firestoreOrThrow(), async (transaction) => {
+    const registryRef = doc(firestoreOrThrow(), "gearCodeRegistry", "current");
+    const assetRef = doc(firestoreOrThrow(), "inventoryAssets", id);
+    const [registry, fresh] = await Promise.all([transaction.get(registryRef), transaction.get(assetRef)]);
+    const reserved = new Set<string>([...(registry.data()?.usedCodes ?? []), ...existingAssetTags]);
+    // New browser-created gear and receipt-created gear share this allocator lock.
+    if (!fresh.exists() && reserved.has(storedAsset.assetTag)) storedAsset.assetTag = createInventoryAssetCode(reserved, assetCodeGroup);
+    if (fresh.exists()) {
+      storedAsset.assetTag = fresh.data().assetTag;
+      storedAsset.moneyEntryId = fresh.data().moneyEntryId || undefined;
+      storedAsset.ownerPartyId = fresh.data().moneyEntryId ? fresh.data().ownerPartyId : storedAsset.ownerPartyId;
+      storedAsset.detailsNeeded = Boolean(storedAsset.moneyEntryId) && (!storedAsset.definitionId || (isCable && !storedAsset.cableLengthInches));
+    }
+    reserved.add(storedAsset.assetTag);
+    transaction.set(registryRef, { usedCodes: [...reserved] });
+    transaction.set(assetRef, {
+      ...assetDocumentValue(storedAsset),
+      createdAt: fresh.exists() ? fresh.data().createdAt : serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  });
   await syncPublicGearAssetRecords([storedAsset]).catch((syncError) => {
     console.warn("Could not update the public QR label record.", syncError);
   });
@@ -1077,6 +1110,7 @@ function partitionConnectionSetInput(input: InventoryConnectionSetInput & { id: 
 
 export async function deleteInventoryAssets(assets: readonly InventoryAsset[]) {
   if (!assets.length) return;
+  if (assets.some(asset => asset.moneyEntryId)) throw new Error("Gear linked to Money must be retired instead of deleted so its four-digit code and financial history remain available.");
   const deletedAssetIds = new Set(assets.map((asset) => asset.id));
   const remainingContents = (await listInventoryAssets()).filter((asset) => (
     asset.currentPlacement?.kind === "container"

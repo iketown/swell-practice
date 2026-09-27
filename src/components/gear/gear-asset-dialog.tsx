@@ -227,7 +227,7 @@ export function GearAssetDialog({
   const canResearchDefinition = !asset && !duplicateFrom && !initialDefinitionId && !cableAssetSelected && !containerAssetSelected;
   const physicalStatus = lifecycleStatus === "active" || lifecycleStatus === "awaiting_check_in";
   const normalizedCableLengthInches = normalizeCableLengthInches(Number(cableLengthInches));
-  const cableLengthIssue = cableAssetSelected && !normalizedCableLengthInches
+  const cableLengthIssue = cableAssetSelected && !normalizedCableLengthInches && !asset?.moneyEntryId
     ? "Enter the cable length in feet or inches."
     : null;
   const cableDefinitionIssue = cableAssetSelected && !asset && !duplicateFrom && (!definition || !isCableDefinition(definition))
@@ -795,7 +795,7 @@ export function GearAssetDialog({
           <FieldGroup className="grid gap-4 sm:grid-cols-2">
             <Field className="sm:col-span-2">
               <FieldLabel htmlFor="gear-asset-definition">{cableAssetSelected ? "Cable definition" : containerAssetSelected ? "Container definition" : "Gear definition"}</FieldLabel>
-              <Select value={researchResult ? null : definitionId || NO_DEFINITION_VALUE} onValueChange={chooseDefinition} disabled={saving || Boolean(asset) || Boolean(researchResult)}>
+              <Select value={researchResult ? null : definitionId || NO_DEFINITION_VALUE} onValueChange={chooseDefinition} disabled={saving || Boolean(asset?.definitionId) || Boolean(researchResult)}>
                 <SelectTrigger id="gear-asset-definition" className="w-full">
                   <SelectValue>{researchResult
                     ? `New definition: ${researchResult.name}`
@@ -902,7 +902,7 @@ export function GearAssetDialog({
                       inputMode="decimal"
                       value={cableLengthFeet}
                       onChange={(event) => changeCableLengthFeet(event.target.value)}
-                      required
+                      required={!asset?.moneyEntryId}
                       aria-invalid={showCableLengthIssue}
                       disabled={saving}
                     />
@@ -917,7 +917,7 @@ export function GearAssetDialog({
                       inputMode="decimal"
                       value={cableLengthInches}
                       onChange={(event) => changeCableLengthInches(event.target.value)}
-                      required
+                      required={!asset?.moneyEntryId}
                       aria-invalid={showCableLengthIssue}
                       disabled={saving}
                     />
@@ -939,7 +939,7 @@ export function GearAssetDialog({
             </Field>
             <Field>
               <FieldLabel htmlFor="gear-asset-owner">Owner</FieldLabel>
-              <Select value={ownerPartyId || "none"} onValueChange={(value) => setOwnerPartyId(value === "none" || !value ? "" : value)} disabled={saving}>
+              <Select value={ownerPartyId || "none"} onValueChange={(value) => setOwnerPartyId(value === "none" || !value ? "" : value)} disabled={saving || Boolean(asset?.moneyEntryId)}>
                 <SelectTrigger id="gear-asset-owner" className="w-full">
                   <SelectValue>{ownerPartyId ? parties.find((party) => party.id === ownerPartyId)?.name ?? "Unknown owner" : "Not assigned"}</SelectValue>
                 </SelectTrigger>
