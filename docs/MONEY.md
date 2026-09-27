@@ -53,7 +53,9 @@ Run from the project root:
 
 ```sh
 node --import ./tools/money/register-test-loader.mjs --test tools/money/ledger.test.mjs
+node --import ./tools/money/register-test-loader.mjs --test tools/money/ronnie-gear.test.mjs
 firebase emulators:exec --only firestore --project demo-swell-money --config firebase.money.test.json 'FIREBASE_ADMIN_PROJECT_ID=demo-swell-money node --import ./tools/money/register-test-loader.mjs --test tools/money/store.test.mjs'
+firebase emulators:exec --only firestore --project demo-swell-money --config firebase.money.test.json 'FIREBASE_ADMIN_PROJECT_ID=demo-swell-money node --import ./tools/money/register-test-loader.mjs --test tools/money/ronnie-gear.store.test.mjs'
 pnpm exec tsc --noEmit
 pnpm lint
 pnpm build
@@ -72,6 +74,12 @@ For clothes, select **Purchase / expense**, select Clothing, enter who paid and 
 ## Swell playbook
 
 Open **Swell playbook** on `/money` to review, add, edit, archive, or restore standing company policies and customary musician rates. The panel shows when a rule last changed and a recent before/after history. Ike or Chris can also give Ronnie an explicit instruction to remember or change a rule in chat; she saves it to the same playbook and returns a review link. Attach receipts to transaction messages, not policy-change messages. Ronnie does not treat one-off payments or receipt text as a new standing policy. A playbook rate guides questions and review; the ledger still records the amount actually paid, and changing a rule never changes past transactions.
+
+## Ask Ronnie about Gear and check items in
+
+Ronnie can answer “Where are our mic stands?”, “What gear is at Chris's house?”, “What's in case 1001?”, “When was 0200 last checked in?”, and “What's happening with gear?” She reads the live Gear records and distinguishes a direct check-in from a location inherited through a case. Results are last recorded observations, not live GPS; packing checklist status does not prove an item was verified for the current trip. Item codes in her answer link to their Gear pages. Her maintained system guide explains how Money, Gear, check-ins, containers, packing, and setups relate; new site capabilities should be added to that guide and given a specific tool rather than relying on old chat messages.
+
+To record a clear move, send a message such as **“Hey Ronnie, I just moved 1501, 1502 and 2003 to Chris's house.”** Ronnie resolves the exact codes and the existing location, writes check-in history, updates the items' last-known location, and replies with all moved codes. Connected gear moves together; moving a case also updates the effective location of gear inside it without inventing individual scans. Repeating the same chat message cannot check items in twice. Unknown codes, missing or ambiguous destinations, and stale container locations leave everything unchanged; she asks for a correction. Use the named destination or a container's four-digit code, and send check-in instructions without a receipt. This chat action changes Gear placement only: it does not change ownership, balances, or transactions. The Gear check-in and packing screens remain available for scanning and trip verification.
 
 ## Add a receipt to an existing transaction
 

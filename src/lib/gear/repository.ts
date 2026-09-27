@@ -21,6 +21,8 @@ import {
   canonicalizeAssetTag,
   createInventoryAssetCode,
   createGearId,
+  DEFAULT_GEAR_LOCATIONS as DEFAULT_LOCATIONS,
+  DEFAULT_GEAR_PARTIES as DEFAULT_PARTIES,
   inferInventoryAssetCodeGroup,
   isCableInventoryAsset,
   isInventoryAssetCode,
@@ -55,6 +57,7 @@ import {
 } from "@/lib/gear/domain";
 import { normalizePowerDependencies, type EquipmentImage, type EquipmentTemplate } from "@/lib/setup-designer/domain";
 import { listEquipmentTemplates } from "@/lib/setup-designer/repository";
+import { planInventoryCheckIn } from "@/lib/gear/check-in-plan";
 
 const DEMO_STORE_KEY = "swell-parts:gear:v1";
 const INVENTORY_CODE_GROUP_ORDER: InventoryAssetCodeGroup[] = [
@@ -133,20 +136,6 @@ export interface PurchaseOrderInput {
   lines: PurchaseOrderLine[];
   createdAt?: number;
 }
-
-const DEFAULT_PARTIES: GearParty[] = [
-  { id: "party-the-swell", name: "The Swell", kind: "band", status: "active", updatedAt: 0 },
-  { id: "party-ike", name: "Ike", kind: "person", status: "active", updatedAt: 0 },
-  { id: "party-cron", name: "Cron", kind: "person", status: "active", updatedAt: 0 },
-  { id: "party-backline", name: "Backline company", kind: "provider", status: "active", updatedAt: 0 },
-];
-
-const DEFAULT_LOCATIONS: GearLocation[] = [
-  { id: "location-ike-house", name: "Ike's house", kind: "house", status: "active", updatedAt: 0 },
-  { id: "location-cron-house", name: "Cron's house", kind: "house", status: "active", updatedAt: 0 },
-  { id: "location-ike-car", name: "Ike's car", kind: "vehicle", status: "active", updatedAt: 0 },
-  { id: "location-rehearsal", name: "Rehearsal studio", kind: "studio", status: "active", updatedAt: 0 },
-];
 
 function seedDemoStore(): GearDemoStore {
   const now = Date.now();
@@ -1298,77 +1287,6 @@ export async function savePurchaseOrder(input: PurchaseOrderInput) {
   return order;
 }
 
-export const CONTAINER_LOCATION_CONFIRMATION_MAX_AGE_MS = 30 * 60 * 1000;
-export const MAX_CONTAINER_NESTING_DEPTH = 5;
-
-function placementSnapshotForAsset(
-  assetId: string,
-  assetsById: ReadonlyMap<string, InventoryAsset>,
-  resolving = new Set<string>(),
-): Pick<InventoryAsset, "effectiveLocationId" | "currentLocationId" | "locationInheritedFromAssetId" | "ancestorContainerIds"> {
-  const asset = assetsById.get(assetId);
-  if (!asset) return { locationInheritedFromAssetId: undefined, ancestorContainerIds: [] };
-  if (resolving.has(assetId)) throw new Error("A container cannot be placed inside itself.");
-  const placement = asset.currentPlacement;
-  if (!placement) return { ancestorContainerIds: [] };
-  if (placement.kind === "location") {
-    return {
-      effectiveLocationId: placement.locationId,
-      currentLocationId: placement.locationId,
-      locationInheritedFromAssetId: undefined,
-      ancestorContainerIds: [],
-    };
-  }
-
-  const container = assetsById.get(placement.containerAssetId);
-  if (!container?.canContainAssets) throw new Error("The selected container no longer exists.");
-  const nextResolving = new Set(resolving).add(assetId);
-  const parentSnapshot = placementSnapshotForAsset(container.id, assetsById, nextResolving);
-  const ancestorContainerIds = [container.id, ...(parentSnapshot.ancestorContainerIds ?? [])];
-  if (ancestorContainerIds.length > MAX_CONTAINER_NESTING_DEPTH) {
-    throw new Error(`Containers can be nested up to ${MAX_CONTAINER_NESTING_DEPTH} levels deep.`);
-  }
-  return {
-    effectiveLocationId: parentSnapshot.effectiveLocationId,
-    currentLocationId: parentSnapshot.effectiveLocationId,
-    locationInheritedFromAssetId: container.id,
-    ancestorContainerIds,
-  };
-}
-
-function withResolvedPlacementSnapshots(
-  assets: readonly InventoryAsset[],
-  directlyPlacedAssets: readonly InventoryAsset[],
-  checkedInAt: number,
-) {
-  const directlyPlacedById = new Map(directlyPlacedAssets.map((asset) => [asset.id, asset]));
-  const assetsById = new Map(assets.map((asset) => [asset.id, directlyPlacedById.get(asset.id) ?? asset]));
-  const propagatedAssets: InventoryAsset[] = [];
-
-  for (const asset of assetsById.values()) {
-    const snapshot = placementSnapshotForAsset(asset.id, assetsById);
-    const previous = assets.find((item) => item.id === asset.id) ?? asset;
-    const changed = directlyPlacedById.has(asset.id)
-      || snapshot.effectiveLocationId !== previous.effectiveLocationId
-      || snapshot.currentLocationId !== previous.currentLocationId
-      || snapshot.locationInheritedFromAssetId !== previous.locationInheritedFromAssetId
-      || JSON.stringify(snapshot.ancestorContainerIds ?? []) !== JSON.stringify(previous.ancestorContainerIds ?? []);
-    if (!changed) continue;
-    const updated = {
-      ...asset,
-      ...snapshot,
-      updatedAt: checkedInAt,
-    };
-    assetsById.set(asset.id, updated);
-    propagatedAssets.push(updated);
-  }
-
-  return {
-    propagatedAssets,
-    directlyPlacedAssets: directlyPlacedAssets.map((asset) => assetsById.get(asset.id) ?? asset),
-  };
-}
-
 export async function checkInInventoryAsset(input: {
   assetId: string;
   destination?: CheckInDestination;
@@ -1390,61 +1308,15 @@ export async function checkInInventoryAsset(input: {
     listInventoryConnectionSets(),
     listGearLocations(),
   ]);
-  const sourceAsset = assets.find((asset) => asset.id === input.assetId);
-  if (!sourceAsset) throw new Error("This gear item no longer exists.");
-  if (destination.kind === "location" && !locations.some((location) => location.id === destination.locationId)) {
-    throw new Error("The selected location no longer exists.");
-  }
-
-  const connectionSet = (sourceAsset.connectionSetId
-    ? connectionSets.find((item) => item.id === sourceAsset.connectionSetId)
-    : undefined)
-    ?? connectionSets.find((item) => item.memberAssetIds.includes(sourceAsset.id));
-  const affectedAssetIds = connectionSet?.memberAssetIds.length ? connectionSet.memberAssetIds : [sourceAsset.id];
-  const affectedAssetIdSet = new Set(affectedAssetIds);
-  const affectedAssets = affectedAssetIds.flatMap((assetId) => {
-    const asset = assets.find((item) => item.id === assetId);
-    return asset ? [asset] : [];
-  });
   const checkedInAt = Date.now();
-
-  if (destination.kind === "container") {
-    const container = assets.find((asset) => asset.id === destination.containerAssetId);
-    if (!container?.canContainAssets) throw new Error("Choose a registered container.");
-    if (affectedAssetIdSet.has(container.id) || container.ancestorContainerIds?.some((id) => affectedAssetIdSet.has(id))) {
-      throw new Error("A container cannot be placed inside itself or one of its contents.");
-    }
-    if (container.currentPlacement?.kind !== "location" || !container.effectiveLocationId || !container.lastPlacedAt) {
-      throw new Error("Check the container into a location before adding items.");
-    }
-    if (checkedInAt - container.lastPlacedAt > CONTAINER_LOCATION_CONFIRMATION_MAX_AGE_MS) {
-      throw new Error("Confirm the container's current location before adding items.");
-    }
-  }
-
   const operationId = input.operationId ?? createGearId("checkin-operation");
-  const checkIns = affectedAssets.map((asset): InventoryCheckIn => ({
-    id: `${operationId}-${asset.id}`,
-    assetId: asset.id,
-    destination,
-    locationId: destination.kind === "location" ? destination.locationId : undefined,
-    method: input.method,
-    actorId: input.actorId,
-    operationId,
-    latitude: input.latitude,
-    longitude: input.longitude,
-    accuracyMeters: input.accuracyMeters,
-    notes: input.notes?.trim() || undefined,
-    checkedInAt,
-  }));
-  const directlyPlacedAssets = affectedAssets.map((asset): InventoryAsset => ({
-    ...asset,
-    lifecycleStatus: "active",
-    currentPlacement: destination,
-    lastPlacedAt: checkedInAt,
-    updatedAt: checkedInAt,
-  }));
-  const resolved = withResolvedPlacementSnapshots(assets, directlyPlacedAssets, checkedInAt);
+  const resolved = planInventoryCheckIn(assets, connectionSets, locations, {
+    sourceAssetIds: [input.assetId], destination, method: input.method, actorId: input.actorId,
+    operationId, checkedInAt, notes: input.notes, latitude: input.latitude,
+    longitude: input.longitude, accuracyMeters: input.accuracyMeters,
+  });
+  const checkIns = resolved.checkIns;
+  const affectedAssetIdSet = new Set(resolved.affectedAssetIds);
 
   if (isDemoMode() || !db) {
     const store = readDemoStore();

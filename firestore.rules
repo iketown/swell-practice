@@ -208,6 +208,10 @@ service cloud.firestore {
     match /moneySettings/{settingId} {
       allow read, write: if false;
     }
+    match /gearAgentCheckIns/{operationId} {
+      // Ronnie's idempotency receipts are written only by the authenticated API.
+      allow read, write: if false;
+    }
 
     match /connectorTypes/{connectorTypeId} {
       allow read, create, update, delete: if isAdmin();

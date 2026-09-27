@@ -16,6 +16,7 @@ export type PaymentStatus = "not_paid" | "partially_paid" | "paid" | "refunded";
 export type CheckInMethod =
   | "manual_single"
   | "manual_bulk"
+  | "agent_chat"
   | "qr_camera"
   | "manual"
   | "qr";
@@ -74,6 +75,20 @@ export interface GearLocation {
   lastCheckInAt?: number;
   updatedAt: number;
 }
+
+export const DEFAULT_GEAR_PARTIES: GearParty[] = [
+  { id: "party-the-swell", name: "The Swell", kind: "band", status: "active", updatedAt: 0 },
+  { id: "party-ike", name: "Ike", kind: "person", status: "active", updatedAt: 0 },
+  { id: "party-cron", name: "Cron", kind: "person", status: "active", updatedAt: 0 },
+  { id: "party-backline", name: "Backline company", kind: "provider", status: "active", updatedAt: 0 },
+];
+
+export const DEFAULT_GEAR_LOCATIONS: GearLocation[] = [
+  { id: "location-ike-house", name: "Ike's house", kind: "house", status: "active", updatedAt: 0 },
+  { id: "location-cron-house", name: "Cron's house", kind: "house", status: "active", updatedAt: 0 },
+  { id: "location-ike-car", name: "Ike's car", kind: "vehicle", status: "active", updatedAt: 0 },
+  { id: "location-rehearsal", name: "Rehearsal studio", kind: "studio", status: "active", updatedAt: 0 },
+];
 
 export interface PublicGearAsset {
   assetTag: string;
