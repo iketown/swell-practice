@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="480" viewBox="0 0 100 80">
+  <title>Overhead four-piece drum kit</title>
+  <desc>Kick, snare, one 12-inch rack tom and one 16-inch floor tom, with hi-hat, 18-inch crash, 20-inch ride and 16-inch crash. The kick faces down at zero degrees.</desc>
+  <!-- Rotate the drummer's view to preserve the site's audience-facing +Y convention. -->
+  <g transform="rotate(180 50 40)" stroke="#2C2A28" stroke-width="1" stroke-linejoin="round">
+    <g id="kick">
+      <rect x="28" y="19" width="30" height="30" rx="1.5" fill="#E3E1DB"/>
+      <path d="M29 21H57M29 47H57" fill="none" stroke="#726357"/>
+      <path d="M43 49H48L47 57H44Z" fill="#C4C1B9"/>
+    </g>
+    <circle id="floor-tom-16" cx="69" cy="61" r="13" fill="#CEDFEC"/>
+    <circle id="snare" cx="31" cy="63" r="11" fill="#9FC4DD"/>
+    <circle id="rack-tom-12" cx="38" cy="42" r="9" fill="#CEDFEC"/>
+    <circle id="crash-18" cx="18" cy="22" r="15" fill="#FFF1C8"/>
+    <circle id="ride-20" cx="65" cy="34" r="17" fill="#FFF1C8"/>
+    <circle id="crash-16" cx="87" cy="38" r="12" fill="#FFF1C8"/>
+    <circle id="hi-hat" cx="14" cy="52" r="10" fill="#FFF1C8"/>
+    <g fill="#726357" stroke="none">
+      <circle cx="18" cy="22" r="1.3"/>
+      <circle cx="65" cy="34" r="1.3"/>
+      <circle cx="87" cy="38" r="1.3"/>
+      <circle cx="14" cy="52" r="1.1"/>
+    </g>
+  </g>
+</svg>

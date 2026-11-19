@@ -1,0 +1,385 @@
+{
+  "schema_version": 1,
+  "artist": "Fictional Trio - FORMAT EXAMPLE",
+  "configuration": "Acoustic / stereo keys / percussion",
+  "revision_date": "2026-09-29",
+  "status": "example",
+  "contact": {
+    "name": "Unassigned example contact",
+    "email": null,
+    "phone": null
+  },
+  "stage": {
+    "width": 24,
+    "depth": 16,
+    "unit": "ft",
+    "dimension_status": "illustrative",
+    "view": "audience-top-down",
+    "origin": "upstage-stage-right",
+    "x_direction": "toward-stage-left",
+    "y_direction": "toward-audience"
+  },
+  "zones": [
+    {
+      "id": "lead",
+      "performer": "Alex - acoustic / vocal",
+      "depth_band": "downstage",
+      "x": 1,
+      "y": 8,
+      "width": 7,
+      "depth": 6
+    },
+    {
+      "id": "keys",
+      "performer": "Taylor - keys / vocal",
+      "depth_band": "midstage",
+      "x": 16,
+      "y": 6,
+      "width": 7.5,
+      "depth": 8
+    },
+    {
+      "id": "perc",
+      "performer": "Morgan - percussion",
+      "depth_band": "upstage",
+      "x": 8,
+      "y": 1,
+      "width": 8,
+      "depth": 6
+    }
+  ],
+  "nodes": [
+    {
+      "id": "lead-mic",
+      "zone_id": "lead",
+      "kind": "mic",
+      "label": "Lead vocal",
+      "x": 2,
+      "y": 10,
+      "width": 1,
+      "depth": 1,
+      "rotation": 0,
+      "supplier": "venue"
+    },
+    {
+      "id": "acoustic",
+      "zone_id": "lead",
+      "kind": "instrument",
+      "label": "Acoustic",
+      "x": 4,
+      "y": 10,
+      "width": 1.5,
+      "depth": 2,
+      "rotation": 0,
+      "supplier": "band"
+    },
+    {
+      "id": "acoustic-di",
+      "zone_id": "lead",
+      "kind": "di",
+      "label": "Acoustic DI",
+      "x": 2,
+      "y": 12,
+      "width": 0.5,
+      "depth": 0.5,
+      "rotation": 0,
+      "supplier": "venue"
+    },
+    {
+      "id": "wedge-lead",
+      "zone_id": "lead",
+      "kind": "wedge",
+      "label": "Wedge A / M1",
+      "x": 4,
+      "y": 13,
+      "width": 1.8,
+      "depth": 1,
+      "rotation": 0,
+      "supplier": "venue"
+    },
+    {
+      "id": "keyboard",
+      "zone_id": "keys",
+      "kind": "keyboard",
+      "label": "Keys L/R",
+      "x": 17,
+      "y": 8,
+      "width": 5,
+      "depth": 2,
+      "rotation": 0,
+      "supplier": "band"
+    },
+    {
+      "id": "keys-mic",
+      "zone_id": "keys",
+      "kind": "mic",
+      "label": "Keys vocal",
+      "x": 22.5,
+      "y": 8.5,
+      "width": 0.75,
+      "depth": 0.75,
+      "rotation": 0,
+      "supplier": "venue"
+    },
+    {
+      "id": "keys-di",
+      "zone_id": "keys",
+      "kind": "di",
+      "label": "Stereo DI",
+      "x": 17,
+      "y": 11.5,
+      "width": 0.6,
+      "depth": 0.5,
+      "rotation": 0,
+      "supplier": "venue"
+    },
+    {
+      "id": "wedge-keys",
+      "zone_id": "keys",
+      "kind": "wedge",
+      "label": "Wedge B / M1",
+      "x": 20,
+      "y": 12.5,
+      "width": 2,
+      "depth": 1,
+      "rotation": 0,
+      "supplier": "venue"
+    },
+    {
+      "id": "power-keys",
+      "zone_id": "keys",
+      "kind": "power",
+      "label": "P1",
+      "x": 22,
+      "y": 11.5,
+      "width": 0.5,
+      "depth": 0.5,
+      "rotation": 0,
+      "supplier": "venue"
+    },
+    {
+      "id": "cajon",
+      "zone_id": "perc",
+      "kind": "drums",
+      "label": "Cajon",
+      "x": 10,
+      "y": 2,
+      "width": 3,
+      "depth": 3,
+      "rotation": 0,
+      "supplier": "band"
+    },
+    {
+      "id": "perc-mic",
+      "zone_id": "perc",
+      "kind": "mic",
+      "label": "Cajon mic",
+      "x": 9,
+      "y": 3,
+      "width": 0.5,
+      "depth": 0.5,
+      "rotation": 0,
+      "supplier": "venue"
+    },
+    {
+      "id": "iem-perc",
+      "zone_id": "perc",
+      "kind": "iem",
+      "label": "Wired IEM / M2",
+      "x": 14,
+      "y": 3,
+      "width": 1,
+      "depth": 1,
+      "rotation": 0,
+      "supplier": "band"
+    },
+    {
+      "id": "power-perc",
+      "zone_id": "perc",
+      "kind": "power",
+      "label": "P2",
+      "x": 14,
+      "y": 5,
+      "width": 0.5,
+      "depth": 0.5,
+      "rotation": 0,
+      "supplier": "venue"
+    }
+  ],
+  "inputs": [
+    {
+      "channel": 1,
+      "source": "Acoustic pickup",
+      "node_id": "acoustic-di",
+      "connection": "Balanced XLR to house console",
+      "mic_di": "Compatible DI; model unresolved",
+      "stand": "none",
+      "phantom": "unknown",
+      "supplier": "venue",
+      "stereo_pair": null,
+      "side": null,
+      "routing": "foh-and-monitors",
+      "status": "proposed",
+      "notes": "Illustrative choice; confirm actual equipment."
+    },
+    {
+      "channel": 2,
+      "source": "Alex vocal",
+      "node_id": "lead-mic",
+      "connection": "Balanced XLR to house console",
+      "mic_di": "SM58-class dynamic",
+      "stand": "tall boom",
+      "phantom": "not-required",
+      "supplier": "venue",
+      "stereo_pair": null,
+      "side": null,
+      "routing": "foh-and-monitors",
+      "status": "proposed",
+      "notes": "Illustrative choice; confirm actual equipment."
+    },
+    {
+      "channel": 3,
+      "source": "Keys L",
+      "node_id": "keys-di",
+      "connection": "Balanced XLR to house console",
+      "mic_di": "Passive stereo DI, left channel",
+      "stand": "none",
+      "phantom": "not-required",
+      "supplier": "venue",
+      "stereo_pair": "keys-stereo",
+      "side": "L",
+      "routing": "foh-and-monitors",
+      "status": "proposed",
+      "notes": "Illustrative choice; confirm actual equipment."
+    },
+    {
+      "channel": 4,
+      "source": "Keys R",
+      "node_id": "keys-di",
+      "connection": "Balanced XLR to house console",
+      "mic_di": "Passive stereo DI, right channel",
+      "stand": "none",
+      "phantom": "not-required",
+      "supplier": "venue",
+      "stereo_pair": "keys-stereo",
+      "side": "R",
+      "routing": "foh-and-monitors",
+      "status": "proposed",
+      "notes": "Illustrative choice; confirm actual equipment."
+    },
+    {
+      "channel": 5,
+      "source": "Taylor vocal",
+      "node_id": "keys-mic",
+      "connection": "Balanced XLR to house console",
+      "mic_di": "SM58-class dynamic",
+      "stand": "tall boom",
+      "phantom": "not-required",
+      "supplier": "venue",
+      "stereo_pair": null,
+      "side": null,
+      "routing": "foh-and-monitors",
+      "status": "proposed",
+      "notes": "Illustrative choice; confirm actual equipment."
+    },
+    {
+      "channel": 6,
+      "source": "Cajon",
+      "node_id": "perc-mic",
+      "connection": "Balanced XLR to house console",
+      "mic_di": "Suitable dynamic instrument mic",
+      "stand": "short boom",
+      "phantom": "not-required",
+      "supplier": "venue",
+      "stereo_pair": null,
+      "side": null,
+      "routing": "foh-and-monitors",
+      "status": "proposed",
+      "notes": "Illustrative choice; confirm actual equipment."
+    }
+  ],
+  "monitors": [
+    {
+      "id": "M1",
+      "type": "wedge",
+      "mode": "mono",
+      "zone_ids": [
+        "lead",
+        "keys"
+      ],
+      "node_ids": [
+        "wedge-lead",
+        "wedge-keys"
+      ],
+      "output_feeds": [
+        "Aux 1"
+      ],
+      "supplier": "venue",
+      "status": "proposed",
+      "notes": "One shared mix feeding two wedges."
+    },
+    {
+      "id": "M2",
+      "type": "iem",
+      "mode": "stereo",
+      "zone_ids": [
+        "perc"
+      ],
+      "node_ids": [
+        "iem-perc"
+      ],
+      "output_feeds": [
+        "Aux 2 L",
+        "Aux 3 R"
+      ],
+      "supplier": "band",
+      "status": "proposed",
+      "notes": "House supplies two balanced feeds; band supplies wired pack and ears."
+    }
+  ],
+  "power": [
+    {
+      "id": "P1",
+      "node_id": "power-keys",
+      "equipment_node_ids": [
+        "keyboard"
+      ],
+      "voltage": 120,
+      "frequency_hz": 60,
+      "outlets": 2,
+      "connector": "US grounded outlet; confirm",
+      "load_watts": null,
+      "circuit_request": "Unresolved; no dedicated circuit assumed",
+      "supplier": "venue",
+      "status": "proposed",
+      "notes": "Illustrative US show; verify keyboard and adapter requirements."
+    },
+    {
+      "id": "P2",
+      "node_id": "power-perc",
+      "equipment_node_ids": [
+        "iem-perc"
+      ],
+      "voltage": 120,
+      "frequency_hz": 60,
+      "outlets": 1,
+      "connector": "US grounded outlet; confirm",
+      "load_watts": null,
+      "circuit_request": "Unresolved; no dedicated circuit assumed",
+      "supplier": "venue",
+      "status": "proposed",
+      "notes": "Example powered wired IEM system; confirm exact pack supply."
+    }
+  ],
+  "intentional_overlaps": [],
+  "open_questions": [
+    "Confirm usable stage and physical operating footprints.",
+    "Confirm acoustic DI and phantom needs.",
+    "Confirm all power loads, outlets, and supplier commitments."
+  ],
+  "notes": [
+    "Fictional teaching example, not The Swell.",
+    "Six physical inputs; two monitor mixes; three output feeds; two physical wedges.",
+    "Geometry illustrates the data format; it is not a measured touring plan."
+  ]
+}

@@ -6,8 +6,9 @@ import Image from "next/image";
 import { useEffect } from "react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { powerDependencyLabel, type EquipmentNodeData, type StageConnectionSide, type StagePosition } from "@/lib/setup-designer/domain";
+import { powerDependencyLabel, type EquipmentNodeData, type StageConnectionSide, type StageOutlinePoint, type StagePosition } from "@/lib/setup-designer/domain";
 import { portsByDirection } from "@/lib/setup-designer/ports";
+import { stageSymbolForEquipment } from "@/lib/setup-designer/stage-symbols";
 import { STAGE_WAYPOINT_HIT_SIZE_PIXELS, STAGE_WAYPOINT_MARKER_SIZE_PIXELS, stageAnchorArrowRotation, stageAnchorCanvasPlacement, stageNodeGeometry } from "@/lib/setup-designer/stage-plot";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +29,7 @@ export type StageWaypointCanvasNode = Node<StageWaypointCanvasData, "stageWaypoi
 export interface StageFloorCanvasData extends Record<string, unknown> {
   widthFeet: number;
   depthFeet: number;
+  outline?: StageOutlinePoint[];
 }
 
 export type StageFloorCanvasNode = Node<StageFloorCanvasData, "stageFloor">;
@@ -57,8 +59,9 @@ export function StageEquipmentNode({ id, data, selected }: NodeProps<StageEquipm
   const geometry = stageNodeGeometry(footprint);
   const inputPlacement = stageAnchorCanvasPlacement(footprint, "input");
   const outputPlacement = stageAnchorCanvasPlacement(footprint, "output");
+  const symbol = stageSymbolForEquipment(data);
   const stageImageUrl = data.stageImage?.downloadUrl;
-  const visibleImageUrl = stageImageUrl ?? data.image?.downloadUrl;
+  const visibleImageUrl = symbol ? `/stage-symbols/${symbol}.svg` : stageImageUrl ?? data.image?.downloadUrl;
   const hasVisibleImage = Boolean(visibleImageUrl);
   const powerLabel = powerDependencyLabel(data);
 
@@ -100,7 +103,7 @@ export function StageEquipmentNode({ id, data, selected }: NodeProps<StageEquipm
               fill
               sizes={`${Math.max(24, Math.ceil(geometry.bodyWidthPixels))}px`}
               unoptimized
-              className={stageImageUrl ? "object-cover" : "object-contain p-[8%]"}
+              className={symbol ? "object-fill" : stageImageUrl ? "object-cover" : "object-contain p-[8%]"}
             />
           ) : data.cableAssembly || data.equipmentKind === "snake" || data.equipmentKind === "split-snake" ? (
             <CableIcon aria-hidden className="absolute left-1/2 top-1/2 size-1/2 -translate-x-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -127,6 +130,7 @@ export function StageEquipmentNode({ id, data, selected }: NodeProps<StageEquipm
       </TooltipTrigger>
       <TooltipContent side="top" sideOffset={10} className="flex max-w-64 flex-col items-start gap-1 px-3 py-2">
         <span className="font-semibold">{data.name}</span>
+        {symbol === "mic-stand" ? <span className="text-background/75">Arrow points toward the microphone</span> : null}
         <span className="text-background/75">{data.cableAssembly ? data.ports.length > 2 ? "One physical breakout cable" : "One physical cable" : data.category} · {formatStageSize(footprint)} · {formatDegrees(footprint.rotationDegrees)}</span>
         {inputs.length || outputs.length ? (
           <span className="text-background/75">
@@ -244,6 +248,37 @@ export function StageWaypointNode({ data, selected }: NodeProps<StageWaypointCan
 }
 
 export function StageFloorNode({ data }: NodeProps<StageFloorCanvasNode>) {
+  const outline = data.outline?.length && data.outline.length >= 3 ? data.outline : null;
+  const svgPoints = outline?.map((point) => `${point.xFeet},${point.yFeet}`).join(" ");
+  const clipPath = outline?.map((point) => (
+    `${(point.xFeet / data.widthFeet) * 100}% ${(point.yFeet / data.depthFeet) * 100}%`
+  )).join(", ");
+
+  if (outline && svgPoints && clipPath) {
+    return (
+      <div className="relative size-full" aria-label={`Stage floor, ${data.widthFeet} by ${data.depthFeet} feet, custom Blender outline`}>
+        <div
+          className="setup-stage-floor absolute inset-0"
+          style={{ clipPath: `polygon(${clipPath})` }}
+          aria-hidden
+        />
+        <svg
+          className="pointer-events-none absolute inset-0 size-full overflow-visible text-foreground/25"
+          viewBox={`0 0 ${data.widthFeet} ${data.depthFeet}`}
+          preserveAspectRatio="none"
+          aria-hidden
+        >
+          <polygon points={svgPoints} fill="none" stroke="currentColor" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+        </svg>
+        <span className="absolute left-1/2 top-2 -translate-x-1/2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Backstage</span>
+        <span className="absolute bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Audience</span>
+        <button type="button" className="pointer-events-auto absolute right-3 top-2 rounded-md border bg-background/90 px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:text-foreground" aria-label="Edit stage layout">
+          {data.widthFeet} × {data.depthFeet} ft
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="setup-stage-floor relative size-full overflow-hidden rounded-xl border-2 border-foreground/25 bg-card/75" aria-label={`Stage floor, ${data.widthFeet} by ${data.depthFeet} feet`}>
       <span className="absolute left-3 top-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Backstage</span>

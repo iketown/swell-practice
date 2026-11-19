@@ -66,7 +66,7 @@ export function MoneyPlaybook({ onClose }: { onClose: () => void }) {
         <div>
           <h2 className="text-xl font-semibold">Swell playbook</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Standing policies and customary rates that Ronnie can remember and update. Each change has a history. Recorded payments and balances still come from the ledger.
+            Standing policies and customary rates. Add or update rules here; each change has a history. Recorded payments and balances still come from the ledger.
           </p>
         </div>
         <div className="flex gap-2">
@@ -97,7 +97,7 @@ export function MoneyPlaybook({ onClose }: { onClose: () => void }) {
         </div>
       </div>
       {!snapshot ? <p className="mt-4 text-sm text-muted-foreground">Loading playbook…</p> : null}
-      {snapshot && !active.length ? <p className="mt-5 text-sm text-muted-foreground">No standing rules yet. You can add one here or ask Ronnie to remember a clear policy in chat.</p> : null}
+      {snapshot && !active.length ? <p className="mt-5 text-sm text-muted-foreground">No standing rules yet. Add your first policy using the form above.</p> : null}
       <ul className="mt-4 divide-y">
         {active.map((item) => (
           <li key={item.id} className="py-4">

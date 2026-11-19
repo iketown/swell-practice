@@ -1,0 +1,12 @@
+import {writeFileSync} from 'node:fs';
+import {getServerFirestore,getServerAuth} from '@/lib/server/firebase-admin';
+import {issueBlenderSession} from '@/lib/server/blender-auth';
+import {readBlenderSnapshot} from '@/lib/server/blender-store';
+const db=getServerFirestore(),id='g8qTbUz0v4xk40HzhHoD';
+const graph=(await db.doc(`setups/${id}/graphs/current`).get()).data();
+writeFileSync('tmp/blender-integration/keyboard-graph.json',JSON.stringify(graph,null,2));
+console.log(JSON.stringify({metadata:(await db.doc(`setups/${id}`).get()).data(),stage:graph.stage,nodes:graph.nodes.map(n=>({id:n.id,name:n.data.name,template:n.data.templateId,category:n.data.category,dimensions:n.data.physicalDimensions,stage:n.stagePosition,stage3d:n.data.stage3d,cable:n.data.cableAssembly,assembly:n.data.assemblyId})),edges:graph.edges},null,2));
+const uid=(await getServerAuth().getUserByEmail(process.env.NEXT_PUBLIC_ADMIN_EMAILS.split(',')[0].trim())).uid;
+const session=await issueBlenderSession(uid,id,true);
+writeFileSync('tmp/blender-integration/keyboard-connection.json',JSON.stringify({...session,setupId:id,appUrl:'http://localhost:3000'}),{mode:0o600});
+writeFileSync('tmp/blender-integration/keyboard-snapshot.json',JSON.stringify(await readBlenderSnapshot(id),null,2));

@@ -69,7 +69,7 @@ test("playbook updates need an explicit standing instruction and a bounded actio
   assert.doesNotThrow(() => playbookActionSchema.parse({ action: "create", operationId: "op-12345678", title: "Video pay", rule: "Sam gets $1,000 for each video session." }));
   assert.throws(() => playbookActionSchema.parse({ action: "create", operationId: "op-12345678", title: "Video pay", rule: "x" }));
 });
-test("receipt reading uses a bounded low-cost vision model and free PDF parsing", () => {
+test("receipt reading keeps model price limits and uses OCR for image-based PDFs", () => {
   const override = process.env.OPEN_ROUTER_MONEY_MODEL;
   delete process.env.OPEN_ROUTER_MONEY_MODEL;
   try {
@@ -82,7 +82,7 @@ test("receipt reading uses a bounded low-cost vision model and free PDF parsing"
     assert.ok(image.provider.max_price.completion <= 1.5);
     assert.ok(image.provider.max_price.image <= 0.005);
     assert.equal("plugins" in image, false);
-    assert.deepEqual(pdf.plugins, [{ id: "file-parser", pdf: { engine: "cloudflare-ai" } }]);
+    assert.deepEqual(pdf.plugins, [{ id: "file-parser", pdf: { engine: "mistral-ocr" } }]);
   } finally {
     if (override === undefined) delete process.env.OPEN_ROUTER_MONEY_MODEL;
     else process.env.OPEN_ROUTER_MONEY_MODEL = override;

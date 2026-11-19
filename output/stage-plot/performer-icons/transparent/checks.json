@@ -1,0 +1,102 @@
+[
+  {
+    "file": "output/stage-plot/performer-icons/transparent/color/joe-color-transparent.png",
+    "size": [
+      1024,
+      1536
+    ],
+    "transparent_pixels": 1136191,
+    "opaque_pixels": 427873,
+    "partial_pixels": 8800
+  },
+  {
+    "file": "output/stage-plot/performer-icons/transparent/color/ike-color-transparent.png",
+    "size": [
+      1024,
+      1536
+    ],
+    "transparent_pixels": 1125453,
+    "opaque_pixels": 438852,
+    "partial_pixels": 8559
+  },
+  {
+    "file": "output/stage-plot/performer-icons/transparent/color/jackson-color-transparent.png",
+    "size": [
+      1024,
+      1536
+    ],
+    "transparent_pixels": 1137921,
+    "opaque_pixels": 426698,
+    "partial_pixels": 8245
+  },
+  {
+    "file": "output/stage-plot/performer-icons/transparent/color/chris-color-transparent.png",
+    "size": [
+      1024,
+      1536
+    ],
+    "transparent_pixels": 1048862,
+    "opaque_pixels": 512303,
+    "partial_pixels": 11699
+  },
+  {
+    "file": "output/stage-plot/performer-icons/transparent/color/sam-color-transparent.png",
+    "size": [
+      1024,
+      1536
+    ],
+    "transparent_pixels": 986852,
+    "opaque_pixels": 572792,
+    "partial_pixels": 13220
+  },
+  {
+    "file": "output/stage-plot/performer-icons/transparent/bw/joe-bw-transparent.png",
+    "size": [
+      1024,
+      1536
+    ],
+    "transparent_pixels": 1117018,
+    "opaque_pixels": 445487,
+    "partial_pixels": 10359
+  },
+  {
+    "file": "output/stage-plot/performer-icons/transparent/bw/ike-bw-transparent.png",
+    "size": [
+      1024,
+      1536
+    ],
+    "transparent_pixels": 1106803,
+    "opaque_pixels": 455295,
+    "partial_pixels": 10766
+  },
+  {
+    "file": "output/stage-plot/performer-icons/transparent/bw/jackson-bw-transparent.png",
+    "size": [
+      1024,
+      1536
+    ],
+    "transparent_pixels": 1112597,
+    "opaque_pixels": 449577,
+    "partial_pixels": 10690
+  },
+  {
+    "file": "output/stage-plot/performer-icons/transparent/bw/chris-bw-transparent.png",
+    "size": [
+      1024,
+      1536
+    ],
+    "transparent_pixels": 1023059,
+    "opaque_pixels": 536527,
+    "partial_pixels": 13278
+  },
+  {
+    "file": "output/stage-plot/performer-icons/transparent/bw/sam-bw-transparent.png",
+    "size": [
+      1024,
+      1536
+    ],
+    "transparent_pixels": 938470,
+    "opaque_pixels": 614431,
+    "partial_pixels": 19963
+  }
+]

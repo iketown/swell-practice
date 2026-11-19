@@ -1,0 +1,3 @@
+Generated with the built-in image generation tool. Selected output uses a white background: transparent-background attempts reintroduced a visible halo.
+
+Remove the glowing aura behind this flat cartoon musician. Keep his exact approved pose, overhead camera angle and forward-looking head, yellow shirt and Telecaster, jeans and shoes. Put the same cutout illustration on a completely SOLID PURE WHITE (#FFFFFF) background. Every pixel outside the hard silhouette must be pure white; no shadows, gradients, glow, haze, black area or transparency. Uniform flat white background right up to the clean hard edges of the hair, sleeves, arms, guitar and shoes. This is background replacement only. Match the original character faithfully; don't enlarge him or crop the guitar.

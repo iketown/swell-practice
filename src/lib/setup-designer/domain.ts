@@ -1,4 +1,5 @@
 import type { Edge, Node, Viewport } from "@xyflow/react";
+import type { Stage3d } from "@/lib/setup-designer/blender-contract";
 
 export type PortDirection = "input" | "output";
 export type ConnectorGender = "male" | "female" | "none";
@@ -42,9 +43,18 @@ export interface StageArea {
   depthFeet: number;
 }
 
+export interface StageOutlinePoint {
+  /** Horizontal distance from stage left. */
+  xFeet: number;
+  /** Vertical distance from the backstage edge. */
+  yFeet: number;
+}
+
 export interface StagePlan {
   widthFeet: number;
   depthFeet: number;
+  /** Optional floor perimeter. When absent, the stage uses its rectangular bounds. */
+  outline?: StageOutlinePoint[];
   viewport: Viewport;
   areas: StageArea[];
   waypoints: StageWaypoint[];
@@ -232,6 +242,8 @@ export interface EquipmentNodeData extends Record<string, unknown> {
   /** Present when this node is one physical cable placed in the signal chain. */
   cableAssembly?: CableAssemblySnapshot;
   physicalDimensions?: EquipmentPhysicalDimensions;
+  /** Optional 3D placement state; physicalDimensions remains this item's size snapshot. */
+  stage3d?: Stage3d;
   notes?: string;
   image?: Pick<EquipmentImage, "storagePath" | "downloadUrl" | "contentType">;
   stageImage?: Pick<EquipmentImage, "storagePath" | "downloadUrl" | "contentType">;

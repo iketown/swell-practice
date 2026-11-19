@@ -1,0 +1,3764 @@
+[
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Title and revision",
+    "group": "Header",
+    "x": 36,
+    "y": 39,
+    "text": "THE SWELL",
+    "size": 25,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Title and revision",
+    "group": "Header",
+    "x": 756,
+    "y": 36,
+    "text": "DRAFT 01  /  29 SEP 2026",
+    "size": 10,
+    "bold": true,
+    "fill": "#216575",
+    "anchor": "end"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Title and revision",
+    "group": "Header",
+    "x": 36,
+    "y": 59,
+    "text": "STAGE PLOT  /  overhead view",
+    "size": 12,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Title and revision",
+    "group": "Header",
+    "x": 36,
+    "y": 76,
+    "text": "Positions from the saved setup. Symbols are schematic; equipment centers preserve the source layout.",
+    "size": 9.5,
+    "bold": false,
+    "fill": "#54616A",
+    "anchor": "start"
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Title and revision",
+    "group": "Header",
+    "points": [
+      [
+        36,
+        88
+      ],
+      [
+        756,
+        88
+      ]
+    ],
+    "stroke": "#182B35",
+    "sw": 1.2,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Title and revision",
+    "group": "Footer",
+    "points": [
+      [
+        36,
+        540
+      ],
+      [
+        756,
+        540
+      ]
+    ],
+    "stroke": "#E6EAEC",
+    "sw": 1,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Title and revision",
+    "group": "Footer",
+    "x": 36,
+    "y": 557,
+    "text": "Setup: keyboard stage CENTER R  /  saved revision 49",
+    "size": 8.5,
+    "bold": false,
+    "fill": "#54616A",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Title and revision",
+    "group": "Footer",
+    "x": 756,
+    "y": 557,
+    "text": "11 x 8 in  /  1 of 2",
+    "size": 8.5,
+    "bold": false,
+    "fill": "#54616A",
+    "anchor": "end"
+  },
+  {
+    "kind": "rect",
+    "page": 0,
+    "layer": "Stage boundary and orientation",
+    "group": "Stage",
+    "x": 42,
+    "y": 105,
+    "w": 667.0,
+    "h": 348.0,
+    "fill": "white",
+    "stroke": "#182B35",
+    "sw": 1.3
+  },
+  {
+    "kind": "rect",
+    "page": 0,
+    "layer": "Stage boundary and orientation",
+    "group": "Stage",
+    "x": 593.0,
+    "y": 105,
+    "w": 116.0,
+    "h": 348.0,
+    "fill": "#F2F4F5",
+    "stroke": "none",
+    "sw": 1
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Stage boundary and orientation",
+    "group": "Stage",
+    "points": [
+      [
+        593.0,
+        105
+      ],
+      [
+        593.0,
+        453.0
+      ]
+    ],
+    "stroke": "#54616A",
+    "sw": 1,
+    "fill": "none",
+    "closed": false,
+    "dash": [
+      4,
+      4
+    ]
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Stage boundary and orientation",
+    "group": "Stage",
+    "x": 317.5,
+    "y": 122,
+    "text": "UPSTAGE / REAR",
+    "size": 10,
+    "bold": true,
+    "fill": "#54616A",
+    "anchor": "middle"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Stage boundary and orientation",
+    "group": "Stage",
+    "x": 651.0,
+    "y": 124,
+    "text": "SIDESTAGE",
+    "size": 10,
+    "bold": true,
+    "fill": "#54616A",
+    "anchor": "middle"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Stage boundary and orientation",
+    "group": "Stage",
+    "x": 651.0,
+    "y": 139,
+    "text": "8 ft wide",
+    "size": 9,
+    "bold": false,
+    "fill": "#54616A",
+    "anchor": "middle"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Stage boundary and orientation",
+    "group": "Stage",
+    "x": 317.5,
+    "y": 470.0,
+    "text": "DOWNSTAGE / AUDIENCE",
+    "size": 11,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "middle"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Stage boundary and orientation",
+    "group": "Stage",
+    "x": 52,
+    "y": 445,
+    "text": "STAGE RIGHT",
+    "size": 10,
+    "bold": true,
+    "fill": "#54616A",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Stage boundary and orientation",
+    "group": "Stage",
+    "x": 583,
+    "y": 445,
+    "text": "STAGE LEFT",
+    "size": 10,
+    "bold": true,
+    "fill": "#54616A",
+    "anchor": "end"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Stage boundary and orientation",
+    "group": "Stage",
+    "x": 52,
+    "y": 142,
+    "text": "Saved footprint",
+    "size": 10,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Stage boundary and orientation",
+    "group": "Stage",
+    "x": 52,
+    "y": 158,
+    "text": "46 ft wide x 24 ft deep",
+    "size": 10,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Stage boundary and orientation",
+    "group": "Stage",
+    "x": 52,
+    "y": 173,
+    "text": "Includes 8 ft sidestage.",
+    "size": 9,
+    "bold": false,
+    "fill": "#54616A",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Stage boundary and orientation",
+    "group": "Stage",
+    "x": 52,
+    "y": 188,
+    "text": "Required minimum: TBC",
+    "size": 9,
+    "bold": false,
+    "fill": "#54616A",
+    "anchor": "start"
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Stage boundary and orientation",
+    "group": "Legend",
+    "x": 480,
+    "y": 153,
+    "rx": 4,
+    "ry": 4,
+    "fill": "#216575",
+    "stroke": "#216575",
+    "sw": 1
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Stage boundary and orientation",
+    "group": "Legend",
+    "x": 490,
+    "y": 157,
+    "text": "Vocal microphone",
+    "size": 9,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "rect",
+    "page": 0,
+    "layer": "Stage boundary and orientation",
+    "group": "Legend",
+    "x": 476,
+    "y": 168,
+    "w": 9,
+    "h": 7,
+    "fill": "#E6EAEC",
+    "stroke": "#182B35",
+    "sw": 1
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Stage boundary and orientation",
+    "group": "Legend",
+    "x": 490,
+    "y": 175,
+    "text": "DI / processor",
+    "size": 9,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "rect",
+    "page": 0,
+    "layer": "Stage boundary and orientation",
+    "group": "Legend",
+    "x": 476,
+    "y": 186,
+    "w": 9,
+    "h": 7,
+    "fill": "white",
+    "stroke": "#54616A",
+    "sw": 1
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Stage boundary and orientation",
+    "group": "Legend",
+    "x": 490,
+    "y": 193,
+    "text": "Saved audio system*",
+    "size": 9,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Stage boundary and orientation",
+    "group": "Legend",
+    "x": 480,
+    "y": 210,
+    "text": "Numbers = saved SD16 ports.",
+    "size": 8.5,
+    "bold": false,
+    "fill": "#54616A",
+    "anchor": "start"
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Sam - drums",
+    "x": 350.66475233607594,
+    "y": 288.83900660906096,
+    "rx": 13,
+    "ry": 11,
+    "fill": "#E6EAEC",
+    "stroke": "#182B35",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Sam - drums",
+    "x": 339.66475233607594,
+    "y": 268.83900660906096,
+    "rx": 9,
+    "ry": 9,
+    "fill": "white",
+    "stroke": "#182B35",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Sam - drums",
+    "x": 360.66475233607594,
+    "y": 268.83900660906096,
+    "rx": 10,
+    "ry": 10,
+    "fill": "white",
+    "stroke": "#182B35",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Sam - drums",
+    "x": 327.66475233607594,
+    "y": 284.83900660906096,
+    "rx": 8,
+    "ry": 8,
+    "fill": "white",
+    "stroke": "#182B35",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Sam - drums",
+    "x": 373.66475233607594,
+    "y": 283.83900660906096,
+    "rx": 10,
+    "ry": 10,
+    "fill": "white",
+    "stroke": "#182B35",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Sam - drums",
+    "x": 321.66475233607594,
+    "y": 261.83900660906096,
+    "rx": 12,
+    "ry": 6,
+    "fill": "#F4F5F6",
+    "stroke": "#182B35",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Sam - drums",
+    "x": 376.66475233607594,
+    "y": 257.83900660906096,
+    "rx": 12,
+    "ry": 6,
+    "fill": "#F4F5F6",
+    "stroke": "#182B35",
+    "sw": 1
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Sam - drums",
+    "points": [
+      [
+        317.66475233607594,
+        261.83900660906096
+      ],
+      [
+        325.66475233607594,
+        261.83900660906096
+      ]
+    ],
+    "stroke": "#54616A",
+    "sw": 1,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Sam - drums",
+    "points": [
+      [
+        372.66475233607594,
+        257.83900660906096
+      ],
+      [
+        380.66475233607594,
+        257.83900660906096
+      ]
+    ],
+    "stroke": "#54616A",
+    "sw": 1,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "JOE - performer",
+    "x": 245.86455057487086,
+    "y": 322.2337882122968,
+    "rx": 9,
+    "ry": 7,
+    "fill": "#D7E4E7",
+    "stroke": "#216575",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "JOE - performer",
+    "x": 245.86455057487086,
+    "y": 321.2337882122968,
+    "rx": 3.5,
+    "ry": 3.5,
+    "fill": "white",
+    "stroke": "#216575",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "IKE - performer",
+    "x": 313.7123786843042,
+    "y": 349.64945154865893,
+    "rx": 9,
+    "ry": 7,
+    "fill": "#D7E4E7",
+    "stroke": "#216575",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "IKE - performer",
+    "x": 313.7123786843042,
+    "y": 348.64945154865893,
+    "rx": 3.5,
+    "ry": 3.5,
+    "fill": "white",
+    "stroke": "#216575",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "CRON - performer",
+    "x": 410.6603209556244,
+    "y": 349.65190144035756,
+    "rx": 9,
+    "ry": 7,
+    "fill": "#D7E4E7",
+    "stroke": "#216575",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "CRON - performer",
+    "x": 410.6603209556244,
+    "y": 348.65190144035756,
+    "rx": 3.5,
+    "ry": 3.5,
+    "fill": "white",
+    "stroke": "#216575",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "JACKSON - performer",
+    "x": 478.4072498217655,
+    "y": 316.1144833208069,
+    "rx": 9,
+    "ry": 7,
+    "fill": "#D7E4E7",
+    "stroke": "#216575",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "JACKSON - performer",
+    "x": 478.4072498217655,
+    "y": 315.1144833208069,
+    "rx": 3.5,
+    "ry": 3.5,
+    "fill": "white",
+    "stroke": "#216575",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "SAM - performer",
+    "x": 356.1666667687455,
+    "y": 256.80282079641586,
+    "rx": 9,
+    "ry": 7,
+    "fill": "#D7E4E7",
+    "stroke": "#216575",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "SAM - performer",
+    "x": 356.1666667687455,
+    "y": 255.80282079641586,
+    "rx": 3.5,
+    "ry": 3.5,
+    "fill": "white",
+    "stroke": "#216575",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Joe - Telecaster",
+    "x": 274.2347387867024,
+    "y": 286.66933864933924,
+    "rx": 7,
+    "ry": 9,
+    "fill": "#E6EAEC",
+    "stroke": "#182B35",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Joe - Telecaster",
+    "x": 274.2347387867024,
+    "y": 279.66933864933924,
+    "rx": 5,
+    "ry": 6,
+    "fill": "#E6EAEC",
+    "stroke": "#182B35",
+    "sw": 1
+  },
+  {
+    "kind": "rect",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Joe - Telecaster",
+    "x": 272.7347387867024,
+    "y": 263.66933864933924,
+    "w": 3,
+    "h": 17,
+    "fill": "white",
+    "stroke": "#182B35",
+    "sw": 0.8
+  },
+  {
+    "kind": "rect",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Joe - Telecaster",
+    "x": 272.2347387867024,
+    "y": 258.66933864933924,
+    "w": 4,
+    "h": 6,
+    "fill": "#E6EAEC",
+    "stroke": "#182B35",
+    "sw": 0.8
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Cron - electric bass",
+    "x": 429.0689035869959,
+    "y": 329.1979925724778,
+    "rx": 7,
+    "ry": 9,
+    "fill": "#E6EAEC",
+    "stroke": "#182B35",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Cron - electric bass",
+    "x": 429.0689035869959,
+    "y": 322.1979925724778,
+    "rx": 5,
+    "ry": 6,
+    "fill": "#E6EAEC",
+    "stroke": "#182B35",
+    "sw": 1
+  },
+  {
+    "kind": "rect",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Cron - electric bass",
+    "x": 427.5689035869959,
+    "y": 306.1979925724778,
+    "w": 3,
+    "h": 17,
+    "fill": "white",
+    "stroke": "#182B35",
+    "sw": 0.8
+  },
+  {
+    "kind": "rect",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Cron - electric bass",
+    "x": 427.0689035869959,
+    "y": 301.1979925724778,
+    "w": 4,
+    "h": 6,
+    "fill": "#E6EAEC",
+    "stroke": "#182B35",
+    "sw": 0.8
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Jackson - ES-335",
+    "x": 476.46150273475746,
+    "y": 294.92873452498213,
+    "rx": 7,
+    "ry": 9,
+    "fill": "#E6EAEC",
+    "stroke": "#182B35",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Jackson - ES-335",
+    "x": 476.46150273475746,
+    "y": 287.92873452498213,
+    "rx": 5,
+    "ry": 6,
+    "fill": "#E6EAEC",
+    "stroke": "#182B35",
+    "sw": 1
+  },
+  {
+    "kind": "rect",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Jackson - ES-335",
+    "x": 474.96150273475746,
+    "y": 271.92873452498213,
+    "w": 3,
+    "h": 17,
+    "fill": "white",
+    "stroke": "#182B35",
+    "sw": 0.8
+  },
+  {
+    "kind": "rect",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Jackson - ES-335",
+    "x": 474.46150273475746,
+    "y": 266.92873452498213,
+    "w": 4,
+    "h": 6,
+    "fill": "#E6EAEC",
+    "stroke": "#182B35",
+    "sw": 0.8
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Ike - Nord keyboard",
+    "points": [
+      [
+        347.65433853588195,
+        365.5868032491504
+      ],
+      [
+        303.7035504701299,
+        390.9618052865759
+      ],
+      [
+        295.2452164576548,
+        376.3115425979919
+      ],
+      [
+        339.1960045234068,
+        350.9365405605664
+      ]
+    ],
+    "stroke": "#182B35",
+    "sw": 1,
+    "fill": "#E6EAEC",
+    "closed": true,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Ike - Nord keyboard",
+    "points": [
+      [
+        342.71262788705303,
+        362.66639868153317
+      ],
+      [
+        336.7542940753095,
+        352.3462628959789
+      ]
+    ],
+    "stroke": "#182B35",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Ike - Nord keyboard",
+    "points": [
+      [
+        340.27091743895573,
+        364.0761210169457
+      ],
+      [
+        334.3125836272122,
+        353.75598523139143
+      ]
+    ],
+    "stroke": "#182B35",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Ike - Nord keyboard",
+    "points": [
+      [
+        337.8292069908584,
+        365.48584335235824
+      ],
+      [
+        331.8708731791148,
+        355.165707566804
+      ]
+    ],
+    "stroke": "#182B35",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Ike - Nord keyboard",
+    "points": [
+      [
+        335.387496542761,
+        366.8955656877708
+      ],
+      [
+        329.42916273101747,
+        356.5754299022165
+      ]
+    ],
+    "stroke": "#182B35",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Ike - Nord keyboard",
+    "points": [
+      [
+        332.94578609466373,
+        368.3052880231833
+      ],
+      [
+        326.9874522829202,
+        357.98515223762905
+      ]
+    ],
+    "stroke": "#182B35",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Ike - Nord keyboard",
+    "points": [
+      [
+        330.5040756465664,
+        369.71501035859586
+      ],
+      [
+        324.5457418348228,
+        359.3948745730416
+      ]
+    ],
+    "stroke": "#182B35",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Ike - Nord keyboard",
+    "points": [
+      [
+        328.062365198469,
+        371.12473269400834
+      ],
+      [
+        322.10403138672547,
+        360.8045969084541
+      ]
+    ],
+    "stroke": "#182B35",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Ike - Nord keyboard",
+    "points": [
+      [
+        325.6206547503717,
+        372.5344550294209
+      ],
+      [
+        319.66232093862817,
+        362.2143192438666
+      ]
+    ],
+    "stroke": "#182B35",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Ike - Nord keyboard",
+    "points": [
+      [
+        323.1789443022744,
+        373.9441773648334
+      ],
+      [
+        317.2206104905308,
+        363.62404157927915
+      ]
+    ],
+    "stroke": "#182B35",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Ike - Nord keyboard",
+    "points": [
+      [
+        320.737233854177,
+        375.35389970024596
+      ],
+      [
+        314.77890004243346,
+        365.0337639146917
+      ]
+    ],
+    "stroke": "#182B35",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Ike - Nord keyboard",
+    "points": [
+      [
+        318.2955234060797,
+        376.7636220356585
+      ],
+      [
+        312.33718959433617,
+        366.44348625010423
+      ]
+    ],
+    "stroke": "#182B35",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Ike - Nord keyboard",
+    "points": [
+      [
+        315.85381295798237,
+        378.173344371071
+      ],
+      [
+        309.8954791462388,
+        367.8532085855167
+      ]
+    ],
+    "stroke": "#182B35",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Ike - Nord keyboard",
+    "points": [
+      [
+        313.412102509885,
+        379.5830667064835
+      ],
+      [
+        307.45376869814146,
+        369.26293092092925
+      ]
+    ],
+    "stroke": "#182B35",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Ike - Nord keyboard",
+    "points": [
+      [
+        310.9703920617877,
+        380.99278904189606
+      ],
+      [
+        305.01205825004416,
+        370.6726532563418
+      ]
+    ],
+    "stroke": "#182B35",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Ike - Nord keyboard",
+    "points": [
+      [
+        308.52868161369037,
+        382.4025113773086
+      ],
+      [
+        302.5703478019468,
+        372.0823755917543
+      ]
+    ],
+    "stroke": "#182B35",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Ike - Nord keyboard",
+    "points": [
+      [
+        306.086971165593,
+        383.81223371272114
+      ],
+      [
+        300.12863735384946,
+        373.49209792716687
+      ]
+    ],
+    "stroke": "#182B35",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Performers and instruments",
+    "group": "Ike - Nord keyboard",
+    "points": [
+      [
+        303.6452607174957,
+        385.2219560481337
+      ],
+      [
+        297.68692690575216,
+        374.9018202625794
+      ]
+    ],
+    "stroke": "#182B35",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Audio equipment",
+    "group": "Processors and DI",
+    "points": [
+      [
+        231.24722070963892,
+        357.54798793719885
+      ],
+      [
+        219.37358234701682,
+        350.13066281060037
+      ],
+      [
+        223.61205384793024,
+        343.3457266033878
+      ],
+      [
+        235.48569221055234,
+        350.7630517299863
+      ]
+    ],
+    "stroke": "#182B35",
+    "sw": 1,
+    "fill": "#E6EAEC",
+    "closed": true,
+    "dash": null
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Audio equipment",
+    "group": "Processors and DI",
+    "x": 224.42963727878458,
+    "y": 350.4468572702933,
+    "rx": 1,
+    "ry": 1,
+    "fill": "#182B35",
+    "stroke": "#182B35",
+    "sw": 0.5
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Audio equipment",
+    "group": "Processors and DI",
+    "x": 230.42963727878458,
+    "y": 350.4468572702933,
+    "rx": 1,
+    "ry": 1,
+    "fill": "#182B35",
+    "stroke": "#182B35",
+    "sw": 0.5
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Audio equipment",
+    "group": "Processors and DI",
+    "points": [
+      [
+        521.9830509880801,
+        306.6296302777317
+      ],
+      [
+        521.9830487071906,
+        320.62963027773145
+      ],
+      [
+        513.9830487071906,
+        320.62962897436597
+      ],
+      [
+        513.9830509880801,
+        306.6296289743662
+      ]
+    ],
+    "stroke": "#182B35",
+    "sw": 1,
+    "fill": "#E6EAEC",
+    "closed": true,
+    "dash": null
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Audio equipment",
+    "group": "Processors and DI",
+    "x": 514.9830498476354,
+    "y": 313.6296296260488,
+    "rx": 1,
+    "ry": 1,
+    "fill": "#182B35",
+    "stroke": "#182B35",
+    "sw": 0.5
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Audio equipment",
+    "group": "Processors and DI",
+    "x": 520.9830498476354,
+    "y": 313.6296296260488,
+    "rx": 1,
+    "ry": 1,
+    "fill": "#182B35",
+    "stroke": "#182B35",
+    "sw": 0.5
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Audio equipment",
+    "group": "Processors and DI",
+    "points": [
+      [
+        437.6691957799781,
+        317.4396178221765
+      ],
+      [
+        451.6691957799781,
+        317.4396178221765
+      ],
+      [
+        451.6691957799781,
+        325.4396178221765
+      ],
+      [
+        437.6691957799781,
+        325.4396178221765
+      ]
+    ],
+    "stroke": "#182B35",
+    "sw": 1,
+    "fill": "#E6EAEC",
+    "closed": true,
+    "dash": null
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Audio equipment",
+    "group": "Processors and DI",
+    "x": 441.6691957799781,
+    "y": 321.4396178221765,
+    "rx": 1,
+    "ry": 1,
+    "fill": "#182B35",
+    "stroke": "#182B35",
+    "sw": 0.5
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Audio equipment",
+    "group": "Processors and DI",
+    "x": 447.6691957799781,
+    "y": 321.4396178221765,
+    "rx": 1,
+    "ry": 1,
+    "fill": "#182B35",
+    "stroke": "#182B35",
+    "sw": 0.5
+  },
+  {
+    "kind": "rect",
+    "page": 0,
+    "layer": "Audio equipment",
+    "group": "Behringer X32",
+    "x": 615.125,
+    "y": 295.625,
+    "w": 50,
+    "h": 32,
+    "fill": "white",
+    "stroke": "#54616A",
+    "sw": 1
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Audio equipment",
+    "group": "Behringer X32",
+    "points": [
+      [
+        623.125,
+        301.625
+      ],
+      [
+        623.125,
+        314.625
+      ]
+    ],
+    "stroke": "#54616A",
+    "sw": 0.6,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Audio equipment",
+    "group": "Behringer X32",
+    "points": [
+      [
+        630.125,
+        301.625
+      ],
+      [
+        630.125,
+        314.625
+      ]
+    ],
+    "stroke": "#54616A",
+    "sw": 0.6,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Audio equipment",
+    "group": "Behringer X32",
+    "points": [
+      [
+        637.125,
+        301.625
+      ],
+      [
+        637.125,
+        314.625
+      ]
+    ],
+    "stroke": "#54616A",
+    "sw": 0.6,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Audio equipment",
+    "group": "Behringer X32",
+    "points": [
+      [
+        644.125,
+        301.625
+      ],
+      [
+        644.125,
+        314.625
+      ]
+    ],
+    "stroke": "#54616A",
+    "sw": 0.6,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Audio equipment",
+    "group": "Behringer X32",
+    "points": [
+      [
+        651.125,
+        301.625
+      ],
+      [
+        651.125,
+        314.625
+      ]
+    ],
+    "stroke": "#54616A",
+    "sw": 0.6,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Audio equipment",
+    "group": "Behringer X32",
+    "points": [
+      [
+        658.125,
+        301.625
+      ],
+      [
+        658.125,
+        314.625
+      ]
+    ],
+    "stroke": "#54616A",
+    "sw": 0.6,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Audio equipment",
+    "group": "Behringer X32",
+    "x": 640.125,
+    "y": 324.625,
+    "text": "X32*",
+    "size": 9,
+    "bold": true,
+    "fill": "#54616A",
+    "anchor": "middle"
+  },
+  {
+    "kind": "rect",
+    "page": 0,
+    "layer": "Audio equipment",
+    "group": "SD16 16-channel Stage Box",
+    "x": 404.10915909961767,
+    "y": 263.2880754017924,
+    "w": 32,
+    "h": 20,
+    "fill": "white",
+    "stroke": "#54616A",
+    "sw": 1
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Audio equipment",
+    "group": "SD16 16-channel Stage Box",
+    "x": 420.10915909961767,
+    "y": 276.2880754017924,
+    "text": "SD16*",
+    "size": 8,
+    "bold": true,
+    "fill": "#54616A",
+    "anchor": "middle"
+  },
+  {
+    "kind": "rect",
+    "page": 0,
+    "layer": "Audio equipment",
+    "group": "front stagebox",
+    "x": 355.1620822677931,
+    "y": 399.2073600999326,
+    "w": 26,
+    "h": 10,
+    "fill": "white",
+    "stroke": "#54616A",
+    "sw": 1
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Audio equipment",
+    "group": "front stagebox",
+    "x": 368.1620822677931,
+    "y": 422.2073600999326,
+    "text": "FRONT*",
+    "size": 8,
+    "bold": true,
+    "fill": "#54616A",
+    "anchor": "middle"
+  },
+  {
+    "kind": "rect",
+    "page": 0,
+    "layer": "Audio equipment",
+    "group": "BOX_A snake",
+    "x": 365.5208333333333,
+    "y": 316.29166666666663,
+    "w": 26,
+    "h": 10,
+    "fill": "white",
+    "stroke": "#54616A",
+    "sw": 1
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Audio equipment",
+    "group": "BOX_A snake",
+    "x": 378.5208333333333,
+    "y": 339.29166666666663,
+    "text": "FAN*",
+    "size": 8,
+    "bold": true,
+    "fill": "#54616A",
+    "anchor": "middle"
+  },
+  {
+    "kind": "rect",
+    "page": 0,
+    "layer": "Audio equipment",
+    "group": "Sam - MA400 headphone amp",
+    "x": 360.8333333333333,
+    "y": 264.125,
+    "w": 10,
+    "h": 8,
+    "fill": "#E6EAEC",
+    "stroke": "#54616A",
+    "sw": 0.8
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Microphones",
+    "group": "joe mic",
+    "x": 248.00230792376,
+    "y": 337.89643638715967,
+    "rx": 4,
+    "ry": 4,
+    "fill": "#216575",
+    "stroke": "#216575",
+    "sw": 1
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Microphones",
+    "group": "joe mic",
+    "points": [
+      [
+        252.27251452285785,
+        352.5278984921498
+      ],
+      [
+        248.00230792376,
+        337.89643638715967
+      ]
+    ],
+    "stroke": "#216575",
+    "sw": 1,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Microphones",
+    "group": "joe mic",
+    "x": 252.27251452285785,
+    "y": 352.5278984921498,
+    "rx": 2,
+    "ry": 2,
+    "fill": "white",
+    "stroke": "#216575",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Microphones",
+    "group": "ike mic",
+    "x": 322.26330032999437,
+    "y": 376.8940959984236,
+    "rx": 4,
+    "ry": 4,
+    "fill": "#216575",
+    "stroke": "#216575",
+    "sw": 1
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Microphones",
+    "group": "ike mic",
+    "points": [
+      [
+        328.9449177478242,
+        385.6783528152726
+      ],
+      [
+        322.26330032999437,
+        376.8940959984236
+      ]
+    ],
+    "stroke": "#216575",
+    "sw": 1,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Microphones",
+    "group": "ike mic",
+    "x": 328.9449177478242,
+    "y": 385.6783528152726,
+    "rx": 2,
+    "ry": 2,
+    "fill": "white",
+    "stroke": "#216575",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Microphones",
+    "group": "cron mic",
+    "x": 402.3392070907307,
+    "y": 370.121903475814,
+    "rx": 4,
+    "ry": 4,
+    "fill": "#216575",
+    "stroke": "#216575",
+    "sw": 1
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Microphones",
+    "group": "cron mic",
+    "points": [
+      [
+        393.4689857291737,
+        382.3690708666023
+      ],
+      [
+        402.3392070907307,
+        370.121903475814
+      ]
+    ],
+    "stroke": "#216575",
+    "sw": 1,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Microphones",
+    "group": "cron mic",
+    "x": 393.4689857291737,
+    "y": 382.3690708666023,
+    "rx": 2,
+    "ry": 2,
+    "fill": "white",
+    "stroke": "#216575",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Microphones",
+    "group": "jackson mic",
+    "x": 474.3952119025032,
+    "y": 334.488546297619,
+    "rx": 4,
+    "ry": 4,
+    "fill": "#216575",
+    "stroke": "#216575",
+    "sw": 1
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Microphones",
+    "group": "jackson mic",
+    "points": [
+      [
+        468.6497962118134,
+        348.60606422418056
+      ],
+      [
+        474.3952119025032,
+        334.488546297619
+      ]
+    ],
+    "stroke": "#216575",
+    "sw": 1,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Microphones",
+    "group": "jackson mic",
+    "x": 468.6497962118134,
+    "y": 348.60606422418056,
+    "rx": 2,
+    "ry": 2,
+    "fill": "white",
+    "stroke": "#216575",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Microphones",
+    "group": "sam mic",
+    "x": 376.6760428737937,
+    "y": 275.22314922654334,
+    "rx": 4,
+    "ry": 4,
+    "fill": "#216575",
+    "stroke": "#216575",
+    "sw": 1
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Microphones",
+    "group": "sam mic",
+    "points": [
+      [
+        390.0,
+        282.625
+      ],
+      [
+        376.6760428737937,
+        275.22314922654334
+      ]
+    ],
+    "stroke": "#216575",
+    "sw": 1,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Microphones",
+    "group": "sam mic",
+    "x": 390.0,
+    "y": 282.625,
+    "rx": 2,
+    "ry": 2,
+    "fill": "white",
+    "stroke": "#216575",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Microphones",
+    "group": "Kick drum mic",
+    "x": 352.8296378117221,
+    "y": 309.965275005875,
+    "rx": 2.8,
+    "ry": 2.8,
+    "fill": "#216575",
+    "stroke": "#216575",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Microphones",
+    "group": "Snare mic",
+    "x": 350.125,
+    "y": 278.17782175724744,
+    "rx": 2.8,
+    "ry": 2.8,
+    "fill": "#216575",
+    "stroke": "#216575",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Microphones",
+    "group": "OH L",
+    "x": 372.64049634388266,
+    "y": 288.4150699267941,
+    "rx": 2.8,
+    "ry": 2.8,
+    "fill": "#216575",
+    "stroke": "#216575",
+    "sw": 1
+  },
+  {
+    "kind": "ellipse",
+    "page": 0,
+    "layer": "Microphones",
+    "group": "OH R",
+    "x": 338.82041133639063,
+    "y": 288.7818738649993,
+    "rx": 2.8,
+    "ry": 2.8,
+    "fill": "#216575",
+    "stroke": "#216575",
+    "sw": 1
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Labels and callouts",
+    "group": "JOE callout",
+    "points": [
+      [
+        226,
+        305
+      ],
+      [
+        234.86455057487086,
+        322.2337882122968
+      ]
+    ],
+    "stroke": "#88959D",
+    "sw": 0.65,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Labels and callouts",
+    "group": "JOE callout",
+    "x": 129,
+    "y": 302,
+    "text": "JOE",
+    "size": 13,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Labels and callouts",
+    "group": "JOE callout",
+    "x": 129,
+    "y": 315,
+    "text": "Gtr 08 / vocal 03",
+    "size": 9.5,
+    "bold": false,
+    "fill": "#54616A",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Labels and callouts",
+    "group": "JOE callout",
+    "x": 129,
+    "y": 327,
+    "text": "Modeler feed",
+    "size": 9.5,
+    "bold": false,
+    "fill": "#54616A",
+    "anchor": "start"
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Labels and callouts",
+    "group": "SAM callout",
+    "points": [
+      [
+        333,
+        228
+      ],
+      [
+        356.1666667687455,
+        247.80282079641586
+      ]
+    ],
+    "stroke": "#88959D",
+    "sw": 0.65,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Labels and callouts",
+    "group": "SAM callout",
+    "x": 307,
+    "y": 195,
+    "text": "SAM",
+    "size": 13,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Labels and callouts",
+    "group": "SAM callout",
+    "x": 307,
+    "y": 208,
+    "text": "Drums 13-16 / vocal 04",
+    "size": 9.5,
+    "bold": false,
+    "fill": "#54616A",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Labels and callouts",
+    "group": "SAM callout",
+    "x": 307,
+    "y": 220,
+    "text": "Kick / snare / OH pair",
+    "size": 9.5,
+    "bold": false,
+    "fill": "#54616A",
+    "anchor": "start"
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Labels and callouts",
+    "group": "JACKSON callout",
+    "points": [
+      [
+        509,
+        281
+      ],
+      [
+        489.4072498217655,
+        316.1144833208069
+      ]
+    ],
+    "stroke": "#88959D",
+    "sw": 0.65,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Labels and callouts",
+    "group": "JACKSON callout",
+    "x": 515,
+    "y": 279,
+    "text": "JACKSON",
+    "size": 13,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Labels and callouts",
+    "group": "JACKSON callout",
+    "x": 515,
+    "y": 292,
+    "text": "Gtr 07 / vocal 02",
+    "size": 9.5,
+    "bold": false,
+    "fill": "#54616A",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Labels and callouts",
+    "group": "JACKSON callout",
+    "x": 515,
+    "y": 304,
+    "text": "Modeler feed",
+    "size": 9.5,
+    "bold": false,
+    "fill": "#54616A",
+    "anchor": "start"
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Labels and callouts",
+    "group": "IKE callout",
+    "points": [
+      [
+        291,
+        397
+      ],
+      [
+        321.4497774967684,
+        384.94917292357115
+      ]
+    ],
+    "stroke": "#88959D",
+    "sw": 0.65,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Labels and callouts",
+    "group": "IKE callout",
+    "x": 266,
+    "y": 414,
+    "text": "IKE",
+    "size": 13,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Labels and callouts",
+    "group": "IKE callout",
+    "x": 266,
+    "y": 427,
+    "text": "Keys 06 / vocal 01",
+    "size": 9.5,
+    "bold": false,
+    "fill": "#54616A",
+    "anchor": "start"
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Labels and callouts",
+    "group": "CRON callout",
+    "points": [
+      [
+        435,
+        397
+      ],
+      [
+        410.6603209556244,
+        359.65190144035756
+      ]
+    ],
+    "stroke": "#88959D",
+    "sw": 0.65,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Labels and callouts",
+    "group": "CRON callout",
+    "x": 410,
+    "y": 414,
+    "text": "CRON",
+    "size": 13,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Labels and callouts",
+    "group": "CRON callout",
+    "x": 410,
+    "y": 427,
+    "text": "Bass 09 / vocal 05",
+    "size": 9.5,
+    "bold": false,
+    "fill": "#54616A",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Labels and callouts",
+    "group": "Bass DI label",
+    "x": 456.6691957799781,
+    "y": 325.4396178221765,
+    "text": "DI",
+    "size": 9,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Labels and callouts",
+    "group": "Monitor label",
+    "x": 420,
+    "y": 235,
+    "text": "MA400",
+    "size": 8.5,
+    "bold": false,
+    "fill": "#54616A",
+    "anchor": "start"
+  },
+  {
+    "kind": "path",
+    "page": 0,
+    "layer": "Labels and callouts",
+    "group": "Monitor label",
+    "points": [
+      [
+        417,
+        238
+      ],
+      [
+        365.8333333333333,
+        268.125
+      ]
+    ],
+    "stroke": "#88959D",
+    "sw": 0.65,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Notes",
+    "group": "Production notes",
+    "x": 36,
+    "y": 494,
+    "text": "* Saved audio system shown for reference; touring supply and house interface TBC.",
+    "size": 10,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Notes",
+    "group": "Production notes",
+    "x": 36,
+    "y": 510,
+    "text": "Audio crew determines cable routes and house patch. See page 2 for sources and open requirements.",
+    "size": 9.5,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 0,
+    "layer": "Notes",
+    "group": "Production notes",
+    "x": 36,
+    "y": 526,
+    "text": "Power drops / monitor mixes: TBC. No riser requirement confirmed. Backline supply is advanced separately.",
+    "size": 9.5,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Title and revision",
+    "group": "Header",
+    "x": 36,
+    "y": 39,
+    "text": "THE SWELL",
+    "size": 25,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Title and revision",
+    "group": "Header",
+    "x": 756,
+    "y": 36,
+    "text": "DRAFT 01  /  29 SEP 2026",
+    "size": 10,
+    "bold": true,
+    "fill": "#216575",
+    "anchor": "end"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Title and revision",
+    "group": "Header",
+    "x": 36,
+    "y": 59,
+    "text": "AUDIO INPUTS  /  saved patch reference",
+    "size": 12,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Title and revision",
+    "group": "Header",
+    "x": 36,
+    "y": 76,
+    "text": "For audio production / house sound. Existing SD16 socket numbers; console channels and show-day supply to confirm.",
+    "size": 9.5,
+    "bold": false,
+    "fill": "#54616A",
+    "anchor": "start"
+  },
+  {
+    "kind": "path",
+    "page": 1,
+    "layer": "Title and revision",
+    "group": "Header",
+    "points": [
+      [
+        36,
+        88
+      ],
+      [
+        756,
+        88
+      ]
+    ],
+    "stroke": "#182B35",
+    "sw": 1.2,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "path",
+    "page": 1,
+    "layer": "Title and revision",
+    "group": "Footer",
+    "points": [
+      [
+        36,
+        540
+      ],
+      [
+        756,
+        540
+      ]
+    ],
+    "stroke": "#E6EAEC",
+    "sw": 1,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Title and revision",
+    "group": "Footer",
+    "x": 36,
+    "y": 557,
+    "text": "Setup: keyboard stage CENTER R  /  saved revision 49",
+    "size": 8.5,
+    "bold": false,
+    "fill": "#54616A",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Title and revision",
+    "group": "Footer",
+    "x": 756,
+    "y": 557,
+    "text": "11 x 8 in  /  2 of 2",
+    "size": 8.5,
+    "bold": false,
+    "fill": "#54616A",
+    "anchor": "end"
+  },
+  {
+    "kind": "rect",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Table heading",
+    "x": 36,
+    "y": 103,
+    "w": 720,
+    "h": 23,
+    "fill": "#182B35",
+    "stroke": "none",
+    "sw": 1
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Table heading",
+    "x": 44,
+    "y": 118,
+    "text": "PORT",
+    "size": 9,
+    "bold": true,
+    "fill": "white",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Table heading",
+    "x": 84,
+    "y": 118,
+    "text": "SOURCE",
+    "size": 9,
+    "bold": true,
+    "fill": "white",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Table heading",
+    "x": 241,
+    "y": 118,
+    "text": "POSITION",
+    "size": 9,
+    "bold": true,
+    "fill": "white",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Table heading",
+    "x": 356,
+    "y": 118,
+    "text": "SIGNAL / INTERFACE",
+    "size": 9,
+    "bold": true,
+    "fill": "white",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Table heading",
+    "x": 568,
+    "y": 118,
+    "text": "MIC / DI / STAND",
+    "size": 9,
+    "bold": true,
+    "fill": "white",
+    "anchor": "start"
+  },
+  {
+    "kind": "rect",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 01",
+    "x": 36,
+    "y": 126,
+    "w": 720,
+    "h": 20,
+    "fill": "#F2F4F5",
+    "stroke": "none",
+    "sw": 1
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 01",
+    "x": 44,
+    "y": 139.5,
+    "text": "01",
+    "size": 9.2,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 01",
+    "x": 84,
+    "y": 139.5,
+    "text": "Ike vocal",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 01",
+    "x": 241,
+    "y": 139.5,
+    "text": "Downstage SR",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 01",
+    "x": 356,
+    "y": 139.5,
+    "text": "XLR microphone",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 01",
+    "x": 568,
+    "y": 139.5,
+    "text": "Beta 87A (owned); boom",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "path",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 01",
+    "points": [
+      [
+        36,
+        146
+      ],
+      [
+        756,
+        146
+      ]
+    ],
+    "stroke": "#E6EAEC",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 02",
+    "x": 44,
+    "y": 159.5,
+    "text": "02",
+    "size": 9.2,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 02",
+    "x": 84,
+    "y": 159.5,
+    "text": "Jackson vocal",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 02",
+    "x": 241,
+    "y": 159.5,
+    "text": "Stage left",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 02",
+    "x": 356,
+    "y": 159.5,
+    "text": "XLR microphone",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 02",
+    "x": 568,
+    "y": 159.5,
+    "text": "Model TBC; boom",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "path",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 02",
+    "points": [
+      [
+        36,
+        166
+      ],
+      [
+        756,
+        166
+      ]
+    ],
+    "stroke": "#E6EAEC",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "rect",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 03",
+    "x": 36,
+    "y": 166,
+    "w": 720,
+    "h": 20,
+    "fill": "#F2F4F5",
+    "stroke": "none",
+    "sw": 1
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 03",
+    "x": 44,
+    "y": 179.5,
+    "text": "03",
+    "size": 9.2,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 03",
+    "x": 84,
+    "y": 179.5,
+    "text": "Joe vocal",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 03",
+    "x": 241,
+    "y": 179.5,
+    "text": "Stage right",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 03",
+    "x": 356,
+    "y": 179.5,
+    "text": "XLR microphone",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 03",
+    "x": 568,
+    "y": 179.5,
+    "text": "Model TBC; boom",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "path",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 03",
+    "points": [
+      [
+        36,
+        186
+      ],
+      [
+        756,
+        186
+      ]
+    ],
+    "stroke": "#E6EAEC",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 04",
+    "x": 44,
+    "y": 199.5,
+    "text": "04",
+    "size": 9.2,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 04",
+    "x": 84,
+    "y": 199.5,
+    "text": "Sam vocal",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 04",
+    "x": 241,
+    "y": 199.5,
+    "text": "Drums / center",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 04",
+    "x": 356,
+    "y": 199.5,
+    "text": "XLR microphone",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 04",
+    "x": 568,
+    "y": 199.5,
+    "text": "Model TBC; boom",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "path",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 04",
+    "points": [
+      [
+        36,
+        206
+      ],
+      [
+        756,
+        206
+      ]
+    ],
+    "stroke": "#E6EAEC",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "rect",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 05",
+    "x": 36,
+    "y": 206,
+    "w": 720,
+    "h": 20,
+    "fill": "#F2F4F5",
+    "stroke": "none",
+    "sw": 1
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 05",
+    "x": 44,
+    "y": 219.5,
+    "text": "05",
+    "size": 9.2,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 05",
+    "x": 84,
+    "y": 219.5,
+    "text": "Cron vocal",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 05",
+    "x": 241,
+    "y": 219.5,
+    "text": "Downstage SL",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 05",
+    "x": 356,
+    "y": 219.5,
+    "text": "XLR microphone",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 05",
+    "x": 568,
+    "y": 219.5,
+    "text": "Model TBC; boom",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "path",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 05",
+    "points": [
+      [
+        36,
+        226
+      ],
+      [
+        756,
+        226
+      ]
+    ],
+    "stroke": "#E6EAEC",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 06",
+    "x": 44,
+    "y": 239.5,
+    "text": "06",
+    "size": 9.2,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 06",
+    "x": 84,
+    "y": 239.5,
+    "text": "Nord keyboard",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 06",
+    "x": 241,
+    "y": 239.5,
+    "text": "Ike / downstage SR",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 06",
+    "x": 356,
+    "y": 239.5,
+    "text": "1/4-inch output; 1 run saved",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 06",
+    "x": 568,
+    "y": 239.5,
+    "text": "DI / mono-stereo TBC",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "path",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 06",
+    "points": [
+      [
+        36,
+        246
+      ],
+      [
+        756,
+        246
+      ]
+    ],
+    "stroke": "#E6EAEC",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "rect",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 07",
+    "x": 36,
+    "y": 246,
+    "w": 720,
+    "h": 20,
+    "fill": "#F2F4F5",
+    "stroke": "none",
+    "sw": 1
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 07",
+    "x": 44,
+    "y": 259.5,
+    "text": "07",
+    "size": 9.2,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 07",
+    "x": 84,
+    "y": 259.5,
+    "text": "Jackson guitar",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 07",
+    "x": 241,
+    "y": 259.5,
+    "text": "Stage left",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 07",
+    "x": 356,
+    "y": 259.5,
+    "text": "Modeler 1/4-inch main out",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 07",
+    "x": 568,
+    "y": 259.5,
+    "text": "Balanced feed / DI TBC",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "path",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 07",
+    "points": [
+      [
+        36,
+        266
+      ],
+      [
+        756,
+        266
+      ]
+    ],
+    "stroke": "#E6EAEC",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 08",
+    "x": 44,
+    "y": 279.5,
+    "text": "08",
+    "size": 9.2,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 08",
+    "x": 84,
+    "y": 279.5,
+    "text": "Joe guitar",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 08",
+    "x": 241,
+    "y": 279.5,
+    "text": "Stage right",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 08",
+    "x": 356,
+    "y": 279.5,
+    "text": "Modeler 1/4-inch main out",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 08",
+    "x": 568,
+    "y": 279.5,
+    "text": "Balanced feed / DI TBC",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "path",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 08",
+    "points": [
+      [
+        36,
+        286
+      ],
+      [
+        756,
+        286
+      ]
+    ],
+    "stroke": "#E6EAEC",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "rect",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 09",
+    "x": 36,
+    "y": 286,
+    "w": 720,
+    "h": 20,
+    "fill": "#F2F4F5",
+    "stroke": "none",
+    "sw": 1
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 09",
+    "x": 44,
+    "y": 299.5,
+    "text": "09",
+    "size": 9.2,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 09",
+    "x": 84,
+    "y": 299.5,
+    "text": "Bass DI",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 09",
+    "x": 241,
+    "y": 299.5,
+    "text": "Cron / downstage SL",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 09",
+    "x": 356,
+    "y": 299.5,
+    "text": "XLR from DI",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 09",
+    "x": 568,
+    "y": 299.5,
+    "text": "DI model / phantom TBC",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "path",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 09",
+    "points": [
+      [
+        36,
+        306
+      ],
+      [
+        756,
+        306
+      ]
+    ],
+    "stroke": "#E6EAEC",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 13",
+    "x": 44,
+    "y": 319.5,
+    "text": "13",
+    "size": 9.2,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 13",
+    "x": 84,
+    "y": 319.5,
+    "text": "Overhead R",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 13",
+    "x": 241,
+    "y": 319.5,
+    "text": "Drums",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 13",
+    "x": 356,
+    "y": 319.5,
+    "text": "XLR microphone",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 13",
+    "x": 568,
+    "y": 319.5,
+    "text": "Model / phantom TBC; tall boom",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "path",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 13",
+    "points": [
+      [
+        36,
+        326
+      ],
+      [
+        756,
+        326
+      ]
+    ],
+    "stroke": "#E6EAEC",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "rect",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 14",
+    "x": 36,
+    "y": 326,
+    "w": 720,
+    "h": 20,
+    "fill": "#F2F4F5",
+    "stroke": "none",
+    "sw": 1
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 14",
+    "x": 44,
+    "y": 339.5,
+    "text": "14",
+    "size": 9.2,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 14",
+    "x": 84,
+    "y": 339.5,
+    "text": "Overhead L",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 14",
+    "x": 241,
+    "y": 339.5,
+    "text": "Drums",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 14",
+    "x": 356,
+    "y": 339.5,
+    "text": "XLR microphone",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 14",
+    "x": 568,
+    "y": 339.5,
+    "text": "Model / phantom TBC; tall boom",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "path",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 14",
+    "points": [
+      [
+        36,
+        346
+      ],
+      [
+        756,
+        346
+      ]
+    ],
+    "stroke": "#E6EAEC",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 15",
+    "x": 44,
+    "y": 359.5,
+    "text": "15",
+    "size": 9.2,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 15",
+    "x": 84,
+    "y": 359.5,
+    "text": "Snare",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 15",
+    "x": 241,
+    "y": 359.5,
+    "text": "Drums",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 15",
+    "x": 356,
+    "y": 359.5,
+    "text": "XLR microphone",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 15",
+    "x": 568,
+    "y": 359.5,
+    "text": "Model TBC; low boom",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "path",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 15",
+    "points": [
+      [
+        36,
+        366
+      ],
+      [
+        756,
+        366
+      ]
+    ],
+    "stroke": "#E6EAEC",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "rect",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 16",
+    "x": 36,
+    "y": 366,
+    "w": 720,
+    "h": 20,
+    "fill": "#F2F4F5",
+    "stroke": "none",
+    "sw": 1
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 16",
+    "x": 44,
+    "y": 379.5,
+    "text": "16",
+    "size": 9.2,
+    "bold": true,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 16",
+    "x": 84,
+    "y": 379.5,
+    "text": "Kick",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 16",
+    "x": 241,
+    "y": 379.5,
+    "text": "Drums",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 16",
+    "x": 356,
+    "y": 379.5,
+    "text": "XLR microphone",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 16",
+    "x": 568,
+    "y": 379.5,
+    "text": "Model TBC; short boom",
+    "size": 9.2,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "path",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 16",
+    "points": [
+      [
+        36,
+        386
+      ],
+      [
+        756,
+        386
+      ]
+    ],
+    "stroke": "#E6EAEC",
+    "sw": 0.5,
+    "fill": "none",
+    "closed": false,
+    "dash": null
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Input list",
+    "group": "Input 16",
+    "x": 36,
+    "y": 402,
+    "text": "13 connected sources. SD16 ports 10-12 are unassigned in this snapshot. R/L overhead names retain source labels.",
+    "size": 9,
+    "bold": false,
+    "fill": "#54616A",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Audio advance notes",
+    "group": "Audio notes",
+    "x": 36,
+    "y": 428,
+    "text": "MONITORS + POWER",
+    "size": 10,
+    "bold": true,
+    "fill": "#216575",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Audio advance notes",
+    "group": "Audio notes",
+    "x": 36,
+    "y": 444,
+    "text": "MA400 headphone amp at drums; saved SD16 outputs 1/2 feed its monitor input.",
+    "size": 9.5,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Audio advance notes",
+    "group": "Audio notes",
+    "x": 36,
+    "y": 459,
+    "text": "Confirm all performers' mixes, IEM/wedge choice, return patch, AC drops and load.",
+    "size": 9.5,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Audio advance notes",
+    "group": "Audio notes",
+    "x": 36,
+    "y": 477,
+    "text": "HOUSE INTERFACE + PHANTOM",
+    "size": 10,
+    "bold": true,
+    "fill": "#216575",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Audio advance notes",
+    "group": "Audio notes",
+    "x": 36,
+    "y": 493,
+    "text": "Confirm band-supplied X32 / SD16 / snake, FOH split or handoff, gain and phantom responsibility.",
+    "size": 9.5,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Audio advance notes",
+    "group": "Audio notes",
+    "x": 36,
+    "y": 508,
+    "text": "Ike's Beta 87A needs phantom; confirm supply before patching. All other mic models remain TBC.",
+    "size": 9.5,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  },
+  {
+    "kind": "text",
+    "page": 1,
+    "layer": "Audio advance notes",
+    "group": "Audio notes",
+    "x": 36,
+    "y": 523,
+    "text": "Backline: instrument / drum / stand supply is a separate advance. This sheet is not a rental order.",
+    "size": 9.5,
+    "bold": false,
+    "fill": "#182B35",
+    "anchor": "start"
+  }
+]

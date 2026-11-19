@@ -10,6 +10,7 @@ import type {
   StageWaypoint,
 } from "@/lib/setup-designer/domain";
 import { cableAssemblyEdges, edgeHasCableAssemblyLeg, edgeIsCableAssemblyPrimary, primaryCableAssemblyLeg } from "@/lib/setup-designer/breakout-cables";
+import { stageSymbolForEquipment } from "@/lib/setup-designer/stage-symbols";
 
 export const STAGE_PIXELS_PER_FOOT = 32;
 export const STAGE_POSITION_INCREMENT_FEET = 0.25;
@@ -83,18 +84,21 @@ function normalizeAnchor(value: StageConnectionAnchor | undefined, fallback: Sta
 
 export function stagePositionForNode(node: SetupNode, stage: Pick<StagePlan, "widthFeet" | "depthFeet">): Required<StagePosition> {
   const footprint = defaultFootprint(node);
-  const widthFeet = Math.max(MIN_STAGE_DIMENSION_FEET, node.stagePosition?.widthFeet ?? footprint.widthFeet);
-  const depthFeet = Math.max(MIN_STAGE_DIMENSION_FEET, node.stagePosition?.depthFeet ?? footprint.depthFeet);
+  const widthFeet = node.stagePosition?.widthFeet && node.stagePosition.widthFeet > 0 ? node.stagePosition.widthFeet : footprint.widthFeet;
+  const depthFeet = node.stagePosition?.depthFeet && node.stagePosition.depthFeet > 0 ? node.stagePosition.depthFeet : footprint.depthFeet;
   const seededX = 2 + Math.max(0, node.position.x) / STAGE_PIXELS_PER_FOOT;
   const seededY = 2 + Math.max(0, node.position.y) / STAGE_PIXELS_PER_FOOT;
   return {
-    xFeet: clamp(node.stagePosition?.xFeet ?? seededX, 0, Math.max(0, stage.widthFeet - widthFeet)),
-    yFeet: clamp(node.stagePosition?.yFeet ?? seededY, 0, Math.max(0, stage.depthFeet - depthFeet)),
+    xFeet: node.stagePosition?.xFeet ?? clamp(seededX, 0, Math.max(0, stage.widthFeet - widthFeet)),
+    yFeet: node.stagePosition?.yFeet ?? clamp(seededY, 0, Math.max(0, stage.depthFeet - depthFeet)),
     widthFeet,
     depthFeet,
     rotationDegrees: normalizeDegrees(node.stagePosition?.rotationDegrees),
     inputAnchor: normalizeAnchor(node.stagePosition?.inputAnchor, DEFAULT_INPUT_ANCHOR),
-    outputAnchor: normalizeAnchor(node.stagePosition?.outputAnchor, DEFAULT_OUTPUT_ANCHOR),
+    // A microphone's output is at the handle end, opposite its +Y-facing grille.
+    outputAnchor: stageSymbolForEquipment(node.data) === "microphone"
+      ? { side: "top", offset: 0.5 }
+      : normalizeAnchor(node.stagePosition?.outputAnchor, DEFAULT_OUTPUT_ANCHOR),
   };
 }
 

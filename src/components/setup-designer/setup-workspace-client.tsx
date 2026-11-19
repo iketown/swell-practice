@@ -100,7 +100,12 @@ import {
   getSetupWorkspace,
   listEquipmentTemplates,
   saveSetupWorkspace,
+  subscribeSetupGraph,
 } from "@/lib/setup-designer/repository";
+import { BlenderConnection } from "@/components/setup-designer/blender-connection";
+import { reconcileStageAttachments } from "@/lib/setup-designer/stage-attachments";
+import { mergeSetupGraphs, sameSetupValue } from "@/lib/setup-designer/merge-setup";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 
 const nodeTypes = { equipment: EquipmentNode };
@@ -139,6 +144,15 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
   const [activeView, setActiveView] = useState<SetupWorkspaceView>("signal");
   const [baseRevision, setBaseRevision] = useState(0);
   const [dirty, setDirty] = useState(false);
+  const [autoSave, setAutoSave] = useState(false);
+  const [incoming, setIncoming] = useState<SetupGraph | null>(null);
+  const [resolutions, setResolutions] = useState<Record<string, "local" | "remote">>({});
+  const [baseline, setBaseline] = useState<SetupGraph | null>(null);
+  const [interacting, setInteracting] = useState(false);
+  const latestGraphRef = useRef<SetupGraph | null>(null);
+  const savingRef = useRef(false);
+  const pointerDownRef = useRef(false);
+  const incomingRevisionRef = useRef(-1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -183,22 +197,32 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
           setError("This setup does not exist or was archived.");
           return;
         }
+        setBaseline(workspace.graph);
         let graph = workspace.graph;
         const recovered = window.localStorage.getItem(recoveryKey);
         if (recovered) {
           try {
-            const parsed = JSON.parse(recovered) as { baseRevision: number; graph: SetupGraph };
+            const parsed = JSON.parse(recovered) as { baseRevision: number; graph: SetupGraph; baseline?: SetupGraph };
             if (parsed.baseRevision === workspace.metadata.revision) {
               graph = setupGraphFromData(parsed.graph, parsed.baseRevision);
               setDirty(true);
               toast.info("Recovered unsaved setup changes from this browser.");
+            } else if (parsed.baseline) {
+              graph = setupGraphFromData(parsed.graph, parsed.baseRevision);
+              setBaseline(setupGraphFromData(parsed.baseline, parsed.baseRevision));
+              setIncoming(workspace.graph);
+              setDirty(true);
+              toast.info("Recovered your draft. Reviewing newer website changes.");
+            } else {
+              window.localStorage.setItem(`${recoveryKey}:older-draft:${Date.now()}`, recovered);
+              toast.info("An older draft was preserved in browser storage; the saved setup has newer changes.");
             }
           } catch {
             window.localStorage.removeItem(recoveryKey);
           }
         }
         setMetadata(workspace.metadata);
-        setBaseRevision(workspace.metadata.revision);
+        setBaseRevision(graph.revision);
         setNodes(ensureStagePositions(graph.nodes, graph.stage));
         setEdges(graph.edges);
         setViewport(graph.viewport);
@@ -215,6 +239,39 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
     return () => { active = false; };
   }, [admin.isAdmin, recoveryKey, setEdges, setNodes, setupId]);
 
+  const currentGraph = useMemo(() => normalizeSetupGraph({ nodes, edges, viewport, stage: stagePlan, revision: baseRevision }), [nodes, edges, viewport, stagePlan, baseRevision]);
+  useEffect(() => { latestGraphRef.current = currentGraph; }, [currentGraph]);
+  useEffect(() => {
+    const down = () => { pointerDownRef.current = true; setInteracting(true); };
+    const up = () => { pointerDownRef.current = false; setInteracting(false); };
+    window.addEventListener("pointerdown", down); window.addEventListener("pointerup", up); window.addEventListener("blur", up);
+    return () => { window.removeEventListener("pointerdown", down); window.removeEventListener("pointerup", up); window.removeEventListener("blur", up); };
+  }, []);
+  useEffect(() => {
+    if (!admin.isAdmin || loading) return;
+    return subscribeSetupGraph(setupId, (graph) => {
+      if (graph.revision > incomingRevisionRef.current) {
+        incomingRevisionRef.current = graph.revision; setResolutions({}); setIncoming(graph);
+      }
+    }, (caught) => { setAutoSave(false); toast.error(`Live updates paused: ${caught.message}`); });
+  }, [setupId, admin.isAdmin, loading]);
+  const mergeResult = useMemo(() => incoming && incoming.revision > baseRevision && baseline
+    ? mergeSetupGraphs(baseline, currentGraph, incoming, resolutions) : null, [incoming, baseRevision, currentGraph, resolutions, baseline]);
+  useEffect(() => {
+    if (!incoming || incoming.revision <= baseRevision || !mergeResult || mergeResult.conflicts.length || saving || interacting) return;
+    const frame = window.requestAnimationFrame(() => {
+    const graph = mergeResult.graph;
+    setBaseline(incoming);
+    setNodes(ensureStagePositions(graph.nodes, graph.stage)); setEdges(graph.edges); setStagePlan(graph.stage);
+    setBaseRevision(incoming.revision);
+    setMetadata((current) => current ? { ...current, revision: incoming.revision } : current);
+    setDirty(!sameSetupValue(graph.nodes, incoming.nodes) || !sameSetupValue(graph.edges, incoming.edges) || !sameSetupValue(graph.stage, incoming.stage));
+    setResolutions({});
+    void listEquipmentTemplates().then(setTemplates).catch(() => toast.error("Gear library could not refresh."));
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [incoming, baseRevision, mergeResult, saving, interacting, setNodes, setEdges]);
+
   const libraryTemplates = useMemo(() => [
     ...templates,
     ...connectionSets.flatMap((connectionSet) => {
@@ -227,10 +284,10 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
     if (!loadedRef.current || !dirty) return;
     const timeout = window.setTimeout(() => {
       const graph = normalizeSetupGraph({ nodes, edges, viewport, stage: stagePlan, revision: baseRevision });
-      window.localStorage.setItem(recoveryKey, JSON.stringify({ baseRevision, graph }));
+      window.localStorage.setItem(recoveryKey, JSON.stringify({ baseRevision, graph, baseline }));
     }, 350);
     return () => window.clearTimeout(timeout);
-  }, [baseRevision, dirty, edges, nodes, recoveryKey, stagePlan, viewport]);
+  }, [baseRevision, baseline, dirty, edges, nodes, recoveryKey, stagePlan, viewport]);
 
   useEffect(() => {
     const preventLeave = (event: BeforeUnloadEvent) => {
@@ -247,33 +304,49 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
   );
 
   const save = useCallback(async () => {
-    if (!metadata || saving || !dirty) return;
-    const graph = normalizeSetupGraph({ nodes, edges: measuredEdges, viewport, stage: stagePlan, revision: baseRevision });
+    if (!metadata || savingRef.current || !dirty || (incoming && incoming.revision > baseRevision)) return;
+    const spatialNodes = reconcileStageAttachments(baseline?.nodes ?? nodes, nodes, stagePlan);
+    const graph = normalizeSetupGraph({ nodes: spatialNodes, edges: withMeasuredStageCableLengths(spatialNodes, edges, stagePlan), viewport, stage: stagePlan, revision: baseRevision });
     const size = graphByteSize(graph);
     if (size >= GRAPH_MAX_BYTES) {
+      setAutoSave(false);
       toast.error("This setup is too large for one Firestore document. Download or simplify it before saving.");
       return;
     }
     if (size >= GRAPH_WARNING_BYTES) toast.warning("This setup is approaching Firestore's graph size limit.");
+    savingRef.current = true;
     setSaving(true);
+    const captured = latestGraphRef.current;
     try {
       const revision = await saveSetupWorkspace(setupId, graph, baseRevision, actorId);
+      setBaseline({ ...graph, revision });
       setBaseRevision(revision);
-      setEdges(graph.edges);
+      const editedWhileSaving = latestGraphRef.current !== captured;
+      if (!editedWhileSaving) { setNodes(graph.nodes); setEdges(graph.edges); }
       setMetadata((current) => current ? { ...current, revision, nodeCount: deriveEquipmentUsage(nodes).length, cableCount: externalCableCount(graph.edges), updatedAt: Date.now() } : current);
-      setDirty(false);
-      window.localStorage.removeItem(recoveryKey);
+      setDirty(editedWhileSaving);
+      if (!editedWhileSaving) window.localStorage.removeItem(recoveryKey);
       toast.success("Setup saved.");
     } catch (caught) {
       if (caught instanceof SetupRevisionConflictError) {
-        toast.error("A newer setup revision exists. Reload before saving again.");
+        setAutoSave(false);
+        void getSetupWorkspace(setupId).then((workspace) => workspace && setIncoming(workspace.graph));
+        toast.error("A newer revision arrived. Your edits are retained for review.");
       } else {
+        setAutoSave(false);
         toast.error(caught instanceof Error ? caught.message : "Could not save this setup.");
       }
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
-  }, [actorId, baseRevision, dirty, measuredEdges, metadata, nodes, recoveryKey, saving, setEdges, setupId, stagePlan, viewport]);
+  }, [incoming, actorId, baseRevision, baseline, dirty, edges, metadata, nodes, recoveryKey, setEdges, setNodes, setupId, stagePlan, viewport]);
+
+  useEffect(() => {
+    if (!autoSave || !dirty || saving || interacting || (incoming && incoming.revision > baseRevision)) return;
+    const timeout = window.setTimeout(() => { if (!pointerDownRef.current) void save(); }, 1000);
+    return () => window.clearTimeout(timeout);
+  }, [autoSave, dirty, saving, interacting, incoming, baseRevision, save]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -338,7 +411,7 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
     const positionChanges = changes.flatMap((change) => change.type === "position" && change.position ? [change] : []);
     if (!positionChanges.length) return;
     const waypointIds = new Set(stagePlan.waypoints.map((waypoint) => waypoint.id));
-    setNodes((current) => current.map((node) => {
+    setNodes((current) => reconcileStageAttachments(current, current.map((node) => {
       const change = positionChanges.find((item) => item.id === node.id);
       if (!change || change.type !== "position" || !change.position) return node;
       const currentPosition = stagePositionForNode(node, stagePlan);
@@ -351,7 +424,7 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
           yFeet: Math.max(0, nextPosition.yFeet),
         },
       };
-    }));
+    }), stagePlan));
     setStagePlan((current) => ({
       ...current,
       areas: current.areas.map((area) => {
@@ -701,9 +774,14 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
   }, [edges, nodes]);
 
   const updateStageNodePosition = useCallback((nodeId: string, position: Required<StagePosition>) => {
-    setNodes((current) => current.map((node) => node.id === nodeId ? { ...node, stagePosition: position } : node));
+    setNodes((current) => reconcileStageAttachments(current, current.map((node) => {
+      if (node.id !== nodeId) return node;
+      const previous = stagePositionForNode(node, stagePlan);
+      const resized = previous.widthFeet !== position.widthFeet || previous.depthFeet !== position.depthFeet;
+      return { ...node, stagePosition: position, data: { ...node.data, ...(resized && node.data.stage3d ? { stage3d: { ...node.data.stage3d, footprintMode: "custom" as const } } : {}) } };
+    }), stagePlan));
     setDirty(true);
-  }, [setNodes]);
+  }, [setNodes, stagePlan]);
 
   const updateStageNodeSignalVisibility = useCallback((nodeId: string, visible: boolean) => {
     setNodes((current) => current.map((node) => node.id === nodeId ? {
@@ -725,6 +803,12 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
     setStagePlan((current) => ({
       ...current,
       ...bounds,
+      ...(current.outline ? {
+        outline: current.outline.map((point) => ({
+          xFeet: point.xFeet * bounds.widthFeet / current.widthFeet,
+          yFeet: point.yFeet * bounds.depthFeet / current.depthFeet,
+        })),
+      } : {}),
       areas: current.areas.map((area) => constrainStageArea(area, bounds)),
       waypoints: current.waypoints.map((waypoint) => ({
         ...waypoint,
@@ -883,7 +967,7 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
       id: "stage-floor",
       type: "stageFloor",
       position: { x: 0, y: 0 },
-      data: { widthFeet: stagePlan.widthFeet, depthFeet: stagePlan.depthFeet },
+      data: { widthFeet: stagePlan.widthFeet, depthFeet: stagePlan.depthFeet, outline: stagePlan.outline },
       style: { width: stagePlan.widthFeet * STAGE_PIXELS_PER_FOOT, height: stagePlan.depthFeet * STAGE_PIXELS_PER_FOOT, pointerEvents: "none" },
       draggable: false,
       selectable: false,
@@ -1213,13 +1297,29 @@ function SetupWorkspace({ setupId }: { setupId: string }) {
           <BoxesIcon data-icon="inline-start" />
           Gear
         </Link>
-        <Button size="sm" onClick={() => void save()} disabled={!dirty || saving}>
+        <Button size="sm" onClick={() => void save()} disabled={!dirty || saving || Boolean(incoming && incoming.revision > baseRevision)}>
           <SaveIcon data-icon="inline-start" />
           {saving ? "Saving..." : "Save"}
         </Button>
       </header>
 
-      <div className="setup-workspace-grid min-h-[calc(100dvh-12.5rem)] overflow-hidden rounded-lg border bg-card shadow-sm">
+      <BlenderConnection setupId={setupId} user={admin.user} autoSave={autoSave} onAutoSave={setAutoSave} />
+      {mergeResult?.conflicts.length ? <Alert>
+        <AlertTitle>Review simultaneous changes</AlertTitle>
+        <AlertDescription>Your draft is preserved. Choose which value to keep for each conflict; other changes merge automatically.</AlertDescription>
+        <div className="col-span-full flex max-h-72 flex-col gap-3 overflow-auto py-2">
+          {mergeResult.conflicts.map((conflict) => <div key={conflict.path} className="flex flex-col gap-1">
+            <p className="break-all text-xs font-medium">{conflict.path}</p>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => setResolutions((current) => ({ ...current, [conflict.path]: "local" }))}>Keep my value</Button>
+              <code className="max-w-xs truncate self-center text-xs" title={JSON.stringify(conflict.local)}>{JSON.stringify(conflict.local) ?? "Removed"}</code>
+              <Button size="sm" variant="outline" onClick={() => setResolutions((current) => ({ ...current, [conflict.path]: "remote" }))}>Use incoming value</Button>
+              <code className="max-w-xs truncate self-center text-xs" title={JSON.stringify(conflict.remote)}>{JSON.stringify(conflict.remote) ?? "Removed"}</code>
+            </div>
+          </div>)}
+        </div>
+      </Alert> : null}
+      <div className="setup-workspace-grid min-h-[520px] overflow-hidden rounded-lg border bg-card shadow-sm">
         <EquipmentLibrary
           templates={libraryTemplates}
           onTemplateCreated={(template) => setTemplates((current) => [...current, template].sort((left, right) => left.name.localeCompare(right.name)))}

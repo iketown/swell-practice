@@ -5,6 +5,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
   orderBy,
   query,
   runTransaction,
@@ -687,6 +688,31 @@ export async function replaceEquipmentTemplateImage(
   return updateEquipmentTemplateImages(template, { iconFile: imageFile }, onProgress);
 }
 
+async function commitTemplateVersion(template: EquipmentTemplate, updated: EquipmentTemplate) {
+  if (isDemoMode() || !db) {
+    const store = readDemoStore();
+    const index = store.templates.findIndex((item) => item.id === template.id);
+    if (index < 0 || store.templates[index].version !== template.version) throw new Error("Gear definition changed. Reopen it before saving.");
+    store.templates[index] = updated;
+    writeDemoStore(store);
+    return;
+  }
+  const firestore = firestoreOrThrow();
+  const reference = doc(firestore, "equipmentTemplates", template.id);
+  await runTransaction(firestore, async (transaction) => {
+    const current = await transaction.get(reference);
+    if (!current.exists() || Number(current.data().version ?? 1) !== template.version) throw new Error("Gear definition changed. Reopen it before saving.");
+    transaction.set(reference, { ...equipmentTemplateDocumentValue(updated), updatedAt: serverTimestamp() }, { merge: true });
+  });
+}
+
+export function subscribeSetupGraph(setupId: string, receive: (graph: SetupGraph) => void, onError: (error: Error) => void) {
+  if (isDemoMode() || !db) return () => {};
+  return onSnapshot(doc(firestoreOrThrow(), "setups", setupId, "graphs", "current"), (snapshot) => {
+    if (snapshot.exists() && !snapshot.metadata.hasPendingWrites) receive(setupGraphFromData(snapshot.data()));
+  }, onError);
+}
+
 export async function updateEquipmentTemplateImages(
   template: EquipmentTemplate,
   files: {
@@ -722,19 +748,7 @@ export async function updateEquipmentTemplateImages(
     version: template.version + 1,
   };
 
-  if (isDemoMode() || !db) {
-    const store = readDemoStore();
-    const existingIndex = store.templates.findIndex((item) => item.id === template.id);
-    if (existingIndex >= 0) store.templates[existingIndex] = updated;
-    else store.templates.push(updated);
-    writeDemoStore(store);
-    return updated;
-  }
-
-  await setDoc(doc(firestoreOrThrow(), "equipmentTemplates", template.id), {
-    ...equipmentTemplateDocumentValue(updated),
-    updatedAt: serverTimestamp(),
-  }, { merge: true });
+  await commitTemplateVersion(template, updated);
   return updated;
 }
 
@@ -793,19 +807,7 @@ export async function updateEquipmentTemplate(
     status: "active",
   };
 
-  if (isDemoMode() || !db) {
-    const store = readDemoStore();
-    const index = store.templates.findIndex((item) => item.id === updated.id);
-    if (index >= 0) store.templates[index] = updated;
-    else store.templates.push(updated);
-    writeDemoStore(store);
-    return updated;
-  }
-
-  await setDoc(doc(firestoreOrThrow(), "equipmentTemplates", updated.id), {
-    ...equipmentTemplateDocumentValue(updated),
-    updatedAt: serverTimestamp(),
-  }, { merge: true });
+  await commitTemplateVersion(template, updated);
   return updated;
 }
 
@@ -816,18 +818,6 @@ export async function archiveEquipmentTemplate(template: EquipmentTemplate) {
     status: "archived",
   };
 
-  if (isDemoMode() || !db) {
-    const store = readDemoStore();
-    const index = store.templates.findIndex((item) => item.id === archived.id);
-    if (index >= 0) store.templates[index] = archived;
-    else store.templates.push(archived);
-    writeDemoStore(store);
-    return archived;
-  }
-
-  await setDoc(doc(firestoreOrThrow(), "equipmentTemplates", archived.id), {
-    ...equipmentTemplateDocumentValue(archived),
-    updatedAt: serverTimestamp(),
-  }, { merge: true });
+  await commitTemplateVersion(template, archived);
   return archived;
 }

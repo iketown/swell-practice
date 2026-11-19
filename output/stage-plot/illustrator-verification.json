@@ -1,0 +1,61 @@
+{
+  "checked": "2026-09-29",
+  "connection": "Adobe Illustrator native MCP at loopback:18412; initialize and document operations successful",
+  "counts": {
+    "layer": 10,
+    "group": 54,
+    "text": 126,
+    "path": 125
+  },
+  "layers": [
+    {
+      "name": "2 / Audio advance notes",
+      "uuid": "924"
+    },
+    {
+      "name": "2 / Input list",
+      "uuid": "817"
+    },
+    {
+      "name": "2 / Title and revision",
+      "uuid": "806"
+    },
+    {
+      "name": "1 / Notes",
+      "uuid": "801"
+    },
+    {
+      "name": "1 / Labels and callouts",
+      "uuid": "772"
+    },
+    {
+      "name": "1 / Microphones",
+      "uuid": "743"
+    },
+    {
+      "name": "1 / Audio equipment",
+      "uuid": "712"
+    },
+    {
+      "name": "1 / Performers and instruments",
+      "uuid": "652"
+    },
+    {
+      "name": "1 / Stage boundary and orientation",
+      "uuid": "629"
+    },
+    {
+      "name": "1 / Title and revision",
+      "uuid": "618"
+    }
+  ],
+  "pageSizePoints": [
+    792,
+    576
+  ],
+  "pages": 2,
+  "textAndLinksPreflight": "No findings; fonts, text overflow and links checked for intended PDF printing",
+  "sourceSetupId": "g8qTbUz0v4xk40HzhHoD",
+  "sourceRevision": 49,
+  "nativeFileSaved": true
+}

@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="792pt" height="576pt" viewBox="0 0 792 576"><rect width="792" height="576" fill="white"/>
+<text x="36" y="39" font-family="Helvetica, Arial, sans-serif" font-size="25" font-weight="700" fill="#182B35" text-anchor="start">THE SWELL</text>
+<text x="756" y="36" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="700" fill="#216575" text-anchor="end">DRAFT 01  /  29 SEP 2026</text>
+<text x="36" y="59" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#182B35" text-anchor="start">AUDIO INPUTS  /  saved patch reference</text>
+<text x="36" y="76" font-family="Helvetica, Arial, sans-serif" font-size="9.5" font-weight="400" fill="#54616A" text-anchor="start">For audio production / house sound. Existing SD16 socket numbers; console channels and show-day supply to confirm.</text>
+<path d="M 36,88 L 756,88" fill="none" stroke="#182B35" stroke-width="1.2"/>
+<path d="M 36,540 L 756,540" fill="none" stroke="#E6EAEC" stroke-width="1"/>
+<text x="36" y="557" font-family="Helvetica, Arial, sans-serif" font-size="8.5" font-weight="400" fill="#54616A" text-anchor="start">Setup: keyboard stage CENTER R  /  saved revision 49</text>
+<text x="756" y="557" font-family="Helvetica, Arial, sans-serif" font-size="8.5" font-weight="400" fill="#54616A" text-anchor="end">11 x 8 in  /  2 of 2</text>
+<rect x="36" y="103" width="720" height="23" fill="#182B35" stroke="none" stroke-width="1"/>
+<text x="44" y="118" font-family="Helvetica, Arial, sans-serif" font-size="9" font-weight="700" fill="white" text-anchor="start">PORT</text>
+<text x="84" y="118" font-family="Helvetica, Arial, sans-serif" font-size="9" font-weight="700" fill="white" text-anchor="start">SOURCE</text>
+<text x="241" y="118" font-family="Helvetica, Arial, sans-serif" font-size="9" font-weight="700" fill="white" text-anchor="start">POSITION</text>
+<text x="356" y="118" font-family="Helvetica, Arial, sans-serif" font-size="9" font-weight="700" fill="white" text-anchor="start">SIGNAL / INTERFACE</text>
+<text x="568" y="118" font-family="Helvetica, Arial, sans-serif" font-size="9" font-weight="700" fill="white" text-anchor="start">MIC / DI / STAND</text>
+<rect x="36" y="126" width="720" height="20" fill="#F2F4F5" stroke="none" stroke-width="1"/>
+<text x="44" y="139.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="700" fill="#182B35" text-anchor="start">01</text>
+<text x="84" y="139.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Ike vocal</text>
+<text x="241" y="139.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Downstage SR</text>
+<text x="356" y="139.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">XLR microphone</text>
+<text x="568" y="139.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Beta 87A (owned); boom</text>
+<path d="M 36,146 L 756,146" fill="none" stroke="#E6EAEC" stroke-width="0.5"/>
+<text x="44" y="159.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="700" fill="#182B35" text-anchor="start">02</text>
+<text x="84" y="159.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Jackson vocal</text>
+<text x="241" y="159.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Stage left</text>
+<text x="356" y="159.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">XLR microphone</text>
+<text x="568" y="159.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Model TBC; boom</text>
+<path d="M 36,166 L 756,166" fill="none" stroke="#E6EAEC" stroke-width="0.5"/>
+<rect x="36" y="166" width="720" height="20" fill="#F2F4F5" stroke="none" stroke-width="1"/>
+<text x="44" y="179.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="700" fill="#182B35" text-anchor="start">03</text>
+<text x="84" y="179.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Joe vocal</text>
+<text x="241" y="179.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Stage right</text>
+<text x="356" y="179.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">XLR microphone</text>
+<text x="568" y="179.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Model TBC; boom</text>
+<path d="M 36,186 L 756,186" fill="none" stroke="#E6EAEC" stroke-width="0.5"/>
+<text x="44" y="199.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="700" fill="#182B35" text-anchor="start">04</text>
+<text x="84" y="199.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Sam vocal</text>
+<text x="241" y="199.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Drums / center</text>
+<text x="356" y="199.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">XLR microphone</text>
+<text x="568" y="199.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Model TBC; boom</text>
+<path d="M 36,206 L 756,206" fill="none" stroke="#E6EAEC" stroke-width="0.5"/>
+<rect x="36" y="206" width="720" height="20" fill="#F2F4F5" stroke="none" stroke-width="1"/>
+<text x="44" y="219.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="700" fill="#182B35" text-anchor="start">05</text>
+<text x="84" y="219.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Cron vocal</text>
+<text x="241" y="219.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Downstage SL</text>
+<text x="356" y="219.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">XLR microphone</text>
+<text x="568" y="219.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Model TBC; boom</text>
+<path d="M 36,226 L 756,226" fill="none" stroke="#E6EAEC" stroke-width="0.5"/>
+<text x="44" y="239.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="700" fill="#182B35" text-anchor="start">06</text>
+<text x="84" y="239.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Nord keyboard</text>
+<text x="241" y="239.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Ike / downstage SR</text>
+<text x="356" y="239.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">1/4-inch output; 1 run saved</text>
+<text x="568" y="239.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">DI / mono-stereo TBC</text>
+<path d="M 36,246 L 756,246" fill="none" stroke="#E6EAEC" stroke-width="0.5"/>
+<rect x="36" y="246" width="720" height="20" fill="#F2F4F5" stroke="none" stroke-width="1"/>
+<text x="44" y="259.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="700" fill="#182B35" text-anchor="start">07</text>
+<text x="84" y="259.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Jackson guitar</text>
+<text x="241" y="259.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Stage left</text>
+<text x="356" y="259.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Modeler 1/4-inch main out</text>
+<text x="568" y="259.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Balanced feed / DI TBC</text>
+<path d="M 36,266 L 756,266" fill="none" stroke="#E6EAEC" stroke-width="0.5"/>
+<text x="44" y="279.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="700" fill="#182B35" text-anchor="start">08</text>
+<text x="84" y="279.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Joe guitar</text>
+<text x="241" y="279.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Stage right</text>
+<text x="356" y="279.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Modeler 1/4-inch main out</text>
+<text x="568" y="279.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Balanced feed / DI TBC</text>
+<path d="M 36,286 L 756,286" fill="none" stroke="#E6EAEC" stroke-width="0.5"/>
+<rect x="36" y="286" width="720" height="20" fill="#F2F4F5" stroke="none" stroke-width="1"/>
+<text x="44" y="299.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="700" fill="#182B35" text-anchor="start">09</text>
+<text x="84" y="299.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Bass DI</text>
+<text x="241" y="299.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Cron / downstage SL</text>
+<text x="356" y="299.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">XLR from DI</text>
+<text x="568" y="299.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">DI model / phantom TBC</text>
+<path d="M 36,306 L 756,306" fill="none" stroke="#E6EAEC" stroke-width="0.5"/>
+<text x="44" y="319.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="700" fill="#182B35" text-anchor="start">13</text>
+<text x="84" y="319.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Overhead R</text>
+<text x="241" y="319.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Drums</text>
+<text x="356" y="319.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">XLR microphone</text>
+<text x="568" y="319.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Model / phantom TBC; tall boom</text>
+<path d="M 36,326 L 756,326" fill="none" stroke="#E6EAEC" stroke-width="0.5"/>
+<rect x="36" y="326" width="720" height="20" fill="#F2F4F5" stroke="none" stroke-width="1"/>
+<text x="44" y="339.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="700" fill="#182B35" text-anchor="start">14</text>
+<text x="84" y="339.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Overhead L</text>
+<text x="241" y="339.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Drums</text>
+<text x="356" y="339.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">XLR microphone</text>
+<text x="568" y="339.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Model / phantom TBC; tall boom</text>
+<path d="M 36,346 L 756,346" fill="none" stroke="#E6EAEC" stroke-width="0.5"/>
+<text x="44" y="359.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="700" fill="#182B35" text-anchor="start">15</text>
+<text x="84" y="359.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Snare</text>
+<text x="241" y="359.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Drums</text>
+<text x="356" y="359.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">XLR microphone</text>
+<text x="568" y="359.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Model TBC; low boom</text>
+<path d="M 36,366 L 756,366" fill="none" stroke="#E6EAEC" stroke-width="0.5"/>
+<rect x="36" y="366" width="720" height="20" fill="#F2F4F5" stroke="none" stroke-width="1"/>
+<text x="44" y="379.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="700" fill="#182B35" text-anchor="start">16</text>
+<text x="84" y="379.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Kick</text>
+<text x="241" y="379.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Drums</text>
+<text x="356" y="379.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">XLR microphone</text>
+<text x="568" y="379.5" font-family="Helvetica, Arial, sans-serif" font-size="9.2" font-weight="400" fill="#182B35" text-anchor="start">Model TBC; short boom</text>
+<path d="M 36,386 L 756,386" fill="none" stroke="#E6EAEC" stroke-width="0.5"/>
+<text x="36" y="402" font-family="Helvetica, Arial, sans-serif" font-size="9" font-weight="400" fill="#54616A" text-anchor="start">13 connected sources. SD16 ports 10-12 are unassigned in this snapshot. R/L overhead names retain source labels.</text>
+<text x="36" y="428" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="700" fill="#216575" text-anchor="start">MONITORS + POWER</text>
+<text x="36" y="444" font-family="Helvetica, Arial, sans-serif" font-size="9.5" font-weight="400" fill="#182B35" text-anchor="start">MA400 headphone amp at drums; saved SD16 outputs 1/2 feed its monitor input.</text>
+<text x="36" y="459" font-family="Helvetica, Arial, sans-serif" font-size="9.5" font-weight="400" fill="#182B35" text-anchor="start">Confirm all performers&#x27; mixes, IEM/wedge choice, return patch, AC drops and load.</text>
+<text x="36" y="477" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="700" fill="#216575" text-anchor="start">HOUSE INTERFACE + PHANTOM</text>
+<text x="36" y="493" font-family="Helvetica, Arial, sans-serif" font-size="9.5" font-weight="400" fill="#182B35" text-anchor="start">Confirm band-supplied X32 / SD16 / snake, FOH split or handoff, gain and phantom responsibility.</text>
+<text x="36" y="508" font-family="Helvetica, Arial, sans-serif" font-size="9.5" font-weight="400" fill="#182B35" text-anchor="start">Ike&#x27;s Beta 87A needs phantom; confirm supply before patching. All other mic models remain TBC.</text>
+<text x="36" y="523" font-family="Helvetica, Arial, sans-serif" font-size="9.5" font-weight="400" fill="#182B35" text-anchor="start">Backline: instrument / drum / stand supply is a separate advance. This sheet is not a rental order.</text>
+</svg>

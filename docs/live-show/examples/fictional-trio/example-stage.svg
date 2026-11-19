@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" width="1200" height="760" role="img" aria-labelledby="title desc">
+<title id="title">Fictional trio stage plot, format example</title>
+<desc id="desc">Audience at bottom, stage right on page left. Acoustic and vocal downstage right, keyboard and vocal stage left, percussion upstage center. Six inputs, two monitor mixes and three output feeds.</desc>
+<rect width="1200" height="760" fill="white"/>
+<g font-family="Arial, Helvetica, sans-serif" fill="#171717">
+<text x="40" y="42" font-size="26" text-anchor="start" font-weight="bold">FICTIONAL TRIO / STAGE PLOT</text>
+<text x="40" y="70" font-size="16" text-anchor="start" font-weight="normal">FORMAT EXAMPLE - not The Swell - illustrative dimensions - 2026-09-29</text>
+<text x="40" y="108" font-size="15" text-anchor="start" font-weight="bold">STAGE RIGHT / audience left</text>
+<text x="760" y="108" font-size="15" text-anchor="end" font-weight="bold">STAGE LEFT / audience right</text>
+<rect x="40" y="130" width="720" height="480" fill="#fafafa" stroke="#171717" stroke-width="2"/>
+<text x="400" y="152" font-size="13" text-anchor="middle" font-weight="normal">UPSTAGE / BACK</text>
+<rect x="70" y="370" width="210" height="180" fill="none" stroke="#aaa" stroke-dasharray="5 4"/>
+<text x="76" y="388" font-size="13" text-anchor="start" font-weight="bold">Alex / downstage</text>
+<rect x="520" y="310" width="225.0" height="240" fill="none" stroke="#aaa" stroke-dasharray="5 4"/>
+<text x="526" y="328" font-size="13" text-anchor="start" font-weight="bold">Taylor / midstage</text>
+<rect x="280" y="160" width="240" height="180" fill="none" stroke="#aaa" stroke-dasharray="5 4"/>
+<text x="286" y="178" font-size="13" text-anchor="start" font-weight="bold">Morgan / upstage</text>
+<path d="M115.0,430 V460 M100,460 H130" fill="none" stroke="#333" stroke-width="2"/>
+<circle cx="137" cy="433" r="10" fill="white" stroke="#333"/>
+<text x="137" y="437" font-size="12" text-anchor="middle" font-weight="bold">1</text>
+<rect x="160" y="430" width="45.0" height="60" fill="#e5e5e5" stroke="#333"/>
+<circle cx="212.0" cy="433" r="10" fill="white" stroke="#333"/>
+<text x="212.0" y="437" font-size="12" text-anchor="middle" font-weight="bold">2</text>
+<rect x="100" y="490" width="15.0" height="15.0" fill="#e5e5e5" stroke="#333"/>
+<circle cx="122.0" cy="493" r="10" fill="white" stroke="#333"/>
+<text x="122.0" y="497" font-size="12" text-anchor="middle" font-weight="bold">3</text>
+<path d="M160,550 L170.8,520 H203.2 L214.0,550 Z" fill="#e5e5e5" stroke="#333"/>
+<circle cx="221.0" cy="523" r="10" fill="white" stroke="#333"/>
+<text x="221.0" y="527" font-size="12" text-anchor="middle" font-weight="bold">4</text>
+<rect x="550" y="370" width="150" height="60" fill="#e5e5e5" stroke="#333"/>
+<path d="M562.5,397.0 V430" stroke="#777"/>
+<path d="M575.0,397.0 V430" stroke="#777"/>
+<path d="M587.5,397.0 V430" stroke="#777"/>
+<path d="M600.0,397.0 V430" stroke="#777"/>
+<path d="M612.5,397.0 V430" stroke="#777"/>
+<path d="M625.0,397.0 V430" stroke="#777"/>
+<path d="M637.5,397.0 V430" stroke="#777"/>
+<path d="M650.0,397.0 V430" stroke="#777"/>
+<path d="M662.5,397.0 V430" stroke="#777"/>
+<path d="M675.0,397.0 V430" stroke="#777"/>
+<path d="M687.5,397.0 V430" stroke="#777"/>
+<circle cx="707" cy="373" r="10" fill="white" stroke="#333"/>
+<text x="707" y="377" font-size="12" text-anchor="middle" font-weight="bold">5</text>
+<path d="M726.25,385.0 V407.5 M715.0,407.5 H737.5" fill="none" stroke="#333" stroke-width="2"/>
+<circle cx="744.5" cy="388.0" r="10" fill="white" stroke="#333"/>
+<text x="744.5" y="392.0" font-size="12" text-anchor="middle" font-weight="bold">6</text>
+<rect x="550" y="475.0" width="18.0" height="15.0" fill="#e5e5e5" stroke="#333"/>
+<circle cx="575.0" cy="478.0" r="10" fill="white" stroke="#333"/>
+<text x="575.0" y="482.0" font-size="12" text-anchor="middle" font-weight="bold">7</text>
+<path d="M640,535.0 L652.0,505.0 H688.0 L700,535.0 Z" fill="#e5e5e5" stroke="#333"/>
+<circle cx="707" cy="508.0" r="10" fill="white" stroke="#333"/>
+<text x="707" y="512.0" font-size="12" text-anchor="middle" font-weight="bold">8</text>
+<rect x="700" y="475.0" width="15.0" height="15.0" fill="#e5e5e5" stroke="#333"/>
+<circle cx="722.0" cy="478.0" r="10" fill="white" stroke="#333"/>
+<text x="722.0" y="482.0" font-size="12" text-anchor="middle" font-weight="bold">9</text>
+<ellipse cx="385.0" cy="235.0" rx="45.0" ry="45.0" fill="#e5e5e5" stroke="#333"/>
+<circle cx="437" cy="193" r="10" fill="white" stroke="#333"/>
+<text x="437" y="197" font-size="12" text-anchor="middle" font-weight="bold">10</text>
+<path d="M317.5,220 V235.0 M310,235.0 H325.0" fill="none" stroke="#333" stroke-width="2"/>
+<circle cx="332.0" cy="223" r="10" fill="white" stroke="#333"/>
+<text x="332.0" y="227" font-size="12" text-anchor="middle" font-weight="bold">11</text>
+<rect x="460" y="220" width="30" height="30" fill="#e5e5e5" stroke="#333"/>
+<circle cx="497" cy="223" r="10" fill="white" stroke="#333"/>
+<text x="497" y="227" font-size="12" text-anchor="middle" font-weight="bold">12</text>
+<rect x="460" y="280" width="15.0" height="15.0" fill="#e5e5e5" stroke="#333"/>
+<circle cx="482.0" cy="283" r="10" fill="white" stroke="#333"/>
+<text x="482.0" y="287" font-size="12" text-anchor="middle" font-weight="bold">13</text>
+<text x="400" y="592" font-size="13" text-anchor="middle" font-weight="normal">DOWNSTAGE / FRONT</text>
+<text x="400" y="639" font-size="20" text-anchor="middle" font-weight="bold">AUDIENCE</text>
+<text x="400" y="662" font-size="14" text-anchor="middle" font-weight="normal">24 ft wide x 16 ft deep - illustrative, not a confirmed minimum</text>
+<text x="810" y="142" font-size="16" text-anchor="start" font-weight="bold">NUMBERED EQUIPMENT KEY</text>
+<text x="810" y="174" font-size="14" text-anchor="start" font-weight="normal">01  Lead vocal | CH 2</text>
+<text x="810" y="197" font-size="14" text-anchor="start" font-weight="normal">02  Acoustic</text>
+<text x="810" y="220" font-size="14" text-anchor="start" font-weight="normal">03  Acoustic DI | CH 1</text>
+<text x="810" y="243" font-size="14" text-anchor="start" font-weight="normal">04  Wedge A / M1</text>
+<text x="810" y="266" font-size="14" text-anchor="start" font-weight="normal">05  Keys L/R</text>
+<text x="810" y="289" font-size="14" text-anchor="start" font-weight="normal">06  Keys vocal | CH 5</text>
+<text x="810" y="312" font-size="14" text-anchor="start" font-weight="normal">07  Stereo DI | CH 3,4</text>
+<text x="810" y="335" font-size="14" text-anchor="start" font-weight="normal">08  Wedge B / M1</text>
+<text x="810" y="358" font-size="14" text-anchor="start" font-weight="normal">09  P1</text>
+<text x="810" y="381" font-size="14" text-anchor="start" font-weight="normal">10  Cajon</text>
+<text x="810" y="404" font-size="14" text-anchor="start" font-weight="normal">11  Cajon mic | CH 6</text>
+<text x="810" y="427" font-size="14" text-anchor="start" font-weight="normal">12  Wired IEM / M2</text>
+<text x="810" y="450" font-size="14" text-anchor="start" font-weight="normal">13  P2</text>
+<text x="810" y="500" font-size="14" text-anchor="start" font-weight="bold">M1: mono / Aux 1 / two wedges</text>
+<text x="810" y="524" font-size="14" text-anchor="start" font-weight="bold">M2: stereo IEM / Aux 2 L + Aux 3 R</text>
+<text x="810" y="557" font-size="14" text-anchor="start" font-weight="normal">P1 / P2: proposed 120 V, 60 Hz</text>
+<text x="810" y="579" font-size="14" text-anchor="start" font-weight="normal">Outlet and load details: see companion list</text>
+<text x="40" y="710" font-size="14" text-anchor="start" font-weight="normal">Badges identify equipment; CH identifies console inputs; M identifies monitor mix; P identifies power.</text>
+<text x="40" y="735" font-size="14" text-anchor="start" font-weight="normal">Contact: unassigned example contact. Verify all equipment, dimensions and power before use.</text>
+</g></svg>

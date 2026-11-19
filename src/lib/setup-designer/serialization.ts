@@ -9,12 +9,14 @@ import {
   type StageArea,
   type StageConnectionAnchor,
   type StageConnectionSide,
+  type StageOutlinePoint,
   type StagePlan,
   type StagePosition,
   type StageRoute,
 } from "@/lib/setup-designer/domain";
 import { equipmentPortsFromData } from "@/lib/setup-designer/ports";
 import { constrainStageArea } from "@/lib/setup-designer/stage-plot";
+import { Stage3dSchema } from "@/lib/setup-designer/blender-contract";
 
 function jsonClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -108,10 +110,22 @@ function normalizeStagePlan(value: unknown): StagePlan {
   }) : [];
   const widthFeet = finitePositive(data.widthFeet, fallback.widthFeet);
   const depthFeet = finitePositive(data.depthFeet, fallback.depthFeet);
+  const outline = Array.isArray(data.outline) ? data.outline.flatMap((item): StageOutlinePoint[] => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+    const point = item as Record<string, unknown>;
+    const xFeet = Number(point.xFeet);
+    const yFeet = Number(point.yFeet);
+    if (!Number.isFinite(xFeet) || !Number.isFinite(yFeet)) return [];
+    return [{
+      xFeet: Math.min(widthFeet, Math.max(0, xFeet)),
+      yFeet: Math.min(depthFeet, Math.max(0, yFeet)),
+    }];
+  }) : [];
 
   return {
     widthFeet,
     depthFeet,
+    ...(outline.length >= 3 ? { outline } : {}),
     viewport: {
       x: Number.isFinite(Number(rawViewport.x)) ? Number(rawViewport.x) : fallback.viewport.x,
       y: Number.isFinite(Number(rawViewport.y)) ? Number(rawViewport.y) : fallback.viewport.y,
@@ -129,6 +143,11 @@ export function normalizeSetupGraph(input: SetupGraphInput): SetupGraph {
     delete data["assignedUnitLabel"];
     delete data["transportChannelLabels"];
     delete data["signalPathLabels"];
+    if (data.stage3d !== undefined) {
+      const spatial = Stage3dSchema.safeParse(data.stage3d);
+      if (spatial.success) data.stage3d = spatial.data;
+      else delete data.stage3d;
+    }
     return {
       id: String(node.id),
       type: "equipment",

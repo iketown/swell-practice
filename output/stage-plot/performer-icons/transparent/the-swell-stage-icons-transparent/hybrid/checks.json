@@ -1,0 +1,67 @@
+[
+  {
+    "file": "joe-hybrid-transparent.png",
+    "dimensions": [
+      1024,
+      1536
+    ],
+    "alpha_range": [
+      0,
+      255
+    ],
+    "opaque_pixels": 444621,
+    "transparent_pixels": 1120681
+  },
+  {
+    "file": "ike-hybrid-transparent.png",
+    "dimensions": [
+      1024,
+      1536
+    ],
+    "alpha_range": [
+      0,
+      255
+    ],
+    "opaque_pixels": 453716,
+    "transparent_pixels": 1111676
+  },
+  {
+    "file": "jackson-hybrid-transparent.png",
+    "dimensions": [
+      1024,
+      1536
+    ],
+    "alpha_range": [
+      0,
+      255
+    ],
+    "opaque_pixels": 448893,
+    "transparent_pixels": 1116099
+  },
+  {
+    "file": "chris-hybrid-transparent.png",
+    "dimensions": [
+      1024,
+      1536
+    ],
+    "alpha_range": [
+      0,
+      255
+    ],
+    "opaque_pixels": 534948,
+    "transparent_pixels": 1028486
+  },
+  {
+    "file": "sam-hybrid-transparent.png",
+    "dimensions": [
+      1024,
+      1536
+    ],
+    "alpha_range": [
+      0,
+      255
+    ],
+    "opaque_pixels": 623052,
+    "transparent_pixels": 935544
+  }
+]

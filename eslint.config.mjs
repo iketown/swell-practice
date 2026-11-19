@@ -11,6 +11,7 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
+    "tmp/**", // Local rendering utilities include Adobe ExtendScript.
     "next-env.d.ts",
   ]),
 ]);

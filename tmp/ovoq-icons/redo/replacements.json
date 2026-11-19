@@ -1,0 +1,65 @@
+[
+  {
+    "file": "01-telecaster-on-stand",
+    "path": "/Users/brianeichenberger/projects/the_swell/stage/stage plot input list etc/icons/01-telecaster-on-stand.png",
+    "master": "/Users/brianeichenberger/projects/the_swell/stage/stage plot input list etc/icons/01-telecaster-on-stand-rendered-master.png",
+    "width": 375,
+    "height": 600,
+    "heightPt": 44,
+    "sourceCrop": [
+      154,
+      20,
+      972,
+      1347
+    ],
+    "sourcePad": 16,
+    "sourceSize": [
+      1150,
+      1368
+    ]
+  },
+  {
+    "file": "02-mustang-bass-on-stand",
+    "path": "/Users/brianeichenberger/projects/the_swell/stage/stage plot input list etc/icons/02-mustang-bass-on-stand.png",
+    "master": "/Users/brianeichenberger/projects/the_swell/stage/stage plot input list etc/icons/02-mustang-bass-on-stand-rendered-master.png",
+    "width": 358,
+    "height": 600,
+    "heightPt": 46,
+    "sourceCrop": [
+      76,
+      34,
+      919,
+      1468
+    ],
+    "sourcePad": 17,
+    "sourceSize": [
+      1024,
+      1536
+    ]
+  },
+  {
+    "file": "10-iem-receiver-numbered",
+    "path": "/Users/brianeichenberger/projects/the_swell/stage/stage plot input list etc/icons/10-iem-receiver-numbered.png",
+    "master": "/Users/brianeichenberger/projects/the_swell/stage/stage plot input list etc/icons/10-iem-receiver-numbered-rendered-master.png",
+    "width": 489,
+    "height": 600,
+    "heightPt": 29,
+    "sourceCrop": [
+      206,
+      49,
+      1147,
+      1211
+    ],
+    "sourcePad": 14,
+    "sourceSize": [
+      1214,
+      1295
+    ],
+    "sticker": {
+      "x": 0.2848297213622291,
+      "y": 0.7773109243697479,
+      "width": 0.29102167182662536,
+      "height": 0.22857142857142856
+    }
+  }
+]

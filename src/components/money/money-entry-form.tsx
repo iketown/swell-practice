@@ -15,6 +15,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MoneyCategoryCreate } from "@/components/money/money-categories";
 import { MoneyGearMatcher } from "@/components/money/money-gear-matcher";
+import { MONEY_ASSISTANT_ENABLED } from "@/lib/money/features";
 import type { MoneyCategory } from "@/lib/money/categories";
 import { MoneySelect } from "@/components/money/money-field";
 import {
@@ -612,7 +613,7 @@ export function MoneyEntryForm({
                     ? "Uploading receipt…"
                     : `${receiptIds.length} attached${receiptNames.length ? `: ${receiptNames.join(", ")}` : ""}. Private to administrators.`}
               </FieldDescription>
-              {kind === "purchase" && receiptIds.length && !demo ? (
+              {MONEY_ASSISTANT_ENABLED && kind === "purchase" && receiptIds.length && !demo ? (
                 <div className="flex flex-wrap items-center gap-3 pt-2">
                   <Button type="button" variant="outline" disabled={readingGear || uploading || busy || receiptIds.length > 4} onClick={() => void readGearItems()}>
                     {readingGear ? "Ronnie is reading…" : "Ask Ronnie to parse receipt"}

@@ -29,6 +29,7 @@ import { MoneyDetail } from "@/components/money/money-detail";
 import { MoneyEntryForm } from "@/components/money/money-entry-form";
 import { MoneyCategories } from "@/components/money/money-categories";
 import { MoneyAgentChat } from "@/components/money/money-agent-chat";
+import { MONEY_ASSISTANT_ENABLED } from "@/lib/money/features";
 import { MoneyPlaybook } from "@/components/money/money-playbook";
 import type { MoneyCategory } from "@/lib/money/categories";
 import { MoneySelect } from "@/components/money/money-field";
@@ -264,13 +265,15 @@ export function MoneyClient({
               >
                 Swell playbook
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => setIntake((v) => !v)}
-                disabled={demo}
-              >
-                Receipt form
-              </Button>
+              {MONEY_ASSISTANT_ENABLED ? (
+                <Button
+                  variant="outline"
+                  onClick={() => setIntake((v) => !v)}
+                  disabled={demo}
+                >
+                  Receipt form
+                </Button>
+              ) : null}
               <Button
                 onClick={() => {
                   setCreating(true);
@@ -310,13 +313,13 @@ export function MoneyClient({
       {!entryId && !demo && managingPlaybook ? (
         <MoneyPlaybook onClose={() => setManagingPlaybook(false)} />
       ) : null}
-      {!entryId && !demo ? (
+      {MONEY_ASSISTANT_ENABLED && !entryId && !demo ? (
         <MoneyAgentChat
           key={admin.user?.uid}
           onRecorded={refresh}
         />
       ) : null}
-      {!entryId && demo ? (
+      {MONEY_ASSISTANT_ENABLED && !entryId && demo ? (
         <Alert>
           <AlertTitle>Ronnie-bot</AlertTitle>
           <AlertDescription>
@@ -346,7 +349,7 @@ export function MoneyClient({
           onCategoriesChanged={categoriesChanged}
         />
       ) : null}
-      {intake && !demo ? (
+      {MONEY_ASSISTANT_ENABLED && intake && !demo ? (
         <section className="swell-panel p-5">
           <h2 className="mb-4 text-lg font-semibold">Start with a receipt</h2>
           <FieldGroup>

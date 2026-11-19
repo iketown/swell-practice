@@ -118,7 +118,7 @@ export function MoneyGearMatcher({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="font-semibold">Gear on this receipt</h3>
-          <p className="text-sm text-muted-foreground">Review each item Ronnie found. Link an existing code or create a new record for the remaining quantity.{lines.length ? <span className="ml-1 font-medium">{reviewedLineCount} of {lines.length} reviewed.</span> : null}</p>
+          <p className="text-sm text-muted-foreground">Add each gear item, then link an existing code or create a new record for the remaining quantity.{lines.length ? <span className="ml-1 font-medium">{reviewedLineCount} of {lines.length} reviewed.</span> : null}</p>
         </div>
         <Button type="button" variant="outline" onClick={() => {
           onLinesChange([...lines, { label: "", quantity: 1, isCable: false, definitionId: "", manufacturer: "" }]);
@@ -144,7 +144,7 @@ export function MoneyGearMatcher({
                 {status}
               </span>
             </div>
-            {!review.reviewed ? <p className="text-xs text-muted-foreground">{review.suggested || suggestions.length ? "Check Ronnie’s suggested gear codes, or choose another match." : "Find existing gear or approve new records."}</p> : null}
+            {!review.reviewed ? <p className="text-xs text-muted-foreground">{review.suggested || suggestions.length ? "Check the suggested gear codes, or choose another match." : "Find existing gear or approve new records."}</p> : null}
             <FieldGroup className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_5rem_9rem_auto]">
               <Field>
                 <FieldLabel htmlFor={`gear-label-${index}`}>Item name</FieldLabel>
@@ -185,7 +185,7 @@ export function MoneyGearMatcher({
                       <div>
                         <span className="font-mono font-semibold tabular-nums">{asset.assetTag}</span>
                         <span className="ml-2">{asset.label}</span>
-                        {review.suggested && !review.reviewed ? <span className="ml-2 text-xs text-muted-foreground">Ronnie’s guess</span> : null}
+                        {review.suggested && !review.reviewed ? <span className="ml-2 text-xs text-muted-foreground">Suggested match</span> : null}
                       </div>
                       <div className="flex items-center gap-2">
                         <Link className="text-xs text-primary underline underline-offset-4" href={`/g/${asset.assetTag}`} target="_blank">Inspect</Link>

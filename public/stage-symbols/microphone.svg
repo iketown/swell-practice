@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="500" viewBox="0 0 32 100" preserveAspectRatio="none">
+  <title>Overhead microphone</title>
+  <desc>The cable connects at the narrow top end. The grille faces down at zero degrees.</desc>
+  <path d="M11 1H21V8H11Z" fill="#726357" stroke="#2C2A28" stroke-width="1.5"/>
+  <path d="M10 8H22L25 68H7Z" fill="#2C2A28"/>
+  <rect x="1" y="66" width="30" height="33" rx="13" fill="#E3D8C7" stroke="#2C2A28" stroke-width="2"/>
+  <path d="M4 75H28M2 82H30M4 89H28M10 68V97M16 67V99M22 68V97" fill="none" stroke="#726357" stroke-width="1"/>
+  <path d="M2 69H30" stroke="#2C2A28" stroke-width="3"/>
+</svg>

@@ -1,0 +1,30 @@
+# Hybrid stage-plot icons
+
+Five transparent RGBA PNGs, 1024 × 1536 pixels, combining restrained color fills with the approved black-and-white artwork's strong dark outlines. Joe is yellow, Ike blue, Jackson green, Chris red, and Sam white/cream with pale gold cymbals.
+
+Created with the built-in image-generation tool; transparency finished locally using the previously approved background-cleanup method. Original color and black-and-white folders are unchanged.
+
+`hybrid-color-and-grayscale-proof.jpg` shows the images in color and simulated grayscale on white. `hybrid-transparency-proof.jpg` shows the edges on a dark background. Both sheets were visually checked; all five PNGs have full alpha transparency with opaque white details preserved. Proof sheets are previews, not transparent assets.
+
+## Generation prompts
+
+joe
+
+Create a hybrid COLOR-TINTED edition of this approved BLACK-AND-WHITE stage plot icon. EXACTLY preserve the existing strong black outlines, all linework, identity, pose, instrument geometry, camera angle, framing and silhouettes. Apply restrained LIGHT pastel color fills to the existing shapes, like lightly colored technical illustration. Black outlines must remain black, crisp and prominent. Keep excellent monochrome-print readability: every shape remains delineated by the original ink contours, interior detail remains distinct when printed grayscale. Keep shadows neutral light-to-medium gray. Do not darken large areas or obscure details. Avoid saturated bright colors, gradients, glow, halo, lighting effects, background shadows or texture. No new labels or objects, no cropping or changes to composition. Output on plain solid WHITE background, not simulated transparency. Coloring plan: pale warm YELLOW shirt and Telecaster body, pale blue-gray jeans, subdued warm skin tint, dark brown hair, neutral dark shoes.
+
+ike
+
+Create a hybrid COLOR-TINTED edition of this approved BLACK-AND-WHITE stage plot icon. EXACTLY preserve the existing strong black outlines, all linework, identity, pose, instrument geometry, camera angle, framing and silhouettes. Apply restrained LIGHT pastel color fills to the existing shapes, like lightly colored technical illustration. Black outlines must remain black, crisp and prominent. Keep excellent monochrome-print readability: every shape remains delineated by the original ink contours, interior detail remains distinct when printed grayscale. Keep shadows neutral light-to-medium gray. Do not darken large areas or obscure details. Avoid saturated bright colors, gradients, glow, halo, lighting effects, background shadows or texture. No new labels or objects, no cropping or changes to composition. Output on plain solid WHITE background, not simulated transparency. Coloring plan: light BLUE shirt and blue Mustang bass body with its pale mint racing stripes; retain gray streaks in hair; pale blue-gray jeans, subdued warm skin tint.
+
+jackson
+
+Create a hybrid COLOR-TINTED edition of this approved BLACK-AND-WHITE stage plot icon. EXACTLY preserve the existing strong black outlines, all linework, identity, pose, instrument geometry, camera angle, framing and silhouettes. Apply restrained LIGHT pastel color fills to the existing shapes, like lightly colored technical illustration. Black outlines must remain black, crisp and prominent. Keep excellent monochrome-print readability: every shape remains delineated by the original ink contours, interior detail remains distinct when printed grayscale. Keep shadows neutral light-to-medium gray. Do not darken large areas or obscure details. Avoid saturated bright colors, gradients, glow, halo, lighting effects, background shadows or texture. No new labels or objects, no cropping or changes to composition. Output on plain solid WHITE background, not simulated transparency. Coloring plan: light sage GREEN shirt and green Telecaster body; dark brown hair and mustache, pale blue-gray jeans, subdued warm skin tint.
+
+chris
+
+Create a hybrid COLOR-TINTED edition of this approved BLACK-AND-WHITE stage plot icon. EXACTLY preserve the existing strong black outlines, all linework, identity, pose, instrument geometry, camera angle, framing and silhouettes. Apply restrained LIGHT pastel color fills to the existing shapes, like lightly colored technical illustration. Black outlines must remain black, crisp and prominent. Keep excellent monochrome-print readability: every shape remains delineated by the original ink contours, interior detail remains distinct when printed grayscale. Keep shadows neutral light-to-medium gray. Do not darken large areas or obscure details. Avoid saturated bright colors, gradients, glow, halo, lighting effects, background shadows or texture. No new labels or objects, no cropping or changes to composition. Output on plain solid WHITE background, not simulated transparency. Coloring plan: light muted RED / soft coral shirt and red Nord keyboard casing; retain salt-and-pepper hair, pale blue-gray jeans, subdued warm skin tint.
+
+sam
+
+Create a hybrid COLOR-TINTED edition of this approved BLACK-AND-WHITE stage plot icon. EXACTLY preserve the existing strong black outlines, all linework, identity, pose, instrument geometry, camera angle, framing and silhouettes. Apply restrained LIGHT pastel color fills to the existing shapes, like lightly colored technical illustration. Black outlines must remain black, crisp and prominent. Keep excellent monochrome-print readability: every shape remains delineated by the original ink contours, interior detail remains distinct when printed grayscale. Keep shadows neutral light-to-medium gray. Do not darken large areas or obscure details. Avoid saturated bright colors, gradients, glow, halo, lighting effects, background shadows or texture. No new labels or objects, no cropping or changes to composition. Output on plain solid WHITE background, not simulated transparency. Coloring plan: white shirt, warm ivory/CREAM drum shells, very pale gold cymbals, pale blue-gray jeans, subdued warm skin tint, medium brown hair; preserve round glasses.
+

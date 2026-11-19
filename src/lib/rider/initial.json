@@ -1,0 +1,1391 @@
+{
+  "width": 24,
+  "depth": 16,
+  "configuration": "Five-piece show",
+  "contact": "",
+  "monitors": "Monitor mixes, feeds and IEM provision to confirm.",
+  "power": "Four AC locations are marked. Confirm outlet counts, voltage and circuit requirements.",
+  "objects": [
+    {
+      "id": "sax",
+      "asset": "sax",
+      "label": "Saxophone",
+      "x": 20.496,
+      "y": 1.22,
+      "w": 1.805,
+      "h": 2.805,
+      "opacity": 0.5
+    },
+    {
+      "id": "cello",
+      "asset": "cello",
+      "label": "Cello",
+      "x": 3.377,
+      "y": 0.176,
+      "w": 1.97,
+      "h": 3.296,
+      "opacity": 0.5
+    },
+    {
+      "id": "acoustic",
+      "asset": "acoustic",
+      "label": "Acoustic guitar",
+      "x": 16.314,
+      "y": 0.293,
+      "w": 2.105,
+      "h": 3.46,
+      "opacity": 0.5
+    },
+    {
+      "id": "x32",
+      "asset": "x32",
+      "label": "X32 console",
+      "x": 25.554,
+      "y": 5.355,
+      "w": 2.221,
+      "h": 1.555,
+      "opacity": 1
+    },
+    {
+      "id": "hx-stomp",
+      "asset": "hx-stomp",
+      "label": "HX Stomp",
+      "x": 0.873,
+      "y": 7.304,
+      "w": 2.137,
+      "h": 2.605,
+      "opacity": 1
+    },
+    {
+      "id": "kemper",
+      "asset": "kemper",
+      "label": "Kemper Profiler",
+      "x": 20.48,
+      "y": 7.052,
+      "w": 2.168,
+      "h": 2.658,
+      "opacity": 1
+    },
+    {
+      "id": "jackson",
+      "asset": "jackson",
+      "label": "Jackson",
+      "x": 17.531,
+      "y": 2.023,
+      "w": 4.383,
+      "h": 6.94,
+      "opacity": 0.35
+    },
+    {
+      "id": "brian",
+      "asset": "brian",
+      "label": "Brian",
+      "x": 14.15,
+      "y": 7.957,
+      "w": 4.329,
+      "h": 6.855,
+      "opacity": 0.35
+    },
+    {
+      "id": "joe",
+      "asset": "joe",
+      "label": "Joe",
+      "x": 2.394,
+      "y": 2.525,
+      "w": 4.149,
+      "h": 6.569,
+      "opacity": 0.35
+    },
+    {
+      "id": "sam",
+      "asset": "sam",
+      "label": "Sam and drums",
+      "x": 9.541,
+      "y": 0.883,
+      "w": 5.26,
+      "h": 7.38,
+      "opacity": 0.35
+    },
+    {
+      "id": "chris",
+      "asset": "chris",
+      "label": "Chris",
+      "x": 6.478,
+      "y": 8.386,
+      "w": 3.463,
+      "h": 5.483,
+      "opacity": 0.35
+    },
+    {
+      "id": "nord",
+      "asset": "nord",
+      "label": "Nord Stage 4 + stand",
+      "x": 6.037,
+      "y": 11.281,
+      "w": 4.359,
+      "h": 2.713,
+      "opacity": 1
+    },
+    {
+      "id": "telecaster",
+      "asset": "telecaster",
+      "label": "Telecaster on stand",
+      "x": 6.376,
+      "y": 0.315,
+      "w": 1.648,
+      "h": 2.782,
+      "opacity": 1
+    },
+    {
+      "id": "bass",
+      "asset": "bass",
+      "label": "Mustang bass on stand",
+      "x": 15.577,
+      "y": 5.721,
+      "w": 1.455,
+      "h": 2.575,
+      "opacity": 1
+    },
+    {
+      "id": "mic-joe",
+      "asset": "boom",
+      "label": "Joe vocal boom",
+      "x": 3.023,
+      "y": 5.02,
+      "w": 2.3,
+      "h": 4.651,
+      "opacity": 1
+    },
+    {
+      "id": "mic-jackson",
+      "asset": "boom",
+      "label": "Jackson vocal boom",
+      "x": 18.284,
+      "y": 4.676,
+      "w": 2.3,
+      "h": 4.651,
+      "opacity": 1
+    },
+    {
+      "id": "mic-brian",
+      "asset": "boom",
+      "label": "Brian vocal boom",
+      "x": 14.931,
+      "y": 10.286,
+      "w": 2.3,
+      "h": 4.651,
+      "opacity": 1
+    },
+    {
+      "id": "mic-chris",
+      "asset": "boom",
+      "label": "Chris vocal boom",
+      "x": 6.996,
+      "y": 10.802,
+      "w": 2.3,
+      "h": 4.651,
+      "opacity": 1
+    },
+    {
+      "id": "mic-sam",
+      "asset": "drum-boom",
+      "label": "Sam vocal boom",
+      "x": 11.912,
+      "y": 2.812,
+      "w": 3.778,
+      "h": 2.922,
+      "opacity": 1
+    },
+    {
+      "id": "ac-jackson",
+      "asset": "power",
+      "label": "Jackson AC drop",
+      "x": 22.622,
+      "y": 9.074,
+      "w": 0.828,
+      "h": 0.874,
+      "opacity": 1
+    },
+    {
+      "id": "ac-brian",
+      "asset": "power",
+      "label": "Brian AC drop",
+      "x": 13.267,
+      "y": 7.572,
+      "w": 0.828,
+      "h": 0.874,
+      "opacity": 1
+    },
+    {
+      "id": "ac-chris",
+      "asset": "power",
+      "label": "Chris AC drop",
+      "x": 6.399,
+      "y": 14.751,
+      "w": 0.828,
+      "h": 0.874,
+      "opacity": 1
+    },
+    {
+      "id": "ac-joe",
+      "asset": "power",
+      "label": "Joe AC drop",
+      "x": 1.322,
+      "y": 9.638,
+      "w": 0.828,
+      "h": 0.874,
+      "opacity": 1
+    },
+    {
+      "id": "name-joe",
+      "asset": "label",
+      "label": "JOE",
+      "x": 3.691,
+      "y": 5.603,
+      "w": 0.915,
+      "h": 0.647,
+      "opacity": 1
+    },
+    {
+      "id": "name-chris",
+      "asset": "label",
+      "label": "CHRIS",
+      "x": 7.447,
+      "y": 10.174,
+      "w": 1.473,
+      "h": 0.647,
+      "opacity": 1
+    },
+    {
+      "id": "name-brian",
+      "asset": "label",
+      "label": "BRIAN",
+      "x": 15.335,
+      "y": 10.747,
+      "w": 1.47,
+      "h": 0.647,
+      "opacity": 1
+    },
+    {
+      "id": "name-jackson",
+      "asset": "label",
+      "label": "JACKSON",
+      "x": 18.414,
+      "y": 4.819,
+      "w": 2.236,
+      "h": 0.647,
+      "opacity": 1
+    },
+    {
+      "id": "name-sam",
+      "asset": "label",
+      "label": "SAM",
+      "x": 11.614,
+      "y": 3.469,
+      "w": 1.136,
+      "h": 0.647,
+      "opacity": 1
+    }
+  ],
+  "inputs": [
+    {
+      "id": "src-1",
+      "number": 1,
+      "source": "Joe vocal",
+      "station": "Joe",
+      "kind": "Mic",
+      "foh": "1",
+      "patch": "",
+      "phantom": "",
+      "notes": "",
+      "x": 4.146,
+      "y": 8.381
+    },
+    {
+      "id": "src-2",
+      "number": 2,
+      "source": "Chris vocal",
+      "station": "Chris",
+      "kind": "Mic",
+      "foh": "2",
+      "patch": "",
+      "phantom": "",
+      "notes": "",
+      "x": 8.128,
+      "y": 14.333
+    },
+    {
+      "id": "src-3",
+      "number": 3,
+      "source": "Brian vocal",
+      "station": "Brian",
+      "kind": "Mic",
+      "foh": "3",
+      "patch": "",
+      "phantom": "",
+      "notes": "",
+      "x": 16.063,
+      "y": 13.818
+    },
+    {
+      "id": "src-4",
+      "number": 4,
+      "source": "Jackson vocal",
+      "station": "Jackson",
+      "kind": "Mic",
+      "foh": "4",
+      "patch": "",
+      "phantom": "",
+      "notes": "",
+      "x": 19.48,
+      "y": 8.203
+    },
+    {
+      "id": "src-5",
+      "number": 5,
+      "source": "Sam vocal",
+      "station": "Sam",
+      "kind": "Mic",
+      "foh": "5",
+      "patch": "",
+      "phantom": "",
+      "notes": "",
+      "x": 15.066,
+      "y": 5.089
+    },
+    {
+      "id": "src-6",
+      "number": 6,
+      "source": "Cello",
+      "station": "Joe",
+      "kind": "DI",
+      "foh": "6",
+      "patch": "",
+      "phantom": "",
+      "notes": "",
+      "x": 2.59,
+      "y": 2.494
+    },
+    {
+      "id": "src-7",
+      "number": 7,
+      "source": "Joe electric guitar",
+      "station": "Joe",
+      "kind": "DI",
+      "foh": "7",
+      "patch": "",
+      "phantom": "",
+      "notes": "",
+      "x": 1.297,
+      "y": 9.064
+    },
+    {
+      "id": "src-8",
+      "number": 8,
+      "source": "Keyboard A",
+      "station": "Chris",
+      "kind": "DI",
+      "foh": "8",
+      "patch": "",
+      "phantom": "",
+      "notes": "",
+      "x": 9.386,
+      "y": 15.12
+    },
+    {
+      "id": "src-9",
+      "number": 9,
+      "source": "Keyboard B",
+      "station": "Chris",
+      "kind": "DI",
+      "foh": "9",
+      "patch": "",
+      "phantom": "",
+      "notes": "",
+      "x": 10.492,
+      "y": 15.12
+    },
+    {
+      "id": "src-10",
+      "number": 10,
+      "source": "Bass",
+      "station": "Brian",
+      "kind": "DI",
+      "foh": "10",
+      "patch": "",
+      "phantom": "",
+      "notes": "",
+      "x": 14.673,
+      "y": 8.037
+    },
+    {
+      "id": "src-11",
+      "number": 11,
+      "source": "Acoustic guitar",
+      "station": "Jackson",
+      "kind": "DI",
+      "foh": "11",
+      "patch": "",
+      "phantom": "",
+      "notes": "",
+      "x": 19.002,
+      "y": 1.736
+    },
+    {
+      "id": "src-12",
+      "number": 12,
+      "source": "Jackson electric guitar",
+      "station": "Jackson",
+      "kind": "DI",
+      "foh": "12",
+      "patch": "",
+      "phantom": "",
+      "notes": "",
+      "x": 22.118,
+      "y": 9.511
+    },
+    {
+      "id": "src-13",
+      "number": 13,
+      "source": "Sax",
+      "station": "Jackson",
+      "kind": "DI",
+      "foh": "13",
+      "patch": "",
+      "phantom": "",
+      "notes": "",
+      "x": 20.146,
+      "y": 1.707
+    },
+    {
+      "id": "src-14",
+      "number": 14,
+      "source": "Kick",
+      "station": "Sam",
+      "kind": "Mic",
+      "foh": "14",
+      "patch": "",
+      "phantom": "",
+      "notes": "",
+      "x": 12.019,
+      "y": 7.175
+    },
+    {
+      "id": "src-15",
+      "number": 15,
+      "source": "Hi-hat / snare",
+      "station": "Sam",
+      "kind": "Mic",
+      "foh": "15",
+      "patch": "",
+      "phantom": "",
+      "notes": "",
+      "x": 12.895,
+      "y": 4.481
+    },
+    {
+      "id": "src-16",
+      "number": 16,
+      "source": "Overhead",
+      "station": "Sam",
+      "kind": "Mic",
+      "foh": "16",
+      "patch": "",
+      "phantom": "",
+      "notes": "",
+      "x": 9.698,
+      "y": 4.128
+    }
+  ],
+  "gear": [
+    {
+      "id": "EQ-001",
+      "item": "Microphone",
+      "spec": "Shure SM58",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-1"
+      ],
+      "station": "Joe",
+      "required": true,
+      "notes": "Model is source wording; confirm exact model and supplier."
+    },
+    {
+      "id": "EQ-002",
+      "item": "Mic stand",
+      "spec": "boom",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-1"
+      ],
+      "station": "Joe",
+      "required": true,
+      "notes": "Stand type listed in Audio inputs; quantity and supplier to confirm."
+    },
+    {
+      "id": "EQ-003",
+      "item": "Audio cable",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-1"
+      ],
+      "station": "Joe",
+      "required": false,
+      "notes": "Planning placeholder. Confirm signal path, cable segments, connectors, quantities and lengths; do not infer one cable per input."
+    },
+    {
+      "id": "EQ-004",
+      "item": "Microphone",
+      "spec": "Shure 87A",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-2"
+      ],
+      "station": "Chris",
+      "required": true,
+      "notes": "Model is source wording; confirm exact model and supplier."
+    },
+    {
+      "id": "EQ-005",
+      "item": "Mic stand",
+      "spec": "boom",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-2"
+      ],
+      "station": "Chris",
+      "required": true,
+      "notes": "Stand type listed in Audio inputs; quantity and supplier to confirm."
+    },
+    {
+      "id": "EQ-006",
+      "item": "Audio cable",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-2"
+      ],
+      "station": "Chris",
+      "required": false,
+      "notes": "Planning placeholder. Confirm signal path, cable segments, connectors, quantities and lengths; do not infer one cable per input."
+    },
+    {
+      "id": "EQ-007",
+      "item": "Microphone",
+      "spec": "Shure 87A",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-3"
+      ],
+      "station": "Brian",
+      "required": true,
+      "notes": "Model is source wording; confirm exact model and supplier."
+    },
+    {
+      "id": "EQ-008",
+      "item": "Mic stand",
+      "spec": "boom",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-3"
+      ],
+      "station": "Brian",
+      "required": true,
+      "notes": "Stand type listed in Audio inputs; quantity and supplier to confirm."
+    },
+    {
+      "id": "EQ-009",
+      "item": "Audio cable",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-3"
+      ],
+      "station": "Brian",
+      "required": false,
+      "notes": "Planning placeholder. Confirm signal path, cable segments, connectors, quantities and lengths; do not infer one cable per input."
+    },
+    {
+      "id": "EQ-010",
+      "item": "Microphone",
+      "spec": "Shure SM58",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-4"
+      ],
+      "station": "Jackson",
+      "required": true,
+      "notes": "Model is source wording; confirm exact model and supplier."
+    },
+    {
+      "id": "EQ-011",
+      "item": "Mic stand",
+      "spec": "boom",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-4"
+      ],
+      "station": "Jackson",
+      "required": true,
+      "notes": "Stand type listed in Audio inputs; quantity and supplier to confirm."
+    },
+    {
+      "id": "EQ-012",
+      "item": "Audio cable",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-4"
+      ],
+      "station": "Jackson",
+      "required": false,
+      "notes": "Planning placeholder. Confirm signal path, cable segments, connectors, quantities and lengths; do not infer one cable per input."
+    },
+    {
+      "id": "EQ-013",
+      "item": "Microphone",
+      "spec": "Shure SM58",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-5"
+      ],
+      "station": "Sam",
+      "required": true,
+      "notes": "Model is source wording; confirm exact model and supplier."
+    },
+    {
+      "id": "EQ-014",
+      "item": "Mic stand",
+      "spec": "large boom",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-5"
+      ],
+      "station": "Sam",
+      "required": true,
+      "notes": "Stand type listed in Audio inputs; quantity and supplier to confirm."
+    },
+    {
+      "id": "EQ-015",
+      "item": "Audio cable",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-5"
+      ],
+      "station": "Sam",
+      "required": false,
+      "notes": "Planning placeholder. Confirm signal path, cable segments, connectors, quantities and lengths; do not infer one cable per input."
+    },
+    {
+      "id": "EQ-016",
+      "item": "Instrument / backline",
+      "spec": "Cello",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-6"
+      ],
+      "station": "Joe",
+      "required": true,
+      "notes": "Instrument listed in Audio inputs; model, accessories and supplier to confirm."
+    },
+    {
+      "id": "EQ-017",
+      "item": "Instrument stand",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-6"
+      ],
+      "station": "Joe",
+      "required": false,
+      "notes": "Planning placeholder. Confirm whether a stand is needed and whether it is shared."
+    },
+    {
+      "id": "EQ-018",
+      "item": "Instrument cable",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-6"
+      ],
+      "station": "Joe",
+      "required": true,
+      "notes": "Original Instrument cable value: \"20\". Confirm meaning, quantity, connectors at both ends, length and units."
+    },
+    {
+      "id": "EQ-019",
+      "item": "DI box / channels",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-6"
+      ],
+      "station": "Joe",
+      "required": true,
+      "notes": "Source says DI required. Confirm channels and physical box allocation; consolidate shared/stereo units before counting."
+    },
+    {
+      "id": "EQ-020",
+      "item": "Audio cable",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-6"
+      ],
+      "station": "Joe",
+      "required": false,
+      "notes": "Planning placeholder. Confirm signal path, cable segments, connectors, quantities and lengths; do not infer one cable per input."
+    },
+    {
+      "id": "EQ-021",
+      "item": "Instrument / backline",
+      "spec": "Joe elec gtr",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-7"
+      ],
+      "station": "Joe",
+      "required": true,
+      "notes": "Instrument listed in Audio inputs; model, accessories and supplier to confirm."
+    },
+    {
+      "id": "EQ-022",
+      "item": "Guitar stand",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-7"
+      ],
+      "station": "Joe",
+      "required": true,
+      "notes": "Source says gtr_stand. Confirm stand type and shared-rack allocation."
+    },
+    {
+      "id": "EQ-023",
+      "item": "Instrument cable",
+      "spec": "20 ft",
+      "quantity": 1,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-7"
+      ],
+      "station": "Joe",
+      "required": true,
+      "notes": ""
+    },
+    {
+      "id": "EQ-024",
+      "item": "DI box / channels",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-7"
+      ],
+      "station": "Joe",
+      "required": true,
+      "notes": "Source says DI required. Confirm channels and physical box allocation; consolidate shared/stereo units before counting."
+    },
+    {
+      "id": "EQ-025",
+      "item": "Audio cable",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-7"
+      ],
+      "station": "Joe",
+      "required": false,
+      "notes": "Planning placeholder. Confirm signal path, cable segments, connectors, quantities and lengths; do not infer one cable per input."
+    },
+    {
+      "id": "EQ-028",
+      "item": "Instrument cable",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-8"
+      ],
+      "station": "Chris",
+      "required": true,
+      "notes": "Original Instrument cable value: \"10\". Confirm meaning, quantity, connectors at both ends, length and units."
+    },
+    {
+      "id": "EQ-029",
+      "item": "DI box / channels",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-8"
+      ],
+      "station": "Chris",
+      "required": true,
+      "notes": "Source says DI required. Confirm channels and physical box allocation; consolidate shared/stereo units before counting."
+    },
+    {
+      "id": "EQ-030",
+      "item": "Audio cable",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-8"
+      ],
+      "station": "Chris",
+      "required": false,
+      "notes": "Planning placeholder. Confirm signal path, cable segments, connectors, quantities and lengths; do not infer one cable per input."
+    },
+    {
+      "id": "EQ-033",
+      "item": "Instrument cable",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-9"
+      ],
+      "station": "Chris",
+      "required": true,
+      "notes": "Original Instrument cable value: \"10\". Confirm meaning, quantity, connectors at both ends, length and units."
+    },
+    {
+      "id": "EQ-034",
+      "item": "DI box / channels",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-9"
+      ],
+      "station": "Chris",
+      "required": true,
+      "notes": "Source says DI required. Confirm channels and physical box allocation; consolidate shared/stereo units before counting."
+    },
+    {
+      "id": "EQ-035",
+      "item": "Audio cable",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-9"
+      ],
+      "station": "Chris",
+      "required": false,
+      "notes": "Planning placeholder. Confirm signal path, cable segments, connectors, quantities and lengths; do not infer one cable per input."
+    },
+    {
+      "id": "EQ-036",
+      "item": "Instrument / backline",
+      "spec": "Bass",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-10"
+      ],
+      "station": "Brian",
+      "required": true,
+      "notes": "Instrument listed in Audio inputs; model, accessories and supplier to confirm."
+    },
+    {
+      "id": "EQ-037",
+      "item": "Guitar stand",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-10"
+      ],
+      "station": "Brian",
+      "required": true,
+      "notes": "Source says gtr_stand. Confirm stand type and shared-rack allocation."
+    },
+    {
+      "id": "EQ-038",
+      "item": "Instrument cable",
+      "spec": "20 ft",
+      "quantity": 1,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-10"
+      ],
+      "station": "Brian",
+      "required": true,
+      "notes": ""
+    },
+    {
+      "id": "EQ-039",
+      "item": "DI box / channels",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-10"
+      ],
+      "station": "Brian",
+      "required": true,
+      "notes": "Source says DI required. Confirm channels and physical box allocation; consolidate shared/stereo units before counting."
+    },
+    {
+      "id": "EQ-040",
+      "item": "Audio cable",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-10"
+      ],
+      "station": "Brian",
+      "required": false,
+      "notes": "Planning placeholder. Confirm signal path, cable segments, connectors, quantities and lengths; do not infer one cable per input."
+    },
+    {
+      "id": "EQ-041",
+      "item": "Instrument / backline",
+      "spec": "Acoustic gtr",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-11"
+      ],
+      "station": "Jackson",
+      "required": true,
+      "notes": "Instrument listed in Audio inputs; model, accessories and supplier to confirm."
+    },
+    {
+      "id": "EQ-042",
+      "item": "Guitar stand",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-11"
+      ],
+      "station": "Jackson",
+      "required": true,
+      "notes": "Source says gtr_stand. Confirm stand type and shared-rack allocation."
+    },
+    {
+      "id": "EQ-043",
+      "item": "Instrument cable",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-11"
+      ],
+      "station": "Jackson",
+      "required": true,
+      "notes": "Original Instrument cable value: \"20\". Confirm meaning, quantity, connectors at both ends, length and units."
+    },
+    {
+      "id": "EQ-044",
+      "item": "DI box / channels",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-11"
+      ],
+      "station": "Jackson",
+      "required": true,
+      "notes": "Source says DI required. Confirm channels and physical box allocation; consolidate shared/stereo units before counting."
+    },
+    {
+      "id": "EQ-045",
+      "item": "Audio cable",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-11"
+      ],
+      "station": "Jackson",
+      "required": false,
+      "notes": "Planning placeholder. Confirm signal path, cable segments, connectors, quantities and lengths; do not infer one cable per input."
+    },
+    {
+      "id": "EQ-046",
+      "item": "Instrument / backline",
+      "spec": "Jackson elec gtr",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-12"
+      ],
+      "station": "Jackson",
+      "required": true,
+      "notes": "Instrument listed in Audio inputs; model, accessories and supplier to confirm."
+    },
+    {
+      "id": "EQ-047",
+      "item": "Guitar stand",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-12"
+      ],
+      "station": "Jackson",
+      "required": true,
+      "notes": "Source says gtr_stand. Confirm stand type and shared-rack allocation."
+    },
+    {
+      "id": "EQ-048",
+      "item": "Instrument cable",
+      "spec": "20 ft",
+      "quantity": 1,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-12"
+      ],
+      "station": "Jackson",
+      "required": true,
+      "notes": ""
+    },
+    {
+      "id": "EQ-049",
+      "item": "DI box / channels",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-12"
+      ],
+      "station": "Jackson",
+      "required": true,
+      "notes": "Source says DI required. Confirm channels and physical box allocation; consolidate shared/stereo units before counting."
+    },
+    {
+      "id": "EQ-050",
+      "item": "Audio cable",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-12"
+      ],
+      "station": "Jackson",
+      "required": false,
+      "notes": "Planning placeholder. Confirm signal path, cable segments, connectors, quantities and lengths; do not infer one cable per input."
+    },
+    {
+      "id": "EQ-051",
+      "item": "Instrument / backline",
+      "spec": "Sax",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-13"
+      ],
+      "station": "Jackson",
+      "required": true,
+      "notes": "Instrument listed in Audio inputs; model, accessories and supplier to confirm."
+    },
+    {
+      "id": "EQ-052",
+      "item": "Instrument stand",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-13"
+      ],
+      "station": "Jackson",
+      "required": false,
+      "notes": "Planning placeholder. Confirm whether a stand is needed and whether it is shared."
+    },
+    {
+      "id": "EQ-053",
+      "item": "Instrument cable",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-13"
+      ],
+      "station": "Jackson",
+      "required": true,
+      "notes": "Original Instrument cable value: \"20\". Confirm meaning, quantity, connectors at both ends, length and units."
+    },
+    {
+      "id": "EQ-054",
+      "item": "DI box / channels",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-13"
+      ],
+      "station": "Jackson",
+      "required": true,
+      "notes": "Source says DI required. Confirm channels and physical box allocation; consolidate shared/stereo units before counting."
+    },
+    {
+      "id": "EQ-055",
+      "item": "Audio cable",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-13"
+      ],
+      "station": "Jackson",
+      "required": false,
+      "notes": "Planning placeholder. Confirm signal path, cable segments, connectors, quantities and lengths; do not infer one cable per input."
+    },
+    {
+      "id": "EQ-056",
+      "item": "Instrument / backline",
+      "spec": "Drums",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-14",
+        "src-15",
+        "src-16"
+      ],
+      "station": "Sam",
+      "required": true,
+      "notes": "Shared drum kit record. Confirm kit, cymbals, hardware, throne and supplier; do not count a kit per drum mic."
+    },
+    {
+      "id": "EQ-057",
+      "item": "Microphone",
+      "spec": "Shure Beta 52A",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-14"
+      ],
+      "station": "Sam",
+      "required": true,
+      "notes": "Model is source wording; confirm exact model and supplier."
+    },
+    {
+      "id": "EQ-058",
+      "item": "Mic stand / mount",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-14"
+      ],
+      "station": "Sam",
+      "required": false,
+      "notes": "Confirm stand or mounting method; original Stand cell is blank."
+    },
+    {
+      "id": "EQ-059",
+      "item": "Audio cable",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-14"
+      ],
+      "station": "Sam",
+      "required": false,
+      "notes": "Planning placeholder. Confirm signal path, cable segments, connectors, quantities and lengths; do not infer one cable per input."
+    },
+    {
+      "id": "EQ-060",
+      "item": "Microphone",
+      "spec": "SM57",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-15"
+      ],
+      "station": "Sam",
+      "required": true,
+      "notes": "Model is source wording; confirm exact model and supplier."
+    },
+    {
+      "id": "EQ-061",
+      "item": "Mic stand / mount",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-15"
+      ],
+      "station": "Sam",
+      "required": false,
+      "notes": "Confirm stand or mounting method; original Stand cell is blank."
+    },
+    {
+      "id": "EQ-062",
+      "item": "Audio cable",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-15"
+      ],
+      "station": "Sam",
+      "required": false,
+      "notes": "Planning placeholder. Confirm signal path, cable segments, connectors, quantities and lengths; do not infer one cable per input."
+    },
+    {
+      "id": "EQ-063",
+      "item": "Microphone",
+      "spec": "KSM32",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-16"
+      ],
+      "station": "Sam",
+      "required": true,
+      "notes": "Model is source wording; confirm exact model and supplier."
+    },
+    {
+      "id": "EQ-064",
+      "item": "Mic stand / mount",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-16"
+      ],
+      "station": "Sam",
+      "required": false,
+      "notes": "Confirm stand or mounting method; original Stand cell is blank."
+    },
+    {
+      "id": "EQ-065",
+      "item": "Audio cable",
+      "spec": "",
+      "quantity": null,
+      "provider": "To confirm",
+      "sourceIds": [
+        "src-16"
+      ],
+      "station": "Sam",
+      "required": false,
+      "notes": "Planning placeholder. Confirm signal path, cable segments, connectors, quantities and lengths; do not infer one cable per input."
+    },
+    {
+      "id": "nord-backline",
+      "item": "Keyboard",
+      "spec": "Nord Stage 4",
+      "quantity": 1,
+      "provider": "Backline",
+      "sourceIds": [
+        "src-8",
+        "src-9"
+      ],
+      "station": "Chris",
+      "required": true,
+      "notes": "",
+      "confirmed": true
+    },
+    {
+      "id": "nord-stand",
+      "item": "Keyboard stand",
+      "spec": "For Nord Stage 4",
+      "quantity": 1,
+      "provider": "Backline",
+      "sourceIds": [
+        "src-8",
+        "src-9"
+      ],
+      "station": "Chris",
+      "required": true,
+      "notes": "",
+      "confirmed": true
+    },
+    {
+      "id": "power-joe",
+      "item": "AC power drop",
+      "spec": "",
+      "quantity": 1,
+      "provider": "To confirm",
+      "sourceIds": [],
+      "station": "Joe",
+      "required": true,
+      "notes": "Plotted location. Outlet count, voltage, draw and circuit allocation to confirm."
+    },
+    {
+      "id": "power-chris",
+      "item": "AC power drop",
+      "spec": "",
+      "quantity": 1,
+      "provider": "To confirm",
+      "sourceIds": [],
+      "station": "Chris",
+      "required": true,
+      "notes": "Plotted location. Outlet count, voltage, draw and circuit allocation to confirm."
+    },
+    {
+      "id": "power-brian",
+      "item": "AC power drop",
+      "spec": "",
+      "quantity": 1,
+      "provider": "To confirm",
+      "sourceIds": [],
+      "station": "Brian",
+      "required": true,
+      "notes": "Plotted location. Outlet count, voltage, draw and circuit allocation to confirm."
+    },
+    {
+      "id": "power-jackson",
+      "item": "AC power drop",
+      "spec": "",
+      "quantity": 1,
+      "provider": "To confirm",
+      "sourceIds": [],
+      "station": "Jackson",
+      "required": true,
+      "notes": "Plotted location. Outlet count, voltage, draw and circuit allocation to confirm."
+    }
+  ],
+  "cables": [
+    {
+      "id": "run-joe",
+      "gearId": "EQ-023",
+      "fromId": "joe",
+      "toId": "hx-stomp"
+    },
+    {
+      "id": "run-brian",
+      "gearId": "EQ-038",
+      "fromId": "brian",
+      "toId": "src-10"
+    },
+    {
+      "id": "run-jackson",
+      "gearId": "EQ-048",
+      "fromId": "jackson",
+      "toId": "kemper"
+    }
+  ]
+}

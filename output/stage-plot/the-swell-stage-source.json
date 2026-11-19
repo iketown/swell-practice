@@ -1,0 +1,896 @@
+{
+  "setupId": "g8qTbUz0v4xk40HzhHoD",
+  "revision": 49,
+  "captured": "2026-09-29",
+  "pageSizePoints": [
+    792,
+    576
+  ],
+  "stageFeet": {
+    "width": 46,
+    "depth": 24,
+    "sidestageWidth": 8
+  },
+  "status": "draft",
+  "placements": [
+    {
+      "id": "node-7a74e5d3-5107-49fd-9288-fc9fe85ee853",
+      "name": "Behringer X32",
+      "category": "Mixer",
+      "stagePosition": {
+        "xFeet": 39.25,
+        "yFeet": 12.749999999999998,
+        "widthFeet": 4,
+        "depthFeet": 3,
+        "rotationDegrees": 0,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "right",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "node-9eec7a8e-4ad5-4297-9ef1-aef7092362d6",
+      "name": "Fender telecaster",
+      "category": "Instrument",
+      "stagePosition": {
+        "xFeet": 14.766188881841543,
+        "yFeet": 10.796161286161327,
+        "widthFeet": 2.5,
+        "depthFeet": 2.5,
+        "rotationDegrees": 0,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "bottom",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "node-fa9dfd1d-4a1a-46e1-b26c-753ce9a1af10",
+      "name": "Joe gtr",
+      "category": "Guitar/Bass Floor Multi-Effects and Amp Modeler",
+      "stagePosition": {
+        "xFeet": 12.246584180146064,
+        "yFeet": 16.71903613358345,
+        "widthFeet": 1.0833333333333333,
+        "depthFeet": 0.41666666666666663,
+        "rotationDegrees": 211.99254642186997,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "node-f8ce5a6f-09a6-4831-8584-65e621a52968",
+      "name": "jackson gtr",
+      "category": "Guitar/Bass Floor Multi-Effects and Amp Modeler",
+      "stagePosition": {
+        "xFeet": 32.30558389753807,
+        "yFeet": 14.179916985704516,
+        "widthFeet": 1.0416666666666667,
+        "depthFeet": 0.41666666666666663,
+        "rotationDegrees": 90.00000933466731,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "node-4610c670-a865-450d-924a-2a51dc3b0e52",
+      "name": "Bass D.I.",
+      "category": "Direct box",
+      "stagePosition": {
+        "xFeet": 27.353622697469753,
+        "yFeet": 14.510203527966196,
+        "widthFeet": 0.8333333333333333,
+        "depthFeet": 0.8333333333333333,
+        "rotationDegrees": 0,
+        "inputAnchor": {
+          "side": "top",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "node-ed8e059b-2f36-4d8e-b995-1a8908a30ac9",
+      "name": "Electric bass",
+      "category": "Instrument",
+      "stagePosition": {
+        "xFeet": 25.44440714393075,
+        "yFeet": 13.729171901550192,
+        "widthFeet": 2.5,
+        "depthFeet": 2.5,
+        "rotationDegrees": 0,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "bottom",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "node-bdaebce5-4218-4e88-a79a-108b9fca41f6",
+      "name": "SD16 16-channel Stage Box",
+      "category": "Digital stage box",
+      "stagePosition": {
+        "xFeet": 24.826493731008114,
+        "yFeet": 10.356074165640853,
+        "widthFeet": 2.5,
+        "depthFeet": 2.5,
+        "rotationDegrees": 0,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "right",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "node-4062ebc5-3611-4be4-bfe2-1c9879ed7847",
+      "name": "Kick drum mic",
+      "category": "Drum microphone",
+      "stagePosition": {
+        "xFeet": 21.354505748260678,
+        "yFeet": 13.823856417275476,
+        "widthFeet": 0.16404199475065617,
+        "depthFeet": 0.6233595800524934,
+        "rotationDegrees": 356.2252649919701,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "top",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "node-7922f263-797a-4e88-aabb-a3b8d30f2fab",
+      "name": "Snare mic",
+      "category": "Drum microphone",
+      "stagePosition": {
+        "xFeet": 21.19750656167979,
+        "yFeet": 11.72406709709079,
+        "widthFeet": 0.10498687664041995,
+        "depthFeet": 0.4384619102663393,
+        "rotationDegrees": 180.00000865142204,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "top",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "node-a09c4f8c-9f36-4dcc-ab54-b6dc235e2c51",
+      "name": "OH L",
+      "category": "Drum microphone",
+      "stagePosition": {
+        "xFeet": 22.76178235261459,
+        "yFeet": 12.608304620570948,
+        "widthFeet": 0.08202099737532809,
+        "depthFeet": 0.08202109358832672,
+        "rotationDegrees": 130.40593314360206,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "top",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "node-81df23e5-4cb0-46e1-b249-e1b4aa8b6058",
+      "name": "OH R",
+      "category": "Drum microphone",
+      "stagePosition": {
+        "xFeet": 20.429362696925484,
+        "yFeet": 12.633601443895442,
+        "widthFeet": 0.08202099737532809,
+        "depthFeet": 0.08202109358832672,
+        "rotationDegrees": 244.6594424294517,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "top",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "node-09ff1579-0316-4df3-83f6-091b60135065",
+      "name": "Nord keys",
+      "category": "Stage keyboard",
+      "stagePosition": {
+        "xFeet": 17.522398448052993,
+        "yFeet": 17.75798893725778,
+        "widthFeet": 3.4999999999999996,
+        "depthFeet": 1.1666666666666667,
+        "rotationDegrees": 149.99999734394112,
+        "inputAnchor": {
+          "side": "top",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "top",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "node-1da5d903-bfed-485b-93c0-9ad9c4a89ad5",
+      "name": "Microphone stand",
+      "category": "Stand",
+      "stagePosition": {
+        "xFeet": 28.424123876676784,
+        "yFeet": 15.80041822235728,
+        "widthFeet": 2,
+        "depthFeet": 2,
+        "rotationDegrees": 202.1449126378634,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "right",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "node-254a915d-04c7-4488-b0d0-3239f6d0a21b",
+      "name": "Microphone stand",
+      "category": "Stand",
+      "stagePosition": {
+        "xFeet": 18.955971338930407,
+        "yFeet": 18.523794447030294,
+        "widthFeet": 1.6666666666666665,
+        "depthFeet": 1.6666666666666665,
+        "rotationDegrees": 152.97761831260823,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "right",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "node-eda1ae9a-175d-4506-ab0f-9d7332c55352",
+      "name": "Microphone stand",
+      "category": "Stand",
+      "stagePosition": {
+        "xFeet": 13.501552725714335,
+        "yFeet": 16.070889551182745,
+        "widthFeet": 2,
+        "depthFeet": 2,
+        "rotationDegrees": 163.72998897198738,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "right",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "node-6f7581ef-54b2-4135-afad-82ced90e6524",
+      "name": "Microphone stand",
+      "category": "Stand",
+      "stagePosition": {
+        "xFeet": 23.239240395115427,
+        "yFeet": 18.12890143907602,
+        "widthFeet": 2,
+        "depthFeet": 2,
+        "rotationDegrees": 215.23659576721525,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "right",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "node-f2057bad-b2cf-4c62-8a1b-91bf4a6ea1fd",
+      "name": "cron mic",
+      "category": "Microphone",
+      "stagePosition": {
+        "xFeet": 24.684313132694072,
+        "yFeet": 17.78426920522855,
+        "widthFeet": 0.3333333333333333,
+        "depthFeet": 1,
+        "rotationDegrees": 215.23659576721525,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "top",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "node-904382aa-4d51-4aec-a8e4-2e7b8be96c4a",
+      "name": "ike mic",
+      "category": "Condenser Microphones",
+      "stagePosition": {
+        "xFeet": 19.161836804367425,
+        "yFeet": 18.251316965408524,
+        "widthFeet": 0.3333333333333333,
+        "depthFeet": 1,
+        "rotationDegrees": 152.9775944069429,
+        "inputAnchor": {
+          "side": "bottom",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "top",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "node-9c125ee3-1b5c-427d-9263-53a37bf9e6d0",
+      "name": "jackson mic",
+      "category": "Microphone",
+      "stagePosition": {
+        "xFeet": 29.65369277488528,
+        "yFeet": 15.326796296387519,
+        "widthFeet": 0.3333333333333333,
+        "depthFeet": 1,
+        "rotationDegrees": 202.144898977485,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "top",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "node-ebbaa4ac-5c03-4bae-8c5f-2b2d16afeb0c",
+      "name": "sam mic",
+      "category": "Microphone",
+      "stagePosition": {
+        "xFeet": 22.91443973842255,
+        "yFeet": 11.239527532865056,
+        "widthFeet": 0.3333333333333333,
+        "depthFeet": 1,
+        "rotationDegrees": 119.05347572412387,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "top",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "node-86cb28ef-23b4-489f-9bd7-e43f8c7a4606",
+      "name": "joe mic",
+      "category": "Microphone",
+      "stagePosition": {
+        "xFeet": 14.040389052213333,
+        "yFeet": 15.56182319911446,
+        "widthFeet": 0.3333333333333333,
+        "depthFeet": 1,
+        "rotationDegrees": 163.72998897198738,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "top",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "node-44ab933e-c070-427c-a2a8-bb9c24ba77ce",
+      "name": "front stagebox",
+      "category": "Stage snake",
+      "stagePosition": {
+        "xFeet": 21.78560337479033,
+        "yFeet": 20.25999035171949,
+        "widthFeet": 1.4166666666666667,
+        "depthFeet": 0.75,
+        "rotationDegrees": 0,
+        "inputAnchor": {
+          "side": "top",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "node-3b96023d-2670-4ba9-938f-da6e1f8aa64b",
+      "name": "BOX_A snake",
+      "category": "Stage snake",
+      "stagePosition": {
+        "xFeet": 22.5,
+        "yFeet": 14.75,
+        "widthFeet": 1.4166666666666667,
+        "depthFeet": 0.3333333333333333,
+        "rotationDegrees": 0,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "right",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "node-08f0448d-37a3-4cc4-9e90-9e6b4113aae7",
+      "name": "Gibson ES-335 60s Semi-hollowbody Electric Guitar - Vintage Burst",
+      "category": "Semi-hollowbody electric guitar",
+      "stagePosition": {
+        "xFeet": 28.71286225756948,
+        "yFeet": 11.365774794826356,
+        "widthFeet": 2.5,
+        "depthFeet": 2.5,
+        "rotationDegrees": 0,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "bottom",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "node-60427e9c-96d3-45be-8f87-bcaab2df561f",
+      "name": "Microphone stand",
+      "category": "Stand",
+      "stagePosition": {
+        "xFeet": 23,
+        "yFeet": 11.25,
+        "widthFeet": 2,
+        "depthFeet": 2,
+        "rotationDegrees": 119.05346206374554,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "right",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "node-afbe8563-c0c2-4943-a9f9-37526a7826e7",
+      "name": "MicroMON MA400 Monitor Headphone Amplifier",
+      "category": "Personal monitor mixer / headphone amplifier",
+      "stagePosition": {
+        "xFeet": 22,
+        "yFeet": 11,
+        "widthFeet": 0.6666666666666666,
+        "depthFeet": 0.5,
+        "rotationDegrees": 0,
+        "inputAnchor": {
+          "side": "top",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "bottom",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "breakout-3b4c63de-7597-4b88-a4e1-4b2a18ce3680",
+      "name": "[XLR-F + XLR-F] \u2192 TRS-M",
+      "category": "Breakout cable",
+      "stagePosition": {
+        "xFeet": 28.5,
+        "yFeet": 12,
+        "widthFeet": 0.6666666666666666,
+        "depthFeet": 0.5,
+        "rotationDegrees": 0,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 1
+        },
+        "outputAnchor": {
+          "side": "left",
+          "offset": 0
+        }
+      }
+    },
+    {
+      "id": "cable-node-232f812a-e391-422c-b76f-62698ca4f53b",
+      "name": "TRS-F \u2192 TRS-M",
+      "category": "Cable",
+      "stagePosition": {
+        "xFeet": 28.25,
+        "yFeet": 10.25,
+        "widthFeet": 0.6666666666666666,
+        "depthFeet": 0.5,
+        "rotationDegrees": 0,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 1
+        },
+        "outputAnchor": {
+          "side": "left",
+          "offset": 0
+        }
+      }
+    },
+    {
+      "id": "stage-drum-kit",
+      "name": "Drum kit",
+      "category": "Drum kit",
+      "stagePosition": {
+        "xFeet": 19,
+        "yFeet": 10,
+        "widthFeet": 4.574448598079441,
+        "depthFeet": 3.7019319460773716,
+        "rotationDegrees": 0,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "right",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "stage-kick-mic-stand",
+      "name": "Kick mic stand \u00b7 short boom",
+      "category": "Microphone stand",
+      "stagePosition": {
+        "xFeet": 20.7410931215668,
+        "yFeet": 14.045380539898797,
+        "widthFeet": 1.4763780114218945,
+        "depthFeet": 1.4763779625335702,
+        "rotationDegrees": 176.22525998301376,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "right",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "stage-snare-mic-stand",
+      "name": "Snare mic stand \u00b7 low boom",
+      "category": "Microphone stand",
+      "stagePosition": {
+        "xFeet": 20.511810988031346,
+        "yFeet": 10.493930497663852,
+        "widthFeet": 1.4763780114218943,
+        "depthFeet": 1.4763779136452462,
+        "rotationDegrees": 0,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "right",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "stage-overhead-mic-stand-l",
+      "name": "Overhead mic stand L \u00b7 tall boom",
+      "category": "Microphone stand",
+      "stagePosition": {
+        "xFeet": 22.484750445355267,
+        "yFeet": 12.219969936086748,
+        "widthFeet": 2.1325458535372115,
+        "depthFeet": 2.1325458535372115,
+        "rotationDegrees": 130.40594680398038,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "right",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "stage-overhead-mic-stand-r",
+      "name": "Overhead mic stand R \u00b7 tall boom",
+      "category": "Microphone stand",
+      "stagePosition": {
+        "xFeet": 18.516035745619476,
+        "yFeet": 12.028894614516279,
+        "widthFeet": 2.132545657983915,
+        "depthFeet": 2.1325458535372115,
+        "rotationDegrees": 244.65942876907343,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "right",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "stage-performer-ike",
+      "name": "Ike",
+      "category": "Performer",
+      "stagePosition": {
+        "xFeet": 17.513607743531075,
+        "yFeet": 15.56619806239611,
+        "widthFeet": 2.450353986634983,
+        "depthFeet": 2.612355812953839,
+        "rotationDegrees": 329.66004357470956,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "right",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "stage-performer-jackson",
+      "name": "Jackson",
+      "category": "Performer",
+      "stagePosition": {
+        "xFeet": 28.794433657578594,
+        "yFeet": 13.60222619036677,
+        "widthFeet": 2.605236108534605,
+        "depthFeet": 1.9147866979984474,
+        "rotationDegrees": 9.267896491394993,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "right",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "stage-performer-joe",
+      "name": "Joe",
+      "category": "Performer",
+      "stagePosition": {
+        "xFeet": 12.75700612331,
+        "yFeet": 14.02424741291937,
+        "widthFeet": 2.605236108534605,
+        "depthFeet": 1.9147863068918543,
+        "rotationDegrees": 0,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "right",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "stage-performer-kron",
+      "name": "Kron",
+      "category": "Performer",
+      "stagePosition": {
+        "xFeet": 24.122231569033595,
+        "yFeet": 15.915151675698636,
+        "widthFeet": 2.6052363040879016,
+        "depthFeet": 1.9147865024451507,
+        "rotationDegrees": 23.1495174652419,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "right",
+          "offset": 0.5
+        }
+      }
+    },
+    {
+      "id": "stage-performer-sam",
+      "name": "Sam",
+      "category": "Performer",
+      "stagePosition": {
+        "xFeet": 20.078961588344548,
+        "yFeet": 9.082944433050832,
+        "widthFeet": 3.1754101707240725,
+        "depthFeet": 2.7724312437488026,
+        "rotationDegrees": 0,
+        "inputAnchor": {
+          "side": "left",
+          "offset": 0.5
+        },
+        "outputAnchor": {
+          "side": "right",
+          "offset": 0.5
+        }
+      }
+    }
+  ],
+  "audioInputs": [
+    {
+      "savedSD16Port": "01",
+      "source": "Ike vocal",
+      "position": "Downstage SL",
+      "interface": "XLR microphone",
+      "requirements": "Beta 87A (owned); boom"
+    },
+    {
+      "savedSD16Port": "02",
+      "source": "Jackson vocal",
+      "position": "Stage left",
+      "interface": "XLR microphone",
+      "requirements": "Model TBC; boom"
+    },
+    {
+      "savedSD16Port": "03",
+      "source": "Joe vocal",
+      "position": "Stage right",
+      "interface": "XLR microphone",
+      "requirements": "Model TBC; boom"
+    },
+    {
+      "savedSD16Port": "04",
+      "source": "Sam vocal",
+      "position": "Drums / center",
+      "interface": "XLR microphone",
+      "requirements": "Model TBC; boom"
+    },
+    {
+      "savedSD16Port": "05",
+      "source": "Cron vocal",
+      "position": "Downstage SR",
+      "interface": "XLR microphone",
+      "requirements": "Model TBC; boom"
+    },
+    {
+      "savedSD16Port": "06",
+      "source": "Nord keyboard",
+      "position": "Cron / downstage SR",
+      "interface": "1/4-inch output; 1 run saved",
+      "requirements": "DI / mono-stereo TBC"
+    },
+    {
+      "savedSD16Port": "07",
+      "source": "Jackson guitar",
+      "position": "Stage left",
+      "interface": "Modeler 1/4-inch main out",
+      "requirements": "Balanced feed / DI TBC"
+    },
+    {
+      "savedSD16Port": "08",
+      "source": "Joe guitar",
+      "position": "Stage right",
+      "interface": "Modeler 1/4-inch main out",
+      "requirements": "Balanced feed / DI TBC"
+    },
+    {
+      "savedSD16Port": "09",
+      "source": "Bass DI",
+      "position": "Ike / downstage SL",
+      "interface": "XLR from DI",
+      "requirements": "DI model / phantom TBC"
+    },
+    {
+      "savedSD16Port": "13",
+      "source": "Overhead R",
+      "position": "Drums",
+      "interface": "XLR microphone",
+      "requirements": "Model / phantom TBC; tall boom"
+    },
+    {
+      "savedSD16Port": "14",
+      "source": "Overhead L",
+      "position": "Drums",
+      "interface": "XLR microphone",
+      "requirements": "Model / phantom TBC; tall boom"
+    },
+    {
+      "savedSD16Port": "15",
+      "source": "Snare",
+      "position": "Drums",
+      "interface": "XLR microphone",
+      "requirements": "Model TBC; low boom"
+    },
+    {
+      "savedSD16Port": "16",
+      "source": "Kick",
+      "position": "Drums",
+      "interface": "XLR microphone",
+      "requirements": "Model TBC; short boom"
+    }
+  ],
+  "notes": [
+    "Current source puts Ike at keys and Kron/Cron at bass. This intentionally supersedes the older formation.",
+    "Stage size is the saved planning footprint, not a confirmed minimum requirement.",
+    "Mic/DI icons exaggerated for readability. No cable topology is prescribed.",
+    "Source power flags are not treated as an approved electrical plan.",
+    "All supply assignments TBC except Ike microphone has an owned asset assignment."
+  ],
+  "documentRevision": 2,
+  "documentOverrides": {
+    "authority": "Brian user instructions, 2026-09-29",
+    "performers": {
+      "keyboard": {
+        "name": "Cron",
+        "vocalInput": 5,
+        "instrumentInput": 6
+      },
+      "bass": {
+        "name": "Ike",
+        "vocalInput": 1,
+        "instrumentInput": 9
+      }
+    },
+    "artwork": "Supplied images-layer icons for guitars, bass, drums and five vocal mic stands",
+    "inputMarkers": "Circled numbers on plot",
+    "rawPlacements": "Unchanged snapshot; performer roles are overridden for this document only"
+  }
+}

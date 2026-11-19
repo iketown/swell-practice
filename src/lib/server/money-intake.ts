@@ -42,7 +42,9 @@ export function receiptModelOptions(hasPdf: boolean) {
       data_collection: "deny" as const,
       max_price: RECEIPT_MAX_PRICE,
     },
-    ...(hasPdf ? { plugins: [{ id: "file-parser", pdf: { engine: "cloudflare-ai" } }] } : {}),
+    // OCR reads scanned/image-only pages as well as embedded text, including mixed PDFs.
+    // OpenRouter bills PDF parsing separately from the model's provider price ceilings.
+    ...(hasPdf ? { plugins: [{ id: "file-parser", pdf: { engine: "mistral-ocr" } }] } : {}),
     max_tokens: MAX_RECEIPT_OUTPUT_TOKENS,
     stream: false,
   };

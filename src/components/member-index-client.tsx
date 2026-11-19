@@ -40,7 +40,7 @@ export function MemberIndexClient() {
           ) : members.length ? (
             <div className="grid gap-2 sm:grid-cols-2">
               {members.map((member) => (
-                <div key={member.id} className="flex items-center justify-between gap-3 rounded-lg border bg-card p-3">
+                <div key={member.id} data-member={member.firstName.trim().toLowerCase()} className="swell-member-card flex items-center justify-between gap-3 rounded-lg border-2 bg-card p-3">
                   <div className="flex min-w-0 items-center gap-3">
                     <MemberAvatar displayName={member.displayName} photoUrl={member.photoUrl} className="size-11" />
                     <div className="min-w-0">

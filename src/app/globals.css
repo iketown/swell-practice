@@ -4,6 +4,27 @@
 
 @custom-variant dark (&:is(.dark *));
 
+.swell-member-card:is([data-member="brian"], [data-member="ike"]) {
+  border-color: oklch(0.7199 0.0651 190.7);
+}
+
+.swell-member-card:is([data-member="chris"], [data-member="christopher"], [data-member="cron"]) {
+  border-color: oklch(0.6448 0.1623 35.2);
+}
+
+.swell-member-card[data-member="jackson"] {
+  border-color: #b8cdaa;
+}
+
+.swell-member-card:is([data-member="joe"], [data-member="joseph"]) {
+  border-color: oklch(0.8022 0.1357 83.6);
+}
+
+.swell-member-card:is([data-member="sam"], [data-member="samuel"]) {
+  border-color: oklch(0.9942 0.0069 88.6);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -375,6 +396,7 @@
   .setup-workspace-grid {
     display: grid;
     grid-template-columns: 260px minmax(540px, 1fr) 360px;
+    height: max(520px, calc(100dvh - 16rem));
   }
 
   .setup-library-panel,
@@ -616,6 +638,7 @@
   @media (max-width: 900px) {
     .setup-workspace-grid {
       grid-template-columns: minmax(0, 1fr);
+      height: auto;
       grid-template-rows: minmax(180px, 30dvh) minmax(560px, 70dvh) minmax(360px, auto);
       overflow: visible;
     }

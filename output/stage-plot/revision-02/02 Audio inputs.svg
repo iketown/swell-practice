@@ -1,0 +1,289 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 792 576">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #f2f4f5;
+      }
+
+      .cls-2, .cls-3, .cls-4, .cls-5, .cls-6, .cls-7 {
+        fill: #182b35;
+      }
+
+      .cls-2, .cls-3, .cls-8, .cls-9, .cls-10 {
+        font-family: Helvetica, Helvetica;
+      }
+
+      .cls-2, .cls-9 {
+        font-size: 9.5px;
+      }
+
+      .cls-3, .cls-6 {
+        font-size: 9.2px;
+      }
+
+      .cls-11 {
+        letter-spacing: 0em;
+      }
+
+      .cls-12 {
+        letter-spacing: 0em;
+      }
+
+      .cls-13 {
+        stroke: #182b35;
+        stroke-width: 1.2px;
+      }
+
+      .cls-13, .cls-14, .cls-15 {
+        fill: none;
+        stroke-miterlimit: 10;
+      }
+
+      .cls-14, .cls-15 {
+        stroke: #e6eaec;
+      }
+
+      .cls-16 {
+        fill: #fff;
+      }
+
+      .cls-16, .cls-4, .cls-5, .cls-6, .cls-17 {
+        font-family: Helvetica-Bold, Helvetica;
+        font-weight: 700;
+      }
+
+      .cls-16, .cls-8 {
+        font-size: 9px;
+      }
+
+      .cls-4 {
+        font-size: 12px;
+      }
+
+      .cls-18 {
+        letter-spacing: 0em;
+      }
+
+      .cls-19 {
+        letter-spacing: 0em;
+      }
+
+      .cls-5 {
+        font-size: 25px;
+      }
+
+      .cls-20 {
+        letter-spacing: -.07em;
+      }
+
+      .cls-21 {
+        letter-spacing: -.07em;
+      }
+
+      .cls-22 {
+        letter-spacing: -.07em;
+      }
+
+      .cls-15 {
+        stroke-width: .5px;
+      }
+
+      .cls-23 {
+        letter-spacing: -.02em;
+      }
+
+      .cls-24 {
+        letter-spacing: -.02em;
+      }
+
+      .cls-25 {
+        letter-spacing: -.02em;
+      }
+
+      .cls-26 {
+        letter-spacing: -.02em;
+      }
+
+      .cls-27 {
+        letter-spacing: -.05em;
+      }
+
+      .cls-28 {
+        letter-spacing: -.05em;
+      }
+
+      .cls-29 {
+        letter-spacing: -.05em;
+      }
+
+      .cls-30 {
+        letter-spacing: -.04em;
+      }
+
+      .cls-31 {
+        letter-spacing: -.04em;
+      }
+
+      .cls-8, .cls-9, .cls-10 {
+        fill: #54616a;
+      }
+
+      .cls-10 {
+        font-size: 8.5px;
+      }
+
+      .cls-17 {
+        fill: #216575;
+        font-size: 10px;
+      }
+    </style>
+  </defs>
+  <g id="_2_Title_and_revision" data-name="2 / Title and revision">
+    <g id="Header">
+      <text id="THE_SWELL" data-name="THE SWELL" class="cls-5" transform="translate(36 39)"><tspan x="0" y="0">THE SWEL</tspan><tspan class="cls-23" x="129.16" y="0">L</tspan></text>
+      <text id="DRAFT_02_29_SEP_2026" data-name="DRAFT 02  /  29 SEP 2026" class="cls-17" transform="translate(635.57 36)"><tspan x="0" y="0" xml:space="preserve">DRAFT 02  /  29 SE</tspan><tspan class="cls-23" x="88.92" y="0">P</tspan><tspan x="95.41" y="0" xml:space="preserve"> 2026</tspan></text>
+      <text id="AUDIO_INPUTS_saved_patch_reference" data-name="AUDIO INPUTS  /  saved patch reference" class="cls-4" transform="translate(36 59)"><tspan x="0" y="0" xml:space="preserve">AUDIO INPUTS  /  saved patch reference</tspan></text>
+      <text id="For_audio_production_house_sound._Existing_SD16_socket_numbers_console_channels_and_show-day_supply_to_confirm." data-name="For audio production / house sound. Existing SD16 socket numbers; console channels and show-day supply to confirm." class="cls-9" transform="translate(36 76)"><tspan x="0" y="0">For audio production / house sound. Existing SD16 socket numbers; console channels and show-day supply to confirm.</tspan></text>
+      <line id="Header_path" data-name="Header / path" class="cls-13" x1="36" y1="88" x2="756" y2="88"/>
+    </g>
+    <g id="Footer">
+      <line id="Footer_path" data-name="Footer / path" class="cls-14" x1="36" y1="540" x2="756" y2="540"/>
+      <text id="Setup_rev_49_Brian_s_performer_icon_revisions" data-name="Setup rev 49 + Brian&amp;apos;s performer / icon revisions" class="cls-10" transform="translate(36 557)"><tspan x="0" y="0">Setup rev 49 + Brian&apos;s performer / icon revisions</tspan></text>
+      <text id="_11_x_8_in_2_of_2" data-name="11 x 8 in  /  2 of 2" class="cls-10" transform="translate(691.42 557)"><tspan class="cls-22" x="0" y="0">1</tspan><tspan x="4.1" y="0" xml:space="preserve">1 x 8 in  /  2 of 2</tspan></text>
+    </g>
+  </g>
+  <g id="_2_Input_list" data-name="2 / Input list">
+    <g id="Table_heading" data-name="Table heading">
+      <rect id="Table_heading_rect" data-name="Table heading / rect" class="cls-7" x="36" y="103" width="720" height="23"/>
+      <text id="PORT" class="cls-16" transform="translate(44 118)"><tspan x="0" y="0">PORT</tspan></text>
+      <text id="SOURCE" class="cls-16" transform="translate(84 118)"><tspan x="0" y="0">SOURCE</tspan></text>
+      <text id="POSITION" class="cls-16" transform="translate(241 118)"><tspan x="0" y="0">POSITION</tspan></text>
+      <text id="SIGNAL_INTERFACE" data-name="SIGNAL / INTERFACE" class="cls-16" transform="translate(356 118)"><tspan x="0" y="0">SIGNA</tspan><tspan class="cls-26" x="28.5" y="0">L</tspan><tspan class="cls-18" x="33.84" y="0" xml:space="preserve"> / INTER</tspan><tspan class="cls-27" x="68.34" y="0">F</tspan><tspan class="cls-11" x="73.35" y="0">ACE</tspan></text>
+      <text id="MIC_DI_STAND" data-name="MIC / DI / STAND" class="cls-16" transform="translate(568 118)"><tspan x="0" y="0">MIC / DI / S</tspan><tspan class="cls-21" x="46.5" y="0">T</tspan><tspan class="cls-11" x="51.34" y="0">AND</tspan></text>
+    </g>
+    <g id="Input_01" data-name="Input 01">
+      <rect id="Input_01_rect" data-name="Input 01 / rect" class="cls-1" x="36" y="126" width="720" height="20"/>
+      <text id="_01" data-name="01" class="cls-6" transform="translate(44 139.5)"><tspan x="0" y="0">01</tspan></text>
+      <text id="Ike_vocal" data-name="Ike vocal" class="cls-3" transform="translate(84 139.5)"><tspan x="0" y="0">Ike vocal</tspan></text>
+      <text id="Downstage_SL" data-name="Downstage SL" class="cls-3" transform="translate(241 139.5)"><tspan x="0" y="0">Downstage S</tspan><tspan class="cls-31" x="54.72" y="0">L</tspan></text>
+      <text id="XLR_microphone" data-name="XLR microphone" class="cls-3" transform="translate(356 139.5)"><tspan x="0" y="0">XLR microphone</tspan></text>
+      <text id="Beta_87A_owned_boom" data-name="Beta 87A (owned); boom" class="cls-3" transform="translate(568 139.5)"><tspan x="0" y="0">Beta 87</tspan><tspan class="cls-28" x="31.71" y="0">A</tspan><tspan class="cls-19" x="37.35" y="0" xml:space="preserve"> (owned); boom</tspan></text>
+      <line id="Input_01_path" data-name="Input 01 / path" class="cls-15" x1="36" y1="146" x2="756" y2="146"/>
+    </g>
+    <g id="Input_02" data-name="Input 02">
+      <text id="_02" data-name="02" class="cls-6" transform="translate(44 159.5)"><tspan x="0" y="0">02</tspan></text>
+      <text id="Jackson_vocal" data-name="Jackson vocal" class="cls-3" transform="translate(84 159.5)"><tspan x="0" y="0">Jackson vocal</tspan></text>
+      <text id="Stage_left" data-name="Stage left" class="cls-3" transform="translate(241 159.5)"><tspan x="0" y="0">Stage left</tspan></text>
+      <text id="XLR_microphone-2" data-name="XLR microphone" class="cls-3" transform="translate(356 159.5)"><tspan x="0" y="0">XLR microphone</tspan></text>
+      <text id="Model_TBC_boom" data-name="Model TBC; boom" class="cls-3" transform="translate(568 159.5)"><tspan x="0" y="0">Model</tspan><tspan class="cls-24" x="25.06" y="0"> </tspan><tspan class="cls-12" x="27.45" y="0">TBC; boom</tspan></text>
+      <line id="Input_02_path" data-name="Input 02 / path" class="cls-15" x1="36" y1="166" x2="756" y2="166"/>
+    </g>
+    <g id="Input_03" data-name="Input 03">
+      <rect id="Input_03_rect" data-name="Input 03 / rect" class="cls-1" x="36" y="166" width="720" height="20"/>
+      <text id="_03" data-name="03" class="cls-6" transform="translate(44 179.5)"><tspan x="0" y="0">03</tspan></text>
+      <text id="Joe_vocal" data-name="Joe vocal" class="cls-3" transform="translate(84 179.5)"><tspan x="0" y="0">Joe vocal</tspan></text>
+      <text id="Stage_right" data-name="Stage right" class="cls-3" transform="translate(241 179.5)"><tspan x="0" y="0">Stage right</tspan></text>
+      <text id="XLR_microphone-3" data-name="XLR microphone" class="cls-3" transform="translate(356 179.5)"><tspan x="0" y="0">XLR microphone</tspan></text>
+      <text id="Model_TBC_boom-2" data-name="Model TBC; boom" class="cls-3" transform="translate(568 179.5)"><tspan x="0" y="0">Model</tspan><tspan class="cls-24" x="25.06" y="0"> </tspan><tspan class="cls-12" x="27.45" y="0">TBC; boom</tspan></text>
+      <line id="Input_03_path" data-name="Input 03 / path" class="cls-15" x1="36" y1="186" x2="756" y2="186"/>
+    </g>
+    <g id="Input_04" data-name="Input 04">
+      <text id="_04" data-name="04" class="cls-6" transform="translate(44 199.5)"><tspan x="0" y="0">04</tspan></text>
+      <text id="Sam_vocal" data-name="Sam vocal" class="cls-3" transform="translate(84 199.5)"><tspan x="0" y="0">Sam vocal</tspan></text>
+      <text id="Drums_center" data-name="Drums / center" class="cls-3" transform="translate(241 199.5)"><tspan x="0" y="0">Drums / center</tspan></text>
+      <text id="XLR_microphone-4" data-name="XLR microphone" class="cls-3" transform="translate(356 199.5)"><tspan x="0" y="0">XLR microphone</tspan></text>
+      <text id="Model_TBC_boom-3" data-name="Model TBC; boom" class="cls-3" transform="translate(568 199.5)"><tspan x="0" y="0">Model</tspan><tspan class="cls-24" x="25.06" y="0"> </tspan><tspan class="cls-12" x="27.45" y="0">TBC; boom</tspan></text>
+      <line id="Input_04_path" data-name="Input 04 / path" class="cls-15" x1="36" y1="206" x2="756" y2="206"/>
+    </g>
+    <g id="Input_05" data-name="Input 05">
+      <rect id="Input_05_rect" data-name="Input 05 / rect" class="cls-1" x="36" y="206" width="720" height="20"/>
+      <text id="_05" data-name="05" class="cls-6" transform="translate(44 219.5)"><tspan x="0" y="0">05</tspan></text>
+      <text id="Cron_vocal" data-name="Cron vocal" class="cls-3" transform="translate(84 219.5)"><tspan x="0" y="0">Cron vocal</tspan></text>
+      <text id="Downstage_SR" data-name="Downstage SR" class="cls-3" transform="translate(241 219.5)"><tspan x="0" y="0">Downstage SR</tspan></text>
+      <text id="XLR_microphone-5" data-name="XLR microphone" class="cls-3" transform="translate(356 219.5)"><tspan x="0" y="0">XLR microphone</tspan></text>
+      <text id="Model_TBC_boom-4" data-name="Model TBC; boom" class="cls-3" transform="translate(568 219.5)"><tspan x="0" y="0">Model</tspan><tspan class="cls-24" x="25.06" y="0"> </tspan><tspan class="cls-12" x="27.45" y="0">TBC; boom</tspan></text>
+      <line id="Input_05_path" data-name="Input 05 / path" class="cls-15" x1="36" y1="226" x2="756" y2="226"/>
+    </g>
+    <g id="Input_06" data-name="Input 06">
+      <text id="_06" data-name="06" class="cls-6" transform="translate(44 239.5)"><tspan x="0" y="0">06</tspan></text>
+      <text id="Nord_keyboard" data-name="Nord keyboard" class="cls-3" transform="translate(84 239.5)"><tspan x="0" y="0">Nord keyboard</tspan></text>
+      <text id="Cron_downstage_SR" data-name="Cron / downstage SR" class="cls-3" transform="translate(241 239.5)"><tspan x="0" y="0">Cron / downstage SR</tspan></text>
+      <text id="_1_4-inch_output_1_run_saved" data-name="1/4-inch output; 1 run saved" class="cls-3" transform="translate(356 239.5)"><tspan x="0" y="0">1/4-inch output; 1 run saved</tspan></text>
+      <text id="DI_mono-stereo_TBC" data-name="DI / mono-stereo TBC" class="cls-3" transform="translate(568 239.5)"><tspan x="0" y="0">DI / mono-stereo</tspan><tspan class="cls-24" x="68.51" y="0"> </tspan><tspan x="70.91" y="0">TBC</tspan></text>
+      <line id="Input_06_path" data-name="Input 06 / path" class="cls-15" x1="36" y1="246" x2="756" y2="246"/>
+    </g>
+    <g id="Input_07" data-name="Input 07">
+      <rect id="Input_07_rect" data-name="Input 07 / rect" class="cls-1" x="36" y="246" width="720" height="20"/>
+      <text id="_07" data-name="07" class="cls-6" transform="translate(44 259.5)"><tspan x="0" y="0">07</tspan></text>
+      <text id="Jackson_guitar" data-name="Jackson guitar" class="cls-3" transform="translate(84 259.5)"><tspan x="0" y="0">Jackson guitar</tspan></text>
+      <text id="Stage_left-2" data-name="Stage left" class="cls-3" transform="translate(241 259.5)"><tspan x="0" y="0">Stage left</tspan></text>
+      <text id="Modeler_1_4-inch_main_out" data-name="Modeler 1/4-inch main out" class="cls-3" transform="translate(356 259.5)"><tspan x="0" y="0">Modeler 1/4-inch main out</tspan></text>
+      <text id="Balanced_feed_DI_TBC" data-name="Balanced feed / DI TBC" class="cls-3" transform="translate(568 259.5)"><tspan x="0" y="0">Balanced feed / DI</tspan><tspan class="cls-24" x="75.69" y="0"> </tspan><tspan class="cls-12" x="78.09" y="0">TBC</tspan></text>
+      <line id="Input_07_path" data-name="Input 07 / path" class="cls-15" x1="36" y1="266" x2="756" y2="266"/>
+    </g>
+    <g id="Input_08" data-name="Input 08">
+      <text id="_08" data-name="08" class="cls-6" transform="translate(44 279.5)"><tspan x="0" y="0">08</tspan></text>
+      <text id="Joe_guitar" data-name="Joe guitar" class="cls-3" transform="translate(84 279.5)"><tspan x="0" y="0">Joe guitar</tspan></text>
+      <text id="Stage_right-2" data-name="Stage right" class="cls-3" transform="translate(241 279.5)"><tspan x="0" y="0">Stage right</tspan></text>
+      <text id="Modeler_1_4-inch_main_out-2" data-name="Modeler 1/4-inch main out" class="cls-3" transform="translate(356 279.5)"><tspan x="0" y="0">Modeler 1/4-inch main out</tspan></text>
+      <text id="Balanced_feed_DI_TBC-2" data-name="Balanced feed / DI TBC" class="cls-3" transform="translate(568 279.5)"><tspan x="0" y="0">Balanced feed / DI</tspan><tspan class="cls-24" x="75.69" y="0"> </tspan><tspan class="cls-12" x="78.09" y="0">TBC</tspan></text>
+      <line id="Input_08_path" data-name="Input 08 / path" class="cls-15" x1="36" y1="286" x2="756" y2="286"/>
+    </g>
+    <g id="Input_09" data-name="Input 09">
+      <rect id="Input_09_rect" data-name="Input 09 / rect" class="cls-1" x="36" y="286" width="720" height="20"/>
+      <text id="_09" data-name="09" class="cls-6" transform="translate(44 299.5)"><tspan x="0" y="0">09</tspan></text>
+      <text id="Bass_DI" data-name="Bass DI" class="cls-3" transform="translate(84 299.5)"><tspan x="0" y="0">Bass DI</tspan></text>
+      <text id="Ike_downstage_SL" data-name="Ike / downstage SL" class="cls-3" transform="translate(241 299.5)"><tspan x="0" y="0">Ike / downstage S</tspan><tspan class="cls-31" x="73.13" y="0">L</tspan></text>
+      <text id="XLR_from_DI" data-name="XLR from DI" class="cls-3" transform="translate(356 299.5)"><tspan x="0" y="0">XLR from DI</tspan></text>
+      <text id="DI_model_phantom_TBC" data-name="DI model / phantom TBC" class="cls-3" transform="translate(568 299.5)"><tspan x="0" y="0">DI model / phantom</tspan><tspan class="cls-24" x="80.28" y="0"> </tspan><tspan x="82.68" y="0">TBC</tspan></text>
+      <line id="Input_09_path" data-name="Input 09 / path" class="cls-15" x1="36" y1="306" x2="756" y2="306"/>
+    </g>
+    <g id="Input_13" data-name="Input 13">
+      <text id="_13" data-name="13" class="cls-6" transform="translate(44 319.5)"><tspan x="0" y="0">13</tspan></text>
+      <text id="Overhead_R" data-name="Overhead R" class="cls-3" transform="translate(84 319.5)"><tspan x="0" y="0">Overhead R</tspan></text>
+      <text id="Drums" class="cls-3" transform="translate(241 319.5)"><tspan x="0" y="0">Drums</tspan></text>
+      <text id="XLR_microphone-6" data-name="XLR microphone" class="cls-3" transform="translate(356 319.5)"><tspan x="0" y="0">XLR microphone</tspan></text>
+      <text id="Model_phantom_TBC_tall_boom" data-name="Model / phantom TBC; tall boom" class="cls-3" transform="translate(568 319.5)"><tspan x="0" y="0">Model / phantom</tspan><tspan class="cls-24" x="68.53" y="0"> </tspan><tspan class="cls-12" x="70.92" y="0">TBC; tall boom</tspan></text>
+      <line id="Input_13_path" data-name="Input 13 / path" class="cls-15" x1="36" y1="326" x2="756" y2="326"/>
+    </g>
+    <g id="Input_14" data-name="Input 14">
+      <rect id="Input_14_rect" data-name="Input 14 / rect" class="cls-1" x="36" y="326" width="720" height="20"/>
+      <text id="_14" data-name="14" class="cls-6" transform="translate(44 339.5)"><tspan x="0" y="0">14</tspan></text>
+      <text id="Overhead_L" data-name="Overhead L" class="cls-3" transform="translate(84 339.5)"><tspan x="0" y="0">Overhead </tspan><tspan class="cls-31" x="42.96" y="0">L</tspan></text>
+      <text id="Drums-2" data-name="Drums" class="cls-3" transform="translate(241 339.5)"><tspan x="0" y="0">Drums</tspan></text>
+      <text id="XLR_microphone-7" data-name="XLR microphone" class="cls-3" transform="translate(356 339.5)"><tspan x="0" y="0">XLR microphone</tspan></text>
+      <text id="Model_phantom_TBC_tall_boom-2" data-name="Model / phantom TBC; tall boom" class="cls-3" transform="translate(568 339.5)"><tspan x="0" y="0">Model / phantom</tspan><tspan class="cls-24" x="68.53" y="0"> </tspan><tspan class="cls-12" x="70.92" y="0">TBC; tall boom</tspan></text>
+      <line id="Input_14_path" data-name="Input 14 / path" class="cls-15" x1="36" y1="346" x2="756" y2="346"/>
+    </g>
+    <g id="Input_15" data-name="Input 15">
+      <text id="_15" data-name="15" class="cls-6" transform="translate(44 359.5)"><tspan x="0" y="0">15</tspan></text>
+      <text id="Snare" class="cls-3" transform="translate(84 359.5)"><tspan x="0" y="0">Snare</tspan></text>
+      <text id="Drums-3" data-name="Drums" class="cls-3" transform="translate(241 359.5)"><tspan x="0" y="0">Drums</tspan></text>
+      <text id="XLR_microphone-8" data-name="XLR microphone" class="cls-3" transform="translate(356 359.5)"><tspan x="0" y="0">XLR microphone</tspan></text>
+      <text id="Model_TBC_low_boom" data-name="Model TBC; low boom" class="cls-3" transform="translate(568 359.5)"><tspan x="0" y="0">Model</tspan><tspan class="cls-24" x="25.06" y="0"> </tspan><tspan class="cls-12" x="27.45" y="0">TBC; low boom</tspan></text>
+      <line id="Input_15_path" data-name="Input 15 / path" class="cls-15" x1="36" y1="366" x2="756" y2="366"/>
+    </g>
+    <g id="Input_16" data-name="Input 16">
+      <rect id="Input_16_rect" data-name="Input 16 / rect" class="cls-1" x="36" y="366" width="720" height="20"/>
+      <text id="_16" data-name="16" class="cls-6" transform="translate(44 379.5)"><tspan x="0" y="0">16</tspan></text>
+      <text id="Kick" class="cls-3" transform="translate(84 379.5)"><tspan x="0" y="0">Kick</tspan></text>
+      <text id="Drums-4" data-name="Drums" class="cls-3" transform="translate(241 379.5)"><tspan x="0" y="0">Drums</tspan></text>
+      <text id="XLR_microphone-9" data-name="XLR microphone" class="cls-3" transform="translate(356 379.5)"><tspan x="0" y="0">XLR microphone</tspan></text>
+      <text id="Model_TBC_short_boom" data-name="Model TBC; short boom" class="cls-3" transform="translate(568 379.5)"><tspan x="0" y="0">Model</tspan><tspan class="cls-24" x="25.06" y="0"> </tspan><tspan class="cls-12" x="27.45" y="0">TBC; short boom</tspan></text>
+      <line id="Input_16_path" data-name="Input 16 / path" class="cls-15" x1="36" y1="386" x2="756" y2="386"/>
+      <text id="_13_connected_sources._SD16_ports_10-12_are_unassigned_in_this_snapshot._R_L_overhead_names_retain_source_labels." data-name="13 connected sources. SD16 ports 10-12 are unassigned in this snapshot. R/L overhead names retain source labels." class="cls-8" transform="translate(36 402)"><tspan x="0" y="0">13 connected sources. SD16 ports 10-12 are unassigned in this snapshot. R/</tspan><tspan class="cls-30" x="306.69" y="0">L</tspan><tspan x="311.36" y="0" xml:space="preserve"> overhead names retain source labels.</tspan></text>
+    </g>
+  </g>
+  <g id="_2_Audio_advance_notes" data-name="2 / Audio advance notes">
+    <g id="Audio_notes" data-name="Audio notes">
+      <text id="MONITORS_POWER" data-name="MONITORS + POWER" class="cls-17" transform="translate(36 428)"><tspan x="0" y="0">MONI</tspan><tspan class="cls-23" x="26.11" y="0">T</tspan><tspan x="32.04" y="0">ORS + POWER</tspan></text>
+      <text id="MA400_headphone_amp_at_drums_saved_SD16_outputs_1_2_feed_its_monitor_input." data-name="MA400 headphone amp at drums; saved SD16 outputs 1/2 feed its monitor input." class="cls-2" transform="translate(36 444)"><tspan x="0" y="0">MA400 headphone amp at drums; saved SD16 outputs 1/2 feed its monitor input.</tspan></text>
+      <text id="Confirm_all_performers_mixes_IEM_wedge_choice_return_patch_AC_drops_and_load." data-name="Confirm all performers&amp;apos; mixes, IEM/wedge choice, return patch, AC drops and load." class="cls-2" transform="translate(36 459)"><tspan x="0" y="0">Confirm all performers&apos; mixes, IEM/wedge choice, return patch,</tspan><tspan class="cls-27" x="264.74" y="0"> </tspan><tspan x="266.86" y="0">AC drops and load.</tspan></text>
+      <text id="HOUSE_INTERFACE_PHANTOM" data-name="HOUSE INTERFACE + PHANTOM" class="cls-17" transform="translate(36 477)"><tspan x="0" y="0">HOUSE INTER</tspan><tspan class="cls-27" x="68.34" y="0">F</tspan><tspan x="73.9" y="0">ACE + PHAN</tspan><tspan class="cls-23" x="134.75" y="0">T</tspan><tspan x="140.68" y="0">OM</tspan></text>
+      <text id="Confirm_band-supplied_X32_SD16_snake_FOH_split_or_handoff_gain_and_phantom_responsibility." data-name="Confirm band-supplied X32 / SD16 / snake, FOH split or handoff, gain and phantom responsibility." class="cls-2" transform="translate(36 493)"><tspan x="0" y="0">Confirm band-supplied X32 / SD16 / snake, FOH split or hando</tspan><tspan class="cls-25" x="265.08" y="0">f</tspan><tspan x="267.55" y="0">f, gain and phantom responsibilit</tspan><tspan class="cls-20" x="404.33" y="0">y</tspan><tspan x="408.38" y="0">.</tspan></text>
+      <text id="Ike_vocal_remains_input_1_Cron_vocal_remains_input_5._Ike_s_Beta_87A_requires_phantom." data-name="Ike vocal remains input 1; Cron vocal remains input 5. Ike&amp;apos;s Beta 87A requires phantom." class="cls-2" transform="translate(36 508)"><tspan x="0" y="0">Ike vocal remains input 1; Cron vocal remains input 5. Ike&apos;s Beta 87</tspan><tspan class="cls-27" x="283.26" y="0">A</tspan><tspan x="289.08" y="0" xml:space="preserve"> requires phantom.</tspan></text>
+      <text id="Backline:_instrument_drum_stand_supply_is_a_separate_advance._This_sheet_is_not_a_rental_order." data-name="Backline: instrument / drum / stand supply is a separate advance. This sheet is not a rental order." class="cls-2" transform="translate(36 523)"><tspan x="0" y="0">Backline: instrument / drum / stand supply is a separate advance.</tspan><tspan class="cls-23" x="274.59" y="0"> </tspan><tspan x="277.06" y="0">This sheet is not a rental orde</tspan><tspan class="cls-29" x="402.21" y="0">r</tspan><tspan x="404.85" y="0">.</tspan></text>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,10 @@
+import {readFileSync} from 'node:fs';
+import {randomUUID} from 'node:crypto';
+const connection=JSON.parse(readFileSync('tmp/blender-integration/connection.json','utf8'));
+const url=`${connection.appUrl}/api/setups/${connection.setupId}/blender-items`;
+const headers={Authorization:`Swell ${connection.token}`,'Content-Type':'application/json'};
+const snapshot=await (await fetch(url,{headers})).json();
+const first=snapshot.items.find(i=>i.nodeId==='verification-box');
+const patch={schemaVersion:1,setupId:connection.setupId,baseRevision:snapshot.revision,clientId:randomUUID(),mutationId:randomUUID(),changes:[{nodeId:first.nodeId,pose:{centerXMeters:7.5*.3048+first.footprint.widthMeters/2}}]};
+const response=await fetch(url,{method:'PATCH',headers,body:JSON.stringify(patch)});
+console.log(JSON.stringify({status:response.status,result:await response.json()}));
