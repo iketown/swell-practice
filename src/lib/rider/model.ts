@@ -215,6 +215,7 @@ export type Input = Plot["inputs"][number];
 export type Gear = Plot["gear"][number];
 export type Provider = Gear["provider"];
 export type Published = {
+  releaseCode?: string;
   releaseNumber?: number;
   revision: number;
   date: string;

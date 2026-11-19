@@ -33,10 +33,7 @@ import { moveStandPair } from "@/lib/rider/instrument-stands";
 import { boxFrame, boxColors } from "@/lib/rider/stage-box";
 import { riderRequest } from "@/lib/rider/version-client";
 import { standardVersionId, versionHref } from "@/lib/rider/versions";
-import {
-  isCurrentPrint,
-  type PrintedVersion,
-} from "@/lib/rider/printed-version";
+import { checkHref } from "@/lib/rider/releases";
 import {
   stageViews,
   viewLayers,
@@ -114,12 +111,12 @@ export function RiderWorkspace({
   initial,
   privateMode,
   editorUid = "",
-  scanned,
+  issuedPacket,
 }: {
   initial: Published;
   privateMode?: "edit" | "history";
   editorUid?: string;
-  scanned?: PrintedVersion;
+  issuedPacket?: Packet;
 }) {
   const admin = useAdmin();
   const allowed =
@@ -148,15 +145,15 @@ export function RiderWorkspace({
   const [view, setView] = useState<StageView>("Overview");
   const [layers, setLayers] = useState(defaultLayers),
     [routeId, setRouteId] = useState<string | null>(null),
-    [packet, setPacket] = useState<Packet>("Full rider"),
+    [packet, setPacket] = useState<Packet>(issuedPacket ?? "Full rider"),
     [provider, setProvider] = useState("All suppliers"),
     [station, setStation] = useState("All stations");
   const [equipmentHover, setEquipmentHover] = useState<string[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null),
     [confirmReset, setConfirmReset] = useState(false);
   const [printBusy, setPrintBusy] = useState(false);
-  const [pages, setPages] = useState<readonly RiderPage[]>(privateMode ? [...riderPages, ...setupPages] : riderPages);
-  const released = !!record.releaseNumber;
+  const [pages, setPages] = useState<readonly RiderPage[]>(privateMode ? [...riderPages, ...setupPages] : issuedPacket === "Backline" ? ["Stage plot", "Equipment advance"] : riderPages);
+  const released = !!record.releaseNumber || !!record.releaseCode;
   const staleDraft = released && !!draft && draft.revision !== record.revision;
   const printOptions = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
@@ -189,7 +186,7 @@ export function RiderWorkspace({
   const legacyKey = "swell-stage-plot:draft:" + editorUid;
   const storageKey = legacyKey + ":" + initial.versionId;
   useEffect(() => {
-    if (privateMode || !released) return;
+    if (issuedPacket || privateMode || !released) return;
     async function refresh() {
       try {
         const res = await fetch("/api/stage-plot", { cache: "no-store" });
@@ -202,7 +199,7 @@ export function RiderWorkspace({
     }
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
-  }, [privateMode, released]);
+  }, [issuedPacket, privateMode, released]);
   useEffect(() => {
     if (!editing || !draft || draft === record) return;
     const persist = () => {
@@ -292,7 +289,14 @@ export function RiderWorkspace({
     if (printOptions.current) printOptions.current.open = false;
     setPrintBusy(true);
     try {
-      if (!privateMode && released)
+      if (issuedPacket && initial.releaseCode) {
+        const res = await fetch("/api/stage-plot?code=" + encodeURIComponent(initial.releaseCode), { cache: "no-store" });
+        if (res.status === 409 || res.status === 404) {
+          window.location.assign(checkHref(initial.releaseCode, packet));
+          return;
+        }
+        if (!res.ok) throw Error("Could not verify this edition. Please try printing again.");
+      } else if (!privateMode && released)
         try {
           const res = await fetch("/api/stage-plot", {
             cache: "no-store",
@@ -530,7 +534,6 @@ export function RiderWorkspace({
       }
     } else if (p.inputs.some((i) => i.id === id)) setTab("Input key");
   }
-  const matchesPrint = released && scanned && isCurrentPrint(scanned, record);
   return (
     <main className={"rider" + (tab === "Equipment" ? " equipment-view" : "")}>
       <div className="rider-screen">
@@ -552,31 +555,11 @@ export function RiderWorkspace({
             ← Stage plot versions
           </a>
         )}
-        {released && scanned && (
-          <aside
-            className={"scan-status " + (matchesPrint ? "current" : "outdated")}
-            role="status"
-          >
-            <div>
-              <strong>
-                {matchesPrint
-                  ? "YOU HAVE THE MOST RECENT VERSION"
-                  : "YOUR STAGE PLOT IS OUT OF DATE"}
-              </strong>
-              {!matchesPrint && <p>Please print the new version.</p>}
-            </div>
-            {!matchesPrint && (
-              <button className="primary" onClick={print} disabled={printBusy}>
-                <Printer /> Print
-              </button>
-            )}
-          </aside>
-        )}
         <header className="rider-top">
           <div className="rider-heading">
             <h1>Stage Plot</h1>
             <p>
-              {privateMode ? record.versionName + " · " : ""}
+              {privateMode || issuedPacket ? record.versionName + " · " : ""}
               {p.configuration} · {p.width} × {p.depth} ft
             </p>
           </div>
@@ -586,13 +569,13 @@ export function RiderWorkspace({
               <time dateTime={record.date}>{dateLabel(record.date)}</time>
             </span>
             <small>
-              {!released
+              {issuedPacket ? "Issued · " + record.releaseCode : !released
                 ? "Version 1 draft"
                 : privateMode
                   ? (editing ? "Editing" : "Saved") +
                     " · Rev " +
                     (editing ? draft!.revision : record.versionRevision)
-                  : "Published · Version " + record.releaseNumber}
+                  : "Issued · " + record.releaseCode}
             </small>
           </div>
           <div className="rider-print-control">
@@ -740,7 +723,7 @@ export function RiderWorkspace({
                         : "Save draft"}
                   </button>
                 </>
-              ) : privateMode === "history" ? null : (
+              ) : privateMode === "history" || issuedPacket ? null : (
                 <button disabled={busy} onClick={() => edit()}>
                   <Pencil size={15} />
                   Edit plot
@@ -1422,8 +1405,8 @@ export function RiderWorkspace({
             height={34}
             unoptimized
           />
-          <a href={canonical}>
-            Latest rider <ArrowUpRight size={14} />
+          <a href={record.releaseCode ? checkHref(record.releaseCode, packet) : canonical}>
+            Check rider <ArrowUpRight size={14} />
           </a>
         </footer>
         {editing && target && (

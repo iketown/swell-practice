@@ -18,6 +18,7 @@ import {
   type RevisionSummary,
 } from "@/lib/rider/versions";
 import type { Published } from "@/lib/rider/model";
+import { ReleaseRegister, IssueDialog } from "./release-manager";
 import { RiderWorkspace } from "./rider-workspace";
 
 type Selection = Pick<VersionSummary, "id" | "name" | "revision">;
@@ -127,27 +128,11 @@ function LibraryBody({ uid, version, revision }: Location & { uid: string }) {
       setBusy(false);
     }
   }
-  async function makeDefault() {
-    if (!publish || !list) return;
-    setBusy(true);
+  function saved(message: string) {
     setError("");
-    try {
-      await riderRequest("", {
-        action: "publish",
-        id: publish.id,
-        revision: publish.revision,
-        publicRevision: list.current.publicRevision,
-      });
-      setMessage(
-        publish.name + " · Rev " + publish.revision + " is the public default.",
-      );
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setPublish(null);
-      setReload((n) => n + 1);
-      setBusy(false);
-    }
+    setMessage(message);
+    setPublish(null);
+    setReload((n) => n + 1);
   }
   if (version && record)
     return (
@@ -173,21 +158,29 @@ function LibraryBody({ uid, version, revision }: Location & { uid: string }) {
         <button disabled={busy} onClick={() => startCopy(item)}>
           <Copy /> Duplicate
         </button>
-        {live ? (
+        {live && (
           <span className="default-mark">
             <Check /> Public default
           </span>
-        ) : (
+        )}
+        {!list?.releases.some(
+          (row) =>
+            row.id === item.id &&
+            row.revision === item.revision &&
+            row.replacement,
+        ) && (
           <button
             disabled={busy}
             onClick={() => {
               setCopy(null);
               setPublish(item);
-              setError("");
-              setMessage("");
             }}
           >
-            {list?.current.releaseNumber ? "Make default" : "Publish version 1"}
+            {list?.releases.some(
+              (row) => row.id === item.id && row.revision === item.revision,
+            )
+              ? "Manage edition"
+              : "Issue rider"}
           </button>
         )}
       </div>
@@ -214,7 +207,7 @@ function LibraryBody({ uid, version, revision }: Location & { uid: string }) {
                 </a>
               </>
             ) : (
-              "Version 1 is in draft."
+              "The public default is a working draft."
             )}
           </p>
         )}
@@ -239,12 +232,20 @@ function LibraryBody({ uid, version, revision }: Location & { uid: string }) {
         {!list && !error && (
           <p role="status">Loading {version ? "revision" : "versions"}…</p>
         )}
-        {(copy || publish) && (
+        {publish && list && (
+          <IssueDialog
+            item={publish}
+            list={list}
+            close={() => setPublish(null)}
+            saved={saved}
+          />
+        )}
+        {copy && (
           <dialog
             ref={(node) => {
               if (node && !node.open) node.showModal();
             }}
-            aria-label={copy ? "Duplicate version" : "Choose public default"}
+            aria-label="Duplicate version"
             className="version-dialog"
             onCancel={(e) => {
               if (busy) e.preventDefault();
@@ -254,80 +255,46 @@ function LibraryBody({ uid, version, revision }: Location & { uid: string }) {
               }
             }}
           >
-            {copy ? (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  duplicate();
-                }}
-              >
-                <h2>Duplicate version</h2>
-                <p>
-                  Copy {copy.name} · Rev {copy.revision}
-                </p>
-                <label className="rider-field">
-                  Version name
-                  <input
-                    autoFocus
-                    required
-                    maxLength={80}
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                </label>
-                {error && <p role="alert">{error}</p>}
-                <div className="version-actions">
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => setCopy(null)}
-                  >
-                    Cancel
-                  </button>
-                  <button className="primary" disabled={busy || !name.trim()}>
-                    {busy ? "Creating…" : "Create copy"}
-                  </button>
-                </div>
-              </form>
-            ) : (
-              publish && (
-                <>
-                  <h2>
-                    {list?.current.releaseNumber
-                      ? "Make this the public default?"
-                      : "Publish version 1?"}
-                  </h2>
-                  <p>
-                    Anyone visiting theswell.live/stage-plot will see and print{" "}
-                    <strong>
-                      {publish.name} · Rev {publish.revision}
-                    </strong>
-                    .{" "}
-                    {list?.current.releaseNumber
-                      ? ""
-                      : "Printed revision checks will turn on."}
-                  </p>
-                  <div className="version-actions">
-                    <button disabled={busy} onClick={() => setPublish(null)}>
-                      Cancel
-                    </button>
-                    <button
-                      className="primary"
-                      disabled={busy}
-                      onClick={makeDefault}
-                    >
-                      {busy
-                        ? "Publishing…"
-                        : list?.current.releaseNumber
-                          ? "Publish as default"
-                          : "Publish version 1"}
-                    </button>
-                  </div>
-                </>
-              )
-            )}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                duplicate();
+              }}
+            >
+              <h2>Duplicate version</h2>
+              <p>
+                Copy {copy.name} · Rev {copy.revision}
+              </p>
+              <label className="rider-field">
+                Version name
+                <input
+                  autoFocus
+                  required
+                  maxLength={80}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </label>
+              {error && <p role="alert">{error}</p>}
+              <div className="version-actions">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setCopy(null)}
+                >
+                  Cancel
+                </button>
+                <button className="primary" disabled={busy || !name.trim()}>
+                  {busy ? "Creating…" : "Create copy"}
+                </button>
+              </div>
+            </form>
           </dialog>
         )}
+        {list && (
+          <ReleaseRegister list={list} manage={setPublish} saved={saved} />
+        )}
+        <h2>Saved setups</h2>
         {list?.versions.map((item) => (
           <section className="version-row" key={item.id}>
             <div className="version-main">

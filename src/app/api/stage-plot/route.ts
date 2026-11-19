@@ -1,5 +1,10 @@
 import { ServerRouteError } from "@/lib/server/admin-auth";
-import { readRider } from "@/lib/server/stage-rider";
+import { releaseCode } from "@/lib/rider/releases";
+import {
+  publicReleaseList,
+  readIssuedRider,
+  readRider,
+} from "@/lib/server/stage-rider";
 import {
   requireRiderAdmin,
   riderFailure,
@@ -8,6 +13,18 @@ import {
 
 export async function GET(request: Request) {
   try {
+    const code = new URL(request.url).searchParams.get("code");
+    if (code !== null) {
+      if (!releaseCode.safeParse(code).success)
+        throw new ServerRouteError("Invalid code.", 400);
+      const release = (await publicReleaseList()).find(
+        (row) => row.code === code,
+      );
+      if (!release) throw new ServerRouteError("Unknown edition.", 404);
+      if (release.replacement)
+        throw new ServerRouteError("An updated edition is required.", 409);
+      return riderJson(await readIssuedRider(release));
+    }
     const internal = new URL(request.url).searchParams.get("workspace") === "1";
     if (internal) await requireRiderAdmin(request);
     return riderJson(await readRider(internal));

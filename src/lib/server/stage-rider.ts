@@ -4,6 +4,11 @@ import { getServerFirestore } from "./firebase-admin";
 import { ServerRouteError } from "./admin-auth";
 import { initialRider } from "@/lib/rider/seed";
 import { plotSchema, type Published } from "@/lib/rider/model";
+import {
+  replaceCopies,
+  type RiderRelease,
+  type Delivery,
+} from "@/lib/rider/releases";
 import { updateEstimatedInputXlr } from "@/lib/rider/input-xlr";
 import {
   standardVersionId,
@@ -17,6 +22,71 @@ const currentDoc = () => getServerFirestore().doc("stageRiders/current");
 const versions = () => currentDoc().collection("versions");
 const revisionDoc = (id: string, revision: number) =>
   versions().doc(id).collection("revisions").doc(String(revision));
+const registryDoc = () =>
+  currentDoc().collection("publication").doc("registry");
+const deliveries = () => currentDoc().collection("deliveries");
+
+function defaultCode(pub: DocumentSnapshot): string | undefined {
+  if (!pub.get("releaseNumber")) return undefined;
+  return pub.get("releaseCode") ?? "public-" + pub.get("revision");
+}
+
+function registryRows(
+  registry: DocumentSnapshot,
+  pub: DocumentSnapshot,
+): RiderRelease[] {
+  if (registry.exists) return registry.get("releases");
+  const code = defaultCode(pub);
+  if (!code) return [];
+  // Older installations only recorded the identity of their last public default.
+  return [
+    {
+      code,
+      id: pub.get("versionId") ?? standardVersionId,
+      name: pub.get("versionName") ?? "Standard setup",
+      revision: pub.get("versionRevision") ?? pub.get("revision"),
+      date: pub.get("date"),
+      legacyPublicRevision: pub.get("revision"),
+      replacement: null,
+    },
+  ];
+}
+
+export async function publicReleaseList() {
+  return getServerFirestore().runTransaction(
+    async (tx) => {
+      const [registry, pub] = await tx.getAll(registryDoc(), currentDoc(), {
+        fieldMask: [
+          "releases",
+          "releaseNumber",
+          "releaseCode",
+          "revision",
+          "versionId",
+          "versionName",
+          "versionRevision",
+          "date",
+        ],
+      });
+      return registryRows(registry, pub);
+    },
+    { readOnly: true },
+  );
+}
+
+export async function readIssuedRider(
+  release: RiderRelease,
+): Promise<Published> {
+  const saved = snapshot(await revisionDoc(release.id, release.revision).get());
+  return {
+    ...saved,
+    versionId: release.id,
+    versionName: release.name,
+    versionRevision: release.revision,
+    releaseCode: release.code,
+    plot: { ...saved.plot, cables: [], cableNodes: [] },
+  };
+}
+
 const today = () => new Date().toISOString().slice(0, 10);
 const missing = () =>
   new ServerRouteError(
@@ -43,6 +113,7 @@ export async function readRider(internal = false): Promise<Published> {
   const record = doc.exists ? snapshot(doc) : initialRider();
   return {
     ...record,
+    releaseCode: defaultCode(doc),
     releaseNumber: doc.get("releaseNumber") ?? 0,
     versionId: doc.get("versionId") ?? standardVersionId,
     versionName: doc.get("versionName") ?? "Standard setup",
@@ -87,9 +158,11 @@ export async function listVersions(): Promise<VersionList> {
   await ensureRiderVersions();
   return getServerFirestore().runTransaction(
     async (tx) => {
-      const [pub, list] = await Promise.all([
+      const [pub, list, registry, sent] = await Promise.all([
         tx.get(currentDoc()),
         tx.get(versions()),
+        tx.get(registryDoc()),
+        tx.get(deliveries().orderBy("date", "desc")),
       ]);
       const rows: VersionSummary[] = list.docs.map((doc) => ({
         id: doc.id,
@@ -98,6 +171,8 @@ export async function listVersions(): Promise<VersionList> {
         revision: doc.get("revision"),
       }));
       return {
+        releases: registryRows(registry, pub),
+        deliveries: sent.docs.map((doc) => doc.data() as Delivery),
         versions: rows.sort(
           (a, b) =>
             b.date.localeCompare(a.date) || a.name.localeCompare(b.name),
@@ -134,15 +209,19 @@ export async function readVersion(
   revision?: number,
 ): Promise<Published> {
   await ensureRiderVersions();
-  const [version, publicState] = await Promise.all([
+  const [version, publicState, registry] = await Promise.all([
     versions().doc(id).get(),
     currentDoc().get(),
+    registryDoc().get(),
   ]);
   if (!version.exists) throw missing();
   const rev = revision ?? version.get("revision");
   const record = snapshot(await revisionDoc(id, rev).get());
   return {
     ...record,
+    releaseCode: registryRows(registry, publicState).find(
+      (r) => r.id === id && r.revision === rev,
+    )?.code,
     releaseNumber: publicState.get("releaseNumber") ?? 0,
     versionId: id,
     versionName: version.get("name"),
@@ -152,6 +231,33 @@ export async function readVersion(
 
 export async function changeVersion(action: VersionAction) {
   await ensureRiderVersions();
+  if (action.action === "sent") {
+    const receipt = deliveries().doc(action.operationId);
+    return getServerFirestore().runTransaction(async (tx) => {
+      const [registry, pub, existing] = await tx.getAll(
+        registryDoc(),
+        currentDoc(),
+        receipt,
+      );
+      const { code, date, recipient } = action;
+      if (existing.exists) {
+        if (
+          existing.get("code") !== code ||
+          existing.get("recipient") !== recipient ||
+          existing.get("date") !== date
+        )
+          throw new ServerRouteError(
+            "This delivery was already recorded with different details.",
+            409,
+          );
+        return { code };
+      }
+      if (!registryRows(registry, pub).some((row) => row.code === code))
+        throw missing();
+      tx.create(receipt, { code, date, recipient });
+      return { code };
+    });
+  }
   const version = versions().doc(action.id);
   const source = revisionDoc(action.id, action.revision);
   return getServerFirestore().runTransaction(async (tx) => {
@@ -161,10 +267,17 @@ export async function changeVersion(action: VersionAction) {
     if (action.action === "save") {
       const releaseNumber =
         (await tx.get(currentDoc())).get("releaseNumber") ?? 0;
-      if (releaseNumber && head.get("revision") !== action.revision)
+      if (
+        (releaseNumber || head.get("hasIssuedRider")) &&
+        head.get("revision") !== action.revision
+      )
         throw conflict();
       const revision = head.get("revision") + 1;
-      const record = { revision, plot: updateEstimatedInputXlr(action.plot), date };
+      const record = {
+        revision,
+        plot: updateEstimatedInputXlr(action.plot),
+        date,
+      };
       tx.create(revisionDoc(action.id, revision), record);
       tx.update(version, { revision, date });
       return {
@@ -203,30 +316,73 @@ export async function changeVersion(action: VersionAction) {
       return { id: copy.id };
     }
     const current = currentDoc();
-    const pub = await tx.get(current);
-    const released = pub.get("releaseNumber") ?? 0;
+    const [pub, registry] = await tx.getAll(current, registryDoc());
+    const rows = registryRows(registry, pub);
+    const existing = rows.find((row) => row.code === action.code);
     if (
-      released > 0 &&
-      pub.get("versionId") === action.id &&
-      pub.get("versionRevision") === action.revision
+      existing &&
+      (existing.id !== action.id ||
+        existing.revision !== action.revision ||
+        existing.replacement)
     )
-      return { publicRevision: pub.get("revision") as number };
-    if (pub.get("revision") !== action.publicRevision) {
       throw new ServerRouteError(
-        "The public default changed. Refresh the version list and choose again.",
+        "This code already belongs to an issued rider. Choose another code.",
         409,
       );
-    }
-    const publicRevision = action.publicRevision + 1;
-    tx.set(current, {
-      ...record,
-      revision: publicRevision,
-      releaseNumber: released + 1,
+    if (
+      rows.some(
+        (row) =>
+          row.id === action.id &&
+          row.revision === action.revision &&
+          row.code !== action.code,
+      )
+    )
+      throw new ServerRouteError(
+        "This saved revision already has a release code. Refresh the library.",
+        409,
+      );
+    const target: RiderRelease = existing ?? {
+      code: action.code,
+      id: action.id,
+      revision: action.revision,
+      name: head.get("name"),
       date,
-      versionId: action.id,
-      versionName: head.get("name"),
-      versionRevision: action.revision,
-    });
-    return { publicRevision };
+      replacement: null,
+    };
+    let next: RiderRelease[];
+    try {
+      next = replaceCopies(
+        existing ? rows : [...rows, target],
+        target,
+        action.replace,
+      );
+    } catch (error) {
+      throw new ServerRouteError((error as Error).message, 409);
+    }
+    const oldDefault = defaultCode(pub);
+    const updateDefault =
+      oldDefault !== target.code &&
+      (action.makeDefault ||
+        (!!oldDefault && action.replace.includes(oldDefault)));
+    if (updateDefault && pub.get("revision") !== action.publicRevision)
+      throw new ServerRouteError(
+        "The public default changed. Refresh and choose again.",
+        409,
+      );
+    if (updateDefault)
+      tx.set(current, {
+        ...record,
+        revision: action.publicRevision + 1,
+        releaseNumber: (pub.get("releaseNumber") ?? 0) + 1,
+        date,
+        releaseCode: target.code,
+        versionId: target.id,
+        versionName: target.name,
+        versionRevision: target.revision,
+      });
+    if (!head.get("hasIssuedRider"))
+      tx.update(version, { hasIssuedRider: true });
+    tx.set(registryDoc(), { releases: next });
+    return { code: target.code };
   });
 }

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { releaseCode, type Delivery, type RiderRelease } from "./releases";
 import { plotSchema } from "./model";
 
 export const standardVersionId = "standard";
@@ -18,9 +19,19 @@ export const versionAction = z.discriminatedUnion("action", [
   }),
   z.object({ action: z.literal("save"), ...ref, plot: plotSchema }),
   z.object({
-    action: z.literal("publish"),
+    action: z.literal("issue"),
+    code: releaseCode,
+    replace: z.array(releaseCode).max(200),
+    makeDefault: z.boolean(),
     ...ref,
     publicRevision: revisionSchema,
+  }),
+  z.object({
+    action: z.literal("sent"),
+    code: releaseCode,
+    recipient: z.string().trim().min(1).max(120),
+    date: z.iso.date(),
+    operationId: z.uuid(),
   }),
 ]);
 export type VersionAction = z.infer<typeof versionAction>;
@@ -40,6 +51,8 @@ export type DefaultVersion = {
 export type VersionList = {
   versions: VersionSummary[];
   current: DefaultVersion;
+  releases: RiderRelease[];
+  deliveries: Delivery[];
 };
 export function versionHref(id: string, revision?: number) {
   const query = new URLSearchParams({ version: id });

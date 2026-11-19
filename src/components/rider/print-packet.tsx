@@ -1,9 +1,11 @@
+import Image from "next/image";
 import {
-  canonical,
+
   byNumber,
   micFor,
   type Published,
 } from "@/lib/rider/model";
+import type { RecipientPacket } from "@/lib/rider/releases";
 import { printedUrl } from "@/lib/rider/printed-version";
 import { EquipmentAdvance } from "./equipment-advance";
 import { PrintQr, qrDataUrl } from "./print-qr";
@@ -11,7 +13,7 @@ import { CablePatchSchedule } from "./cable-patch-schedule";
 import { StandPlacementPanel } from "./stand-placement";
 import { viewLayers, defaultLayers } from "@/lib/rider/plot-layers";
 import { StageCanvas } from "./stage-canvas";
-export type Packet = "Full rider" | "Audio production" | "Backline";
+export type Packet = RecipientPacket;
 export const riderPages = [
   "Stage plot",
   "Equipment advance",
@@ -35,14 +37,11 @@ export function PrintPacket({
   unsaved?: boolean;
 }) {
   const { plot: p, revision, date } = record;
-  const savedIssue = !record.releaseNumber
-    ? "Version 1 draft"
-    : preview
-      ? "Version preview · Rev " + revision
-      : "Published · Version " + record.releaseNumber;
-  const issue = unsaved ? "Unsaved draft" : savedIssue;
+  const code = unsaved ? undefined : record.releaseCode;
+  const issue = code ? "Issued · " + code : unsaved ? "Unsaved draft" : "Working draft · Rev " + revision;
   const dateText = unsaved ? "Based on " + date : date;
-  const qrUrl = unsaved ? canonical : printedUrl(record, preview);
+  const qrUrl = printedUrl(code, packet);
+  const visibleUrl = qrUrl.replace("https://", "");
   const title = (name: string) => (
     <header className="print-title">
       <div>
@@ -62,19 +61,19 @@ export function PrintPacket({
   return (
     <article className="rider-print">
       <style>{`@page {size: letter landscape; margin: .25in .25in 1.3in;
-        @bottom-left { width:75%; margin-left:.5in; border-top:.7pt solid #506562; padding-top:8pt; vertical-align:top; white-space:pre-line; content:${JSON.stringify("THE SWELL · Latest rider: theswell.live/stage-plot\n" + issue + " · " + record.versionName + " · " + dateText).replaceAll("\\n", "\\A ")}; font:9pt Arial; line-height:1.4; }
+        @bottom-left { width:75%; margin-left:.5in; border-top:.7pt solid #506562; padding-top:8pt; vertical-align:top; white-space:pre-line; content:${JSON.stringify("THE SWELL · " + visibleUrl + "\n" + issue + " · " + record.versionName + " · " + dateText).replaceAll("\\n", "\\A ")}; font:9pt Arial; line-height:1.4; }
         @bottom-right { width:15%; margin-right:.5in; border-top:.7pt solid #506562; padding-top:8pt; vertical-align:top; content:url("${qrDataUrl(qrUrl)}"); }
         @bottom-center { width:10%; white-space:nowrap; vertical-align:bottom; padding-bottom:5pt; content:"Page " counter(page); font:8pt Arial; }
       }`}</style>
       <footer className="print-version-footer">
         <div>
           <strong>
-            {record.releaseNumber && !unsaved
+            {code
               ? "Check your printed revision"
               : "Online stage plot"}
           </strong>
           <span>
-            Latest rider · <a href={canonical}>theswell.live/stage-plot</a>
+            <a href={qrUrl}>{visibleUrl}</a>
           </span>
           <small>
             {issue} · {record.versionName} · {dateText}
@@ -82,6 +81,20 @@ export function PrintPacket({
         </div>
         <PrintQr url={qrUrl} label={unsaved ? "Open the latest rider online" : "Check this printed revision online"} />
       </footer>
+      <section className="print-sheet print-cover">
+        <Image alt="The Swell" src="/swell-logo-horizontal-stripes.svg" width={190} height={85} unoptimized priority />
+        <h1>Technical rider</h1>
+        <h2>{record.versionName} · {packet}</h2>
+        <p>{issue} · {dateText}</p>
+        <div className="cover-check">
+          <PrintQr url={qrUrl} label="Check this rider online" />
+          <div>
+            <strong>Before working from this rider, please check this link to make sure you have the latest and correct tech rider.</strong>
+            <a href={qrUrl}>{visibleUrl}</a>
+            {!code && <p>Working copy. Request an issued edition before advancing the show.</p>}
+          </div>
+        </div>
+      </section>
       {pages.includes("Stage plot") && (
         <section className="print-sheet print-diagram-sheet">
           {title("Stage plot")}
