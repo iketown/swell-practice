@@ -125,7 +125,7 @@ export function applyRackMap(p: Plot, map: RackMap): Plot {
         return {
           ...row,
           spec: "Balanced XLR female to XLR male",
-          notes: `${mix.name} bus ${side + 1} → ${mix.device} XLR Out ${mix.out + (side % 2)} → IEM TX ${mix.tx} ${side % 2 ? "R" : "L"}. Confirm cable supplier and length.`,
+          notes: `${mix.name} bus ${side + 1} → ${mix.device} XLR Out ${mix.out + (side % 2)} → IEM TX ${mix.tx} ${side % 2 ? "R" : "L"}. Confirm cable length.`,
         };
     }
     return row;
