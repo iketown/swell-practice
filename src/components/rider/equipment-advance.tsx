@@ -28,7 +28,7 @@ function combineCableLengths(rows: Requirement[]): Requirement[] {
   for (const row of result) row.cableLengths?.sort((a, b) => (Number.parseFloat(b.spec) || 0) - (Number.parseFloat(a.spec) || 0) || a.spec.localeCompare(b.spec));
   return result;
 }
-const categories = ["Instruments", "Drums", "Stands and hardware", "Drum microphones", "Microphones and DI boxes", "Cables and stage boxes", "Monitors and audio systems", "Stage, risers and power", "Personnel", "Accessories and other equipment"] as const;
+const categories = ["Instruments", "Drums", "Stands and hardware", "Drum microphones", "Microphones and DI boxes", "Side Stage Cables", "Main Stage Cables", "Analog Drop Snakes", "Monitors and audio systems", "Stage, risers and power", "Personnel", "Accessories and other equipment"] as const;
 type Category = typeof categories[number];
 function isDrumMicrophone(g: Plot["gear"][number], plot: Plot) {
   return /microphone|\bmic\b|condenser|\bsm57\b|\bksm32\b|beta 52a/i.test(`${g.item} ${g.spec}`)
@@ -42,7 +42,12 @@ function category(row: Requirement, plot?: Plot): Category {
   if (/technician|engineer|personnel|operator|crew/.test(item)) return "Personnel";
   if (/^(drum kit|drums|drum rug|cymbals?|drum hardware|drum throne)$/.test(item) || (item === "instrument / backline" && /^drums?$/i.test(row.spec))) return "Drums";
   if (/stand|mount|hardware|throne/.test(item)) return "Stands and hardware";
-  if (/cable|snake|stage.?box|splitter|loom/.test(item)) return "Cables and stage boxes";
+  if (/splitter/.test(item) || /digital stage.?box/.test(text)) return "Monitors and audio systems";
+  if (/stage.?box|drop snake|subsnake/.test(item)) return "Analog Drop Snakes";
+  if (/cable|snake|loom/.test(item)) {
+    const atRack = [...row.stations].some(station => /sidestage|side stage|stage.left rack/i.test(station));
+    return atRack ? "Side Stage Cables" : "Main Stage Cables";
+  }
   if (/microphone|\bmic\b|\bdi\b|direct box/.test(item)) return "Microphones and DI boxes";
   if (/rug|riser|platform|power|ac drop|\btable\b/.test(item)) return "Stage, risers and power";
   if (/monitor|console|mixer|iem|in.ear|speaker|kemper|hx stomp/.test(text)) return "Monitors and audio systems";
@@ -115,16 +120,25 @@ function RequirementNotes({ notes }: { notes: string[] }) {
     : <div key={index}>{block.lines.map(line => <div className="advance-note" key={line}>{line}</div>)}</div>);
 }
 
-function Requirements({ rows, plot, unresolved = false }: { rows: Requirement[]; plot: Plot; unresolved?: boolean }) {
+function Requirements({ rows, plot, rackCables, unresolved = false }: { rows: Requirement[]; plot: Plot; rackCables?: ReturnType<typeof sideStageCables>; unresolved?: boolean }) {
   return <>{categories.map(name => {
     const firstChannel = (g: Requirement) => Math.min(...g.allocations.flatMap(a => a.sourceIds).map(id => plot.inputs.find(input => input.id === id)?.number ?? Infinity));
     const standOrder = (g: Requirement) => /vocal mic stands/i.test(g.item) ? 0 : /stands for drum mics/i.test(g.item) ? 1 : /stands for sax\/cello/i.test(g.item) ? 2 : 3;
     const group = rows.filter(row => category(row, plot) === name).sort((a, b) => (name === "Drum microphones" ? firstChannel(a) - firstChannel(b) : name === "Stands and hardware" ? standOrder(a) - standOrder(b) : 0) || a.item.localeCompare(b.item) || a.spec.localeCompare(b.spec));
-    if (!group.length) return null;
+    const patch = name === "Side Stage Cables" && rackCables?.included.size ? rackCables : undefined;
+    if (!group.length && !patch) return null;
     const packages = group.filter(g => drumSections(g).length > 0);
     const tableRows = group.filter(g => !packages.includes(g));
     return <section className={"advance-category" + (name === "Drums" ? " advance-drums" : name === "Drum microphones" ? " advance-drum-mics" : name === "Stage, risers and power" ? " advance-stage" : "")} key={name}>
       <h2>{name}</h2>
+      {patch && <div className="side-stage-cables">
+        <p>Allow approximately 10 ft per run for the monitor and wireless mic connections on the stage-left rack table.</p>
+        {([["Monitors", patch.monitors], ["Wireless mics", patch.wireless]] as const).map(([heading, lines]) =>
+          lines.length > 0 && <div key={heading}><h3>{heading}</h3>
+            <ul className="advance-note-list">{lines.map(line => <li key={line}>{line}</li>)}</ul>
+          </div>
+        )}
+      </div>}
       {name === "Drums" && !packages.length && group.some(g => g.item === "Drum kit" || (g.item === "Instrument / backline" && /^drums?$/i.test(g.spec))) && <p>Drum package details to follow from The Swell. Existing listed items below remain part of the advance.</p>}
       {packages.map(g => <DrumPackage requirement={g} key={g.allocations[0].id} />)}
       {tableRows.length > 0 && <table className="advance-table">
@@ -170,16 +184,7 @@ export function EquipmentAdvance({ plot, packet, title }: { plot: Plot; packet: 
       {title("Audio requirements")}
       <p className="advance-intro">Provided by venue production. Quantities below are totals. See the audio input key for channel details; items with unassigned suppliers are listed separately.</p>
       <section className="advance-category"><h2>Monitors</h2><p>{plot.monitors || "Monitor system, mix count and output connections need to be specified."}</p></section>
-      {rackCables.included.size > 0 && <section className="advance-category side-stage-cables">
-        <h2>Side stage cable needs</h2>
-        <p>Allow approximately 10 ft per run between adjacent units on the stage-left rack table.</p>
-        {([["Monitors", rackCables.monitors], ["Wireless mics", rackCables.wireless]] as const).map(([heading, lines]) =>
-          lines.length > 0 && <div key={heading}><h3>{heading}</h3>
-            <ul className="advance-note-list">{lines.map(line => <li key={line}>{line}</li>)}</ul>
-          </div>
-        )}
-      </section>}
-      <Requirements rows={audio} plot={plot} />
+      <Requirements rows={audio} plot={plot} rackCables={rackCables} />
       <section className="advance-category"><h2>Power and production details</h2><p>{plot.power || "Power requirements need to be specified."}</p>
         {!audio.some(g => /riser|platform/i.test(g.item)) && <p>Risers: no requirement recorded; confirm whether any are needed.</p>}
         {!audio.some(g => /personnel|engineer|technician|operator|crew/i.test(g.item)) && <p>Personnel: crew roles and coverage have not been specified.</p>}
