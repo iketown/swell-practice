@@ -49,20 +49,20 @@
   },
   "acoustic": {
     "label": "Acoustic guitar",
-    "w": 2.105,
-    "h": 3.46,
+    "w": 1.19,
+    "h": 1.956,
     "opacity": 0.5
   },
   "bass": {
     "label": "Mustang bass on stand",
-    "w": 1.455,
-    "h": 2.575,
+    "w": 1.0185,
+    "h": 1.8025,
     "opacity": 1
   },
   "telecaster": {
     "label": "Telecaster on stand",
-    "w": 1.648,
-    "h": 2.782,
+    "w": 1.1536,
+    "h": 1.9474,
     "opacity": 1
   },
   "iem": {
@@ -107,6 +107,12 @@
     "h": 0.874,
     "opacity": 1
   },
+  "stage-riser": {
+    "label": "Stage riser",
+    "w": 8,
+    "h": 8,
+    "opacity": 1
+  },
   "monitor-table": {
     "label": "Monitor table",
     "w": 2.5,
@@ -121,26 +127,26 @@
   },
   "telecaster-yellow": {
     "label": "Telecaster (yellow, instrument only)",
-    "w": 1.648,
-    "h": 2.782,
+    "w": 1.1536,
+    "h": 1.9474,
     "opacity": 1
   },
   "telecaster-green": {
     "label": "Telecaster (green, instrument only)",
-    "w": 1.648,
-    "h": 2.782,
+    "w": 1.1536,
+    "h": 1.9474,
     "opacity": 1
   },
   "mustang-blue": {
     "label": "Mustang bass (blue, instrument only)",
-    "w": 1.455,
-    "h": 2.575,
+    "w": 1.0185,
+    "h": 1.8025,
     "opacity": 1
   },
   "acoustic-only": {
     "label": "Acoustic guitar (instrument only)",
-    "w": 2.105,
-    "h": 3.46,
+    "w": 1.19,
+    "h": 1.956,
     "opacity": 1
   },
   "sennheiser-ek-iem-g4": {
@@ -151,8 +157,8 @@
   },
   "hercules-gs414b-plus": {
     "label": "Hercules GS414B Plus stand",
-    "w": 2,
-    "h": 1.849,
+    "w": 1.4,
+    "h": 1.2943,
     "opacity": 1
   }
 }

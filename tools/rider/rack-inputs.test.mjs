@@ -35,7 +35,7 @@ test("a receiver or monitor swap reaches the saved cable notes and patch diagram
   const { applyRackMap, earRoutes } = await import("../../src/lib/rider/rack-map.ts");
   const inputs = Array.from({length:18}, (_,i) => ({id: i < 16 ? String(i+1) : "wl-vocal-"+(i+1),number:i+1,source:"Source "+(i+1)}));
   const original = {stageBoxes:[],inputs,rackMap:standardRackMap,gear:[{id:"wl-iem-lead-1"},{id:"wl-mic-lead-1"}]};
-  const map = {...standardRackMap,wirelessInputs:[2,1],earPairs:[5,2,3,4,1]};
+  const map = {...standardRackMap,wirelessInputs:[2,1],earPairs:[5,2,3,4,1,6]};
   const saved = applyRackMap(original,map);
   assert.equal(wirelessRoutes(saved,map)[0].input,"XLR IN 2");
   assert.match(saved.gear[1].notes,/split tail 17 → X32 Rack XLR IN 2/);
@@ -52,7 +52,7 @@ test("the table cable order follows patch swaps and only replaces matching venue
     ...Array.from({length: 10}, (_, i) => "wl-iem-lead-" + (i + 1)),
     "wl-mic-lead-1", "wl-mic-lead-2", "rack-map-rx-patch",
   ].map(id => ({ id, quantity: id === "rack-map-rx-patch" ? 2 : 1, required: true, provider: "Venue production", spec: rackTableXlr }));
-  const map = {...standardRackMap, earPairs: [5,2,3,4,1], wirelessInputs: [2,1]};
+  const map = {...standardRackMap, housePorts:[3,4,5], earPairs: [5,2,3,4,1], wirelessInputs: [2,1]};
   const summary = sideStageCables({gear, rackMap: map});
   assert.equal(summary.included.size, 13);
   assert.match(summary.monitors[0], /S16 OUT 1–8 → IEM TX 5, 2, 3, 4/);
@@ -62,4 +62,22 @@ test("the table cable order follows patch swaps and only replaces matching venue
   assert.equal(partial.monitors.length, 1);
   assert(!partial.included.has("wl-iem-lead-2"));
   assert.equal(sideStageCables({gear}).included.size, 0);
+});
+
+
+test("the sixth stereo mix and four playback stems use distinct local X32 outputs", async () => {
+  const { earRoutes, housePlayback, playbackChannels } = await import("../../src/lib/rider/rack-map.ts");
+  const current = rackMapSchema.parse(standardRackMap);
+  assert.deepEqual(earRoutes(current).slice(4).map(m => [m.name, m.bus, m.device, m.out]),
+    [["Sam", 9, "X32", 1], ["Extra", 11, "X32", 3]]);
+  assert.deepEqual(housePlayback(current).map(s => [s.label, s.channel, s.port, s.foh]), [
+    ["Percussion", 28, 5, 19], ["Instrument", 29, 6, 20], ["Vocal", 30, 7, 21], ["Extras", 31, 8, 22],
+  ]);
+  assert.equal(rackMapSchema.safeParse({...current, housePorts:[3, 6, 7, 8]}).success, false);
+  assert.deepEqual(playbackChannels(current).map(s => [s.usb, s.channel, s.foh]), [[2,28,19],[3,29,20],[4,30,21],[5,31,22],[1,32,null]]);
+  const previous = {...current, playbackOrder: undefined};
+  assert.deepEqual(housePlayback(previous).map(s => s.channel), [30,31,32,28]);
+  const legacy = rackMapSchema.parse({...previous, housePorts:[3, 4, 5]});
+  assert.equal(earRoutes(legacy).length, 5);
+  assert.equal(housePlayback(legacy).length, 3);
 });

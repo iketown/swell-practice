@@ -59,7 +59,8 @@ export function moveStandPair(p: Plot, id: string, x: number, y: number): PlotOb
   const group = p.objects.filter((o) => o.id === id || o.id === old.standId || o.standId === id);
   let dx = x - old.x, dy = y - old.y;
   for (const o of group) {
-    dx = Math.max(-o.x, Math.min(p.width + 5 - o.w - o.x, dx));
+    const rightEdge = o.asset === "stage-riser" ? p.width : p.width + 5;
+    dx = Math.max(-o.x, Math.min(rightEdge - o.w - o.x, dx));
     dy = Math.max(-o.y, Math.min(p.depth - o.h - o.y, dy));
   }
   const ids = new Set(group.map((o) => o.id));

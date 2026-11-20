@@ -36,6 +36,23 @@ function outwardGuide(
   };
 }
 
+// Follow the rear of Joe's deck when the upstage box can be reached from below.
+function riserApproach(west: number, rearY: number | undefined, box?: Frame) {
+  if (rearY === undefined || !box) return;
+  const inletX = box.x + box.width / 2;
+  const inletY = box.y + box.height + edgeGap;
+  const clearance = rearY - inletY;
+  if (clearance <= 0 || inletX <= west) return;
+  const laneY = rearY - Math.min(.35, clearance / 2);
+  const turn = Math.min(.45, (inletX - west) / 2);
+  const inletTurn = Math.min(turn, (laneY - inletY) / 2);
+  return {
+    turnY: laneY + turn,
+    approach: ` Q${west} ${laneY} ${west + turn} ${laneY} H${inletX - inletTurn}` +
+      ` Q${inletX} ${laneY} ${inletX} ${laneY - inletTurn} V${inletY}`,
+  };
+}
+
 function drumRugGuide(rug: Frame, box: Frame, kick?: Point): Guide {
   const endX = box.x + box.width + edgeGap;
   const rearY = box.y + box.height / 2;
@@ -63,6 +80,7 @@ export function StageCableGuide({
   width: w,
   depth: h,
   drumBox,
+  joeRiserRearY,
   stageLeftBox,
   drumRug,
   kick,
@@ -73,6 +91,7 @@ export function StageCableGuide({
   width: number;
   depth: number;
   drumBox?: Frame;
+  joeRiserRearY?: number;
   stageLeftBox?: Frame;
   drumRug?: Frame;
   kick?: Point;
@@ -105,10 +124,11 @@ export function StageCableGuide({
   const westBottom = drumBox && westEnd - west < 0.5
     ? { x: drumBox.x + drumBox.width / 2, y: drumBox.y + drumBox.height + edgeGap }
     : undefined;
-  const westTurnY = westBottom ? westBottom.y + 0.65 : westY + rearRadius;
-  const westApproach = westBottom
+  const alongRiser = riserApproach(west, joeRiserRearY, drumBox);
+  const westTurnY = alongRiser?.turnY ?? (westBottom ? westBottom.y + 0.65 : westY + rearRadius);
+  const westApproach = alongRiser?.approach ?? (westBottom
     ? ` H${westBottom.x} V${westBottom.y}`
-    : ` Q${west} ${westY} ${west + rearRadius} ${westY} H${westEnd}`;
+    : ` Q${west} ${westY} ${west + rearRadius} ${westY} H${westEnd}`);
   const enterFromBelow = boxOnstage && east <= stageLeftBox.x + stageLeftBox.width;
   const eastY = enterFromBelow ? stageLeftBox.y + stageLeftBox.height + edgeGap : stageLeftBox
     ? stageLeftBox.y + stageLeftBox.height * (cableView ? 0.27 : 0.5)

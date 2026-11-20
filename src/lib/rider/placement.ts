@@ -1,5 +1,9 @@
 import type { PlotObject } from "./model";
 
+export function riserDimensions(o: PlotObject) {
+  return `${o.w}′ × ${o.h}′ · ${o.riserHeightInches}″ high`;
+}
+
 export function objectAnchor(o: Pick<PlotObject, "asset" | "layer" | "w" | "h" | "placement">) {
   return o.placement ?? {
     x: o.w / 2,

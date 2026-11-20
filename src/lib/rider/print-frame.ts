@@ -20,6 +20,7 @@ export function printFrame(p: Plot, view: StageView, overview = rackOverview(p, 
     include(p.width, overview.bottom);
   }
   for (const o of p.objects) {
+    if (o.overviewOnly && view !== "Overview") continue;
     include(o.x, o.y, o.w, o.h + 0.5);
     if (view === "Stand placement" && (o.layer === "stands" || ["boom", "drum-boom", "drum-rug", "hercules-gs414b-plus"].includes(o.asset))) {
       const { x, y } = stageAnchor(o);

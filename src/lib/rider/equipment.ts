@@ -1,3 +1,4 @@
+import { riserDimensions } from "./placement";
 import artwork from "./assets.json";
 import type { Plot, PlotObject } from "./model";
 
@@ -61,15 +62,17 @@ export function reconcileEquipment(p: Plot): Plot {
   const points = [
     ...p.objects.filter(isEquipmentObject).map((o) => ({
       id: o.id,
+      asset: o.asset,
       label: o.asset === "sam" ? "Drum kit" : o.label,
       station: "",
-      spec:
+      spec: o.asset === "stage-riser" ? riserDimensions(o) :
         assets[o.asset]?.label === o.label
           ? ""
           : (assets[o.asset]?.label ?? ""),
     })),
     ...p.stageBoxes.map((b) => ({
       id: b.id,
+      asset: "",
       label: "Stage box · " + b.label,
       spec: "",
       station: "",
@@ -80,7 +83,8 @@ export function reconcileEquipment(p: Plot): Plot {
       g.createdForPlot &&
       g.plotIds?.length === 1 &&
       points.find((point) => point.id === g.plotIds![0]);
-    return point ? { ...g, item: point.label } : g;
+    if (!point) return g;
+    return { ...g, item: point.label, ...(point.asset === "stage-riser" ? { spec: point.spec } : {}) };
   });
   for (const point of points) {
     if (gear.some((g) => g.plotIds?.includes(point.id))) continue;

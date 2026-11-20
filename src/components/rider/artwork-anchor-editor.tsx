@@ -37,7 +37,7 @@ export function ArtworkAnchorEditor({ asset, label, width, height, anchor, onCha
         onChange({ x: Math.max(0, Math.min(width, anchor.x + delta[e.key].x)), y: Math.max(0, Math.min(height, anchor.y + delta[e.key].y)) });
       }}>
       <rect x="-.25" y="-.25" width={width + .5} height={height + .5} fill="#f1f3ed" />
-      {asset === "drum-rug" || asset === "monitor-table" || asset === "symbol" || asset === "label" ?
+      {asset === "stage-riser" || asset === "drum-rug" || asset === "monitor-table" || asset === "symbol" || asset === "label" ?
         <rect width={width} height={height} fill="#d4dfd3" stroke="#708579" strokeWidth=".03" /> :
         <image href={objectImage(asset)} width={width} height={height} preserveAspectRatio="none" />}
       <rect width={width} height={height} fill="none" stroke="#8d9e93" strokeWidth=".02" strokeDasharray=".1 .08" />

@@ -27,6 +27,9 @@ const object = z.object({
   label: name,
   layer: z.enum(["people", "stands", "equipment"]).optional(),
   standId: id.optional(),
+  overviewPosition: z.object(position).optional(),
+  overviewOnly: z.literal(true).optional(),
+  riserHeightInches: z.number().positive().max(120).optional(),
   placement: z.object({
     // Local offsets in physical feet, independent of artwork scaling.
     x: z.number().min(0).max(60),
@@ -47,12 +50,15 @@ const object = z.object({
   w: z.number().min(0.15).max(60),
   h: z.number().min(0.15).max(60),
   opacity: z.number().min(0.05).max(1),
+}).refine(o => o.asset !== "stage-riser" || o.riserHeightInches !== undefined, {
+  message: "Enter the riser deck height in inches.",
 });
 const input = z.object({
   id,
   number: z.number().int().min(1).max(999),
   source: name,
   station: name,
+  overviewPosition: z.object(position).optional(),
   kind: z.enum(["Mic", "DI", "Line"]),
   stageBoxId: id.nullable().default(null),
   foh: z.string().max(60),
@@ -256,8 +262,8 @@ export function resizePlayingArea(
     ...p,
     width,
     depth,
-    objects: p.objects.map((point) => place(point)),
-    inputs: p.inputs.map((point) => place(point)),
+    objects: p.objects.map(point => ({ ...place(point), ...(point.overviewPosition && { overviewPosition: place(point.overviewPosition) }) })),
+    inputs: p.inputs.map(point => ({ ...place(point), ...(point.overviewPosition && { overviewPosition: place(point.overviewPosition) }) })),
     stageBoxes: p.stageBoxes.map((point) => place(point, true)),
     cableNodes: p.cableNodes.map((point) => place(point, true)),
   };

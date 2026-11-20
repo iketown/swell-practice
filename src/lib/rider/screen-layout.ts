@@ -1,3 +1,13 @@
+import type { Plot } from "./model";
+
+export function overviewPoint<T extends { overviewPosition?: { x: number; y: number } }>(point: T): T {
+  return point.overviewPosition ? { ...point, ...point.overviewPosition } : point;
+}
+
+export function overviewPlot(plot: Plot): Plot {
+  return { ...plot, objects: plot.objects.map(overviewPoint), inputs: plot.inputs.map(overviewPoint) };
+}
+
 // Scale decorative artwork around its physical anchor, so screen zoom/spacing
 // cannot separate a stand base or cable attachment from its saved stage point.
 export const screenStageSpacing = 1.2;

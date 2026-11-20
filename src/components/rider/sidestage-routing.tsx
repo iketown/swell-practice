@@ -14,7 +14,8 @@ function Device({ x, y, width, name, detail }: {
 
 export function SidestageRouting({ width, layout }: { width: number; layout: RackOverview }) {
   const arrow = useId().replaceAll(":", "") + "-rack-arrow";
-  const { top, rear, boxes } = layout;
+  const { top, rear, boxes, playbackCount } = layout;
+  const playbackRange = `19–${18 + playbackCount}`;
   const line = (path: string, label: string) => <path aria-label={label} d={path}
     fill="none" stroke="#294b43" strokeWidth=".085" strokeLinejoin="round" markerEnd={`url(#${arrow})`} />;
   return <g transform={`translate(${width} ${top})`} textAnchor="middle" fill="#203d35" pointerEvents="none"
@@ -47,11 +48,11 @@ export function SidestageRouting({ width, layout }: { width: number; layout: Rac
     <Device x={6.95} y={6.15} width={4.4} name="X32 Rack" detail="Monitor mixer" />
     <path d="M4.97 7.23 H6.88" stroke="#294b43" strokeWidth=".08" markerStart={`url(#${arrow})`} markerEnd={`url(#${arrow})`} />
     <text x="5.92" y="6.94" fontSize=".45">AES50</text>
-    {line("M11.35 6.98 H11.95 V5.12 H13.65", "Three X32 playback outputs to FOH channels 19–21")}
-    <text x="12.83" y="4.8" textAnchor="end" fontSize=".47">Playback 19–21</text>
+    {line("M11.35 6.98 H11.95 V5.12 H13.65", `X32 playback outputs to FOH channels ${playbackRange}`)}
+    <text x="12.83" y="4.8" textAnchor="end" fontSize=".47">Playback {playbackRange}</text>
     {line("M2.75 7.8 V8.7 H4.5 V9.45", "S16 stereo outputs to IEM transmitters")}
     {line("M9.15 7.8 V8.7 H7.45 V9.45", "X32 stereo outputs to IEM transmitters")}
-    <Device x={3.05} y={9.45} width={5.85} name="Wireless IEM TX" detail="5 active · 1 spare" />
+    <Device x={3.05} y={9.45} width={5.85} name="Wireless IEM TX" detail={playbackCount === 4 ? "5 band · 1 Extra" : "5 active · 1 spare"} />
     <text x="6.5" y="12.05" fontSize=".54" fontWeight="700">See rack guide p. 2 for channel routes.</text>
   </g>;
 }

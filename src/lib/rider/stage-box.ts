@@ -16,9 +16,10 @@ export const boxHeaderHeight = 0.62;
 export const boxRowHeight = 0.64;
 
 export function boxFrame(plot: Plot, box: StageBox, inputs: Input[]) {
-  const columns = Math.max(3, Math.ceil(Math.sqrt(inputs.length / 1.4)));
+  const compact = inputs.length > 0 && inputs.length <= 4;
+  const columns = compact ? 2 : Math.max(3, Math.ceil(Math.sqrt(inputs.length / 1.4)));
   const rows = Math.max(1, Math.ceil(inputs.length / columns));
-  const naturalWidth = Math.max(
+  const naturalWidth = compact ? 2 : Math.max(
     columns * 0.82,
     Math.min(6, box.label.length * 0.22 + 0.24),
   );

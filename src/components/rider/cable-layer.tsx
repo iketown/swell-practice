@@ -12,7 +12,7 @@ import {
 } from "@/lib/rider/cable-routing";
 import { rackCable } from "@/lib/rider/rack-overview";
 import type { Plot } from "@/lib/rider/model";
-import { symbolTransform } from "@/lib/rider/screen-layout";
+import { overviewPlot, symbolTransform } from "@/lib/rider/screen-layout";
 
 export type RoutingControls = {
   selected: string | null;
@@ -26,9 +26,10 @@ export function CableLayer({
   selected,
   labels = false,
   bundleRack = false,
+  overviewPositions = false,
   onSelect,
   onChange,
-}: { plot: Plot; symbolScale: number; labels?: boolean; bundleRack?: boolean } & RoutingControls) {
+}: { plot: Plot; symbolScale: number; labels?: boolean; bundleRack?: boolean; overviewPositions?: boolean } & RoutingControls) {
   const group = useRef<SVGGElement>(null);
   const [drag, setDrag] = useState<{
     id: string;
@@ -61,9 +62,9 @@ export function CableLayer({
     [drag, plot, placement],
   );
   const routes = useMemo(() => {
-    const runs = drawCables(preview);
+    const runs = drawCables(overviewPositions ? overviewPlot(preview) : preview);
     return bundleRack ? runs.filter(route => !rackCable(route.run)) : runs;
-  }, [preview, bundleRack]);
+  }, [preview, bundleRack, overviewPositions]);
   const owners = useMemo(() => {
     const map = new Map<string, string[]>();
     for (const c of plot.cables) {

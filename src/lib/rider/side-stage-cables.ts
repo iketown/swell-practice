@@ -28,7 +28,7 @@ export function sideStageCables(plot: Plot) {
     const tx = mixes.map(m => m.tx).join(", ");
     monitors.push(device === "S16"
       ? `1 eight-channel XLR snake or 8 individual XLR cables · S16 OUT 1–8 → IEM TX ${tx} (one stereo pair each).`
-      : `2 XLR cables · X32 Rack OUT 1/2 → IEM TX ${tx} L/R.`);
+      : `${cableIds.length} XLR cables · ${mixes.map(m => `X32 Rack OUT ${m.out}/${m.out + 1} → IEM TX ${m.tx} L/R`).join(" · ")}.`);
   }
 
   if (include(["rack-map-rx-patch"], 2))

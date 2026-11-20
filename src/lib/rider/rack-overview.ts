@@ -24,6 +24,6 @@ export function rackOverview(plot: Plot, view: StageView) {
       for (const id of gear.plotIds ?? []) devices.add(id);
     }
   }
-  return { boxes, devices, top, rear, bottom: top + 12.4 };
+  return { playbackCount: plot.rackMap.housePorts?.length ?? 3, boxes, devices, top, rear, bottom: top + 12.4 };
 }
 export type RackOverview = NonNullable<ReturnType<typeof rackOverview>>;

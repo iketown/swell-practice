@@ -28,7 +28,7 @@ function combineCableLengths(rows: Requirement[]): Requirement[] {
   for (const row of result) row.cableLengths?.sort((a, b) => (Number.parseFloat(b.spec) || 0) - (Number.parseFloat(a.spec) || 0) || a.spec.localeCompare(b.spec));
   return result;
 }
-const categories = ["Instruments", "Drums", "Stands and hardware", "Drum microphones", "Microphones and DI boxes", "Side Stage Cables", "Main Stage Cables", "Analog Drop Snakes", "Analog splitter", "Monitors and audio systems", "Wireless handheld vocal system", "Stage, risers and power", "Personnel", "Accessories and other equipment"] as const;
+const categories = ["Instruments", "Drums", "Stands and hardware", "Drum microphones", "Microphones and DI boxes", "Side Stage Cables", "Main Stage Cables", "Analog Drop Snakes", "Analog splitter", "Monitors and audio systems", "Wireless handheld vocal system", "Risers", "Stage and power", "Personnel", "Accessories and other equipment"] as const;
 type Category = typeof categories[number];
 function isDrumMicrophone(g: Plot["gear"][number], plot: Plot) {
   return /microphone|\bmic\b|condenser|\bsm57\b|\bksm32\b|beta 52a/i.test(`${g.item} ${g.spec}`)
@@ -41,6 +41,7 @@ function category(row: Requirement, plot?: Plot): Category {
   const text = `${item} ${row.spec}`.toLowerCase();
   if (/technician|engineer|personnel|operator|crew/.test(item)) return "Personnel";
   if (/^(drum kit|drums|drum rug|cymbals?|drum hardware|drum throne)$/.test(item) || (item === "instrument / backline" && /^drums?$/i.test(row.spec))) return "Drums";
+  if (/\brisers?\b/.test(item) || row.allocations.some(g => g.plotIds?.some(id => plot?.objects.some(o => o.id === id && o.asset === "stage-riser")))) return "Risers";
   if (/stand|mount|hardware|throne/.test(item)) return "Stands and hardware";
   if (/^analog splitter\b/.test(item)) return "Analog splitter";
   if (/^wireless handheld vocal systems?$/.test(item)) return "Wireless handheld vocal system";
@@ -51,7 +52,7 @@ function category(row: Requirement, plot?: Plot): Category {
     return atRack ? "Side Stage Cables" : "Main Stage Cables";
   }
   if (/microphone|\bmic\b|\bdi\b|direct box/.test(item)) return "Microphones and DI boxes";
-  if (/rug|riser|platform|power|ac drop|\btable\b/.test(item)) return "Stage, risers and power";
+  if (/rug|riser|platform|power|ac drop|\btable\b/.test(item)) return "Stage and power";
   if (/monitor|console|mixer|iem|in.ear|speaker|kemper|hx stomp/.test(text)) return "Monitors and audio systems";
   if (/instrument|guitar|bass|cello|keyboard|drum/.test(item) && !/pickup/.test(item)) return "Instruments";
   return "Accessories and other equipment";
@@ -132,16 +133,19 @@ function RequirementNotes({ notes }: { notes: string[] }) {
 }
 
 function Requirements({ rows, plot, rackCables, unresolved = false }: { rows: Requirement[]; plot: Plot; rackCables?: ReturnType<typeof sideStageCables>; unresolved?: boolean }) {
+  const wireless = rows.filter(row => category(row, plot) === "Wireless handheld vocal system");
+  const wirelessId = wireless.length ? `wireless-details-${wireless[0].allocations[0].id}` : undefined;
   return <>{categories.map(name => {
     const firstChannel = (g: Requirement) => Math.min(...g.allocations.flatMap(a => a.sourceIds).map(id => plot.inputs.find(input => input.id === id)?.number ?? Infinity));
     const standOrder = (g: Requirement) => /vocal mic stands/i.test(g.item) ? 0 : /stands for drum mics/i.test(g.item) ? 1 : /stands for sax\/cello/i.test(g.item) ? 2 : 3;
     const group = rows.filter(row => category(row, plot) === name).sort((a, b) => (name === "Drum microphones" ? firstChannel(a) - firstChannel(b) : name === "Stands and hardware" ? standOrder(a) - standOrder(b) : name === "Monitors and audio systems" ? monitorOrder(a) - monitorOrder(b) : 0) || a.item.localeCompare(b.item) || a.spec.localeCompare(b.spec));
     const patch = name === "Side Stage Cables" && rackCables?.included.size ? rackCables : undefined;
-    if (!group.length && !patch) return null;
+    const wirelessReference = name === "Microphones and DI boxes" && wirelessId;
+    if (!group.length && !patch && !wirelessReference) return null;
     const packages = group.filter(g => drumSections(g).length > 0);
-    const tableRows = group.filter(g => !packages.includes(g));
-    return <section className={"advance-category" + (name === "Drums" ? " advance-drums" : name === "Drum microphones" ? " advance-drum-mics" : name === "Stage, risers and power" ? " advance-stage" : "")} key={name}>
-      <h2>{name}</h2>
+    const tableRows = [...(wirelessReference ? wireless : []), ...group.filter(g => !packages.includes(g))];
+    return <section className={"advance-category" + (name === "Drums" ? " advance-drums" : name === "Drum microphones" ? " advance-drum-mics" : (name === "Stage and power" || name === "Risers") ? " advance-stage" : "")} key={name}>
+      <h2 id={name === "Wireless handheld vocal system" ? wirelessId : undefined}>{name}</h2>
       {patch && <div className="side-stage-cables">
         <p>Allow approximately 10 ft per run for the monitor and wireless mic connections on the stage-left rack table.</p>
         {([["Monitors", patch.monitors], ["Wireless mics", patch.wireless]] as const).map(([heading, lines]) =>
@@ -157,11 +161,15 @@ function Requirements({ rows, plot, rackCables, unresolved = false }: { rows: Re
         <thead><tr><th>Qty.</th><th>Description</th><th>Ref.</th></tr></thead>
         <tbody>{tableRows.map(g => {
           const channels = [...new Set(g.allocations.flatMap(a => a.sourceIds).map(id => plot.inputs.find(i => i.id === id)?.number).filter((n): n is number => n !== undefined))].sort((a, b) => a - b);
+          const isWirelessSummary = wirelessReference && wireless.includes(g);
           const notes = supplierNotes(g, plot);
           const useSpecAsName = g.item === name && !!g.spec;
           return <tr key={g.allocations[0].id}>
             <td>{quantityText(g)}</td>
-            <td><strong>{useSpecAsName ? g.spec : requestName(g)}</strong>{!g.required && <span> (optional)</span>}{!useSpecAsName && g.spec && g.item !== "Instrument / backline" && <div>{g.spec}</div>}{g.cableLengths && <ul className="advance-note-list">{g.cableLengths.map(length => <li key={length.spec}>{quantityText(length)} @ {length.spec || "length to confirm"}</li>)}</ul>}<RequirementNotes notes={notes} /></td>
+            <td>{isWirelessSummary ? <>
+              <strong>Wireless handheld vocal mics</strong>{!g.required && " (optional)"}
+              <div><a className="wireless-detail-reference" href={`#${wirelessId}`}>See Wireless handheld vocal system for details</a>.</div>
+            </> : <><strong>{useSpecAsName ? g.spec : requestName(g)}</strong>{!g.required && <span> (optional)</span>}{!useSpecAsName && g.spec && g.item !== "Instrument / backline" && <div>{g.spec}</div>}{g.cableLengths && <ul className="advance-note-list">{g.cableLengths.map(length => <li key={length.spec}>{quantityText(length)} @ {length.spec || "length to confirm"}</li>)}</ul>}<RequirementNotes notes={notes} /></>}</td>
             <td>{unresolved && <div>Supplier to confirm</div>}{[...g.stations].join(", ")}{channels.length > 0 && <div>#{channels.join(", #")}</div>}</td>
           </tr>;
         })}</tbody>
@@ -198,10 +206,10 @@ export function EquipmentAdvance({ plot, packet, title }: { plot: Plot; packet: 
       <section className="advance-category"><h2>Monitors</h2><p>{plot.monitors || "Monitor system, mix count and output connections need to be specified."}</p></section>
       <Requirements rows={audio} plot={plot} rackCables={rackCables} />
       <section className="advance-category"><h2>Power and production details</h2><p>{plot.power || "Power requirements need to be specified."}</p>
-        {!audio.some(g => /riser|platform/i.test(g.item)) && <p>Risers: no requirement recorded; confirm whether any are needed.</p>}
+        {!plot.gear.some(g => g.required && /riser|platform/i.test(g.item)) && <p>Risers: no requirement recorded; confirm whether any are needed.</p>}
         {!audio.some(g => /personnel|engineer|technician|operator|crew/i.test(g.item)) && <p>Personnel: crew roles and coverage have not been specified.</p>}
       </section>
-      <section className="advance-category"><h2>Production contact</h2><p>{plot.contact || "Production contact needs to be specified."}</p></section>
+      <section className="advance-category"><h2>Production contact</h2><p className="production-contact">{plot.contact || "Production contact needs to be specified."}</p></section>
     </section>}
     {band.length > 0 && <section className="print-sheet advance-sheet" data-advance="band">
       {title("The Swell brings")}

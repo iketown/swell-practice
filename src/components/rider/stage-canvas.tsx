@@ -1,5 +1,5 @@
 "use client";
-import { useId, useRef, type PointerEvent as ReactPointerEvent } from "react";
+import { useId, useMemo, useRef, type PointerEvent as ReactPointerEvent } from "react";
 import {
   boxColors,
   boxFrame,
@@ -9,9 +9,9 @@ import {
   sideStageWidth,
 } from "@/lib/rider/stage-box";
 import { byNumber, objectImage, type Plot } from "@/lib/rider/model";
-import { objectAnchor, stageAnchor } from "@/lib/rider/placement";
+import { objectAnchor, riserDimensions, stageAnchor } from "@/lib/rider/placement";
 import { printFrame } from "@/lib/rider/print-frame";
-import { symbolTransform } from "@/lib/rider/screen-layout";
+import { overviewPlot, symbolTransform } from "@/lib/rider/screen-layout";
 import { instrumentLabel } from "@/lib/rider/instrument-label";
 
 import {
@@ -43,7 +43,7 @@ type Props = {
   onEdit?: (id: string) => void;
 };
 export function StageCanvas({
-  plot: p,
+  plot,
   editing,
   symbolScale = 1,
   view = "Overview",
@@ -58,6 +58,7 @@ export function StageCanvas({
   onMove,
   onEdit,
 }: Props) {
+  const p = useMemo(() => view === "Overview" ? overviewPlot(plot) : plot, [view, plot]);
   const svg = useRef<SVGSVGElement>(null);
   const drag = useRef<{
     id: string;
@@ -69,6 +70,7 @@ export function StageCanvas({
   const grid = useId().replaceAll(":", "");
   const tracingRackCable = routing?.selected && p.cables.some(run => run.id === routing.selected && rackCable(run));
   const overview = tracingRackCable ? null : rackOverview(p, view);
+  const schematicSide = view === "Overview" && plot.objects.some(o => o.overviewPosition);
   const side = overview ? rackOverviewWidth : sideStageWidth;
   const sideDepth = Math.max(p.depth, overview?.bottom ?? 0);
   const sortedInputs = byNumber(p);
@@ -84,6 +86,10 @@ export function StageCanvas({
     ?? p.stageBoxes.find(box => box !== drumBox && box.x >= w);
   const sideFrame = sideBox && boxFrame(p, sideBox, p.inputs.filter(input => input.stageBoxId === sideBox.id));
   const drumRug = p.objects.find(object => object.asset === "drum-rug");
+  const risers = p.objects.filter(o => o.asset === "stage-riser");
+  const drumRiser = risers.find(o => o.id === "riser-sam") ?? risers.find(o => drumRug &&
+    drumRug.x >= o.x && drumRug.x + drumRug.w <= o.x + o.w &&
+    drumRug.y >= o.y && drumRug.y + drumRug.h <= o.y + o.h);
   const chrisStand = p.objects.find(object => object.id === "mic-chris");
   const brianStand = p.objects.find(object => object.id === "mic-brian");
   function displayedBox(frame: typeof drumFrame) {
@@ -213,7 +219,7 @@ export function StageCanvas({
         <text x={w + side / 2} y={0.89}>
           SIDESTAGE
         </text>
-        <text x={w + side / 2} y={1.48} fontSize=".34">{overview ? "SIGNAL FLOW" : "2 FT GRID"}</text>
+        <text x={w + side / 2} y={1.48} fontSize=".34">{overview ? "SIGNAL FLOW" : schematicSide ? "EQUIPMENT ICONS" : "2 FT GRID"}</text>
         <text x={0.32} y={h + 0.71} textAnchor="start">
           STAGE RIGHT
         </text>
@@ -239,12 +245,32 @@ export function StageCanvas({
         </text>
       </g>
       </>}
+      {view !== "Cable patch and routing" && risers.map(o => {
+        const hot = active === o.id || highlighted.includes(o.id);
+        const isDrumRiser = o === drumRiser;
+        const labelX = isDrumRiser ? o.x + o.w / 2 : o.x + o.w - .36;
+        const labelY = isDrumRiser ? o.y + .59 : o.y + o.h * (view === "Stand placement" ? .60 : .44);
+        return <g key={o.id} data-point={o.id} aria-label={o.label} {...handlers(o.id, o.x, o.y)}>
+          <title>{`${o.label} · ${riserDimensions(o)}`}</title>
+          <rect x={o.x} y={o.y} width={o.w} height={o.h} fill="#bccad2" fillOpacity={.32 * o.opacity}
+            stroke={hot ? "#008493" : "#556b77"} strokeWidth={hot ? .10 : .065} />
+          <text x={labelX} y={labelY} textAnchor={isDrumRiser ? "middle" : "end"}
+            fontSize=".43" fontWeight="700" fill="#304854" stroke="#fff" strokeWidth=".085" paintOrder="stroke">
+            {o.label}
+            <tspan x={isDrumRiser ? undefined : labelX} dy={isDrumRiser ? 0 : .5} fontSize=".39" fontWeight="550">
+              {isDrumRiser && " · "}{riserDimensions(o)}
+            </tspan>
+          </text>
+          {editing && <rect x={o.x} y={o.y} width={o.w} height={o.h} className={selected === o.id ? "rider-selected" : "rider-hit"} />}
+        </g>;
+      })}
       <StageCableGuide
         width={w}
         depth={h}
         drumBox={displayedBox(drumFrame)}
+        joeRiserRearY={risers.find(o => o.id === "riser-joe")?.y}
         stageLeftBox={displayedBox(sideFrame)}
-        drumRug={drumRug && { x: drumRug.x, y: drumRug.y, width: drumRug.w, height: drumRug.h }}
+        drumRug={drumRug && !drumRiser ? { x: drumRug.x, y: drumRug.y, width: drumRug.w, height: drumRug.h } : undefined}
         kick={kick}
         chrisBase={chrisStand && stageAnchor(chrisStand)}
         brianBase={brianStand && stageAnchor(brianStand)}
@@ -272,9 +298,10 @@ export function StageCanvas({
         </g>
       ))}
       {p.objects.map((o) => {
+        if (o.overviewOnly && view !== "Overview") return null;
         if (overview && (overview.devices.has(o.id) || o.asset === "x32" ||
           /^wl-(section$|rx-caption-|tx-caption-|iem-tx-)/.test(o.id))) return null;
-        if (o.asset === "drum-rug" || o.asset === "monitor-table" || (view === "Stand placement" && !isStand(o))) return null;
+        if (o.asset === "stage-riser" || o.asset === "drum-rug" || o.asset === "monitor-table" || (view === "Stand placement" && !isStand(o))) return null;
         const selectable = view !== "Stand placement" || isStand(o);
         const hot = selectable && (active === o.id || highlighted.includes(o.id));
         const visible = visibleObject(o, layers) || hot;
@@ -393,13 +420,14 @@ export function StageCanvas({
           </g>
         );
       })}
-      {layers.cables && (routing || view === "Cable patch and routing") && <CableLayer plot={p} bundleRack={Boolean(overview)} labels={view === "Cable patch and routing"} symbolScale={symbolScale} {...(routing ?? { selected: null, onSelect: () => {} })} />}
+      {layers.cables && (routing || view === "Cable patch and routing") && <CableLayer plot={plot} overviewPositions={schematicSide} bundleRack={Boolean(overview)} labels={view === "Cable patch and routing"} symbolScale={symbolScale} {...(routing ?? { selected: null, onSelect: () => {} })} />}
       {overview && layers.cables && <SidestageRouting width={w} layout={overview} />}
       {layers.stageBoxes &&
         p.stageBoxes.map((box) => {
           const members = sortedInputs.filter((i) => i.stageBoxId === box.id);
           const frame = boxFrame(p, box, members);
           const color = boxColors[box.color];
+          const fitCompactTitle = frame.columns === 2 && box.label.length * 0.24 > frame.width - 0.2;
           return (
             <g
               key={box.id}
@@ -437,10 +465,12 @@ export function StageCanvas({
                   textAnchor="middle"
                   dominantBaseline="central"
                   fill="white"
+                  textLength={fitCompactTitle ? frame.width - 0.2 : undefined}
+                  lengthAdjust="spacingAndGlyphs"
                   fontSize={Math.min(
                     0.42,
                     (frame.width - 0.2) /
-                      (Math.max(box.label.length, 1) * 0.68),
+                      (Math.max(box.label.length, 1) * (fitCompactTitle ? 0.48 : 0.68)),
                   )}
                   fontWeight="700"
                 >

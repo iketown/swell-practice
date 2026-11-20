@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { earRoutes, housePlayback, type RackMap } from "@/lib/rider/rack-map";
+import { earRoutes, playbackChannels, type RackMap } from "@/lib/rider/rack-map";
 import { type wirelessRoutes, type RackInput } from "@/lib/rider/rack-inputs";
 
 import { rackOutputCenter, s16Front, s16InputCenter, x32Rear, x32WirelessCenter } from "./rack-panels";
@@ -21,6 +21,7 @@ function Panel({
     <div className="rack-panel-scroll">
       <figure className={"rack-panel " + device}>
         <Image
+          className="rack-panel-artwork"
           alt={
             s16
               ? "Behringer S16 front panel"
@@ -75,6 +76,7 @@ export function RackChannelGuide({
   onTrace?: (route: string) => void;
 }) {
   const ears = earRoutes(map);
+  const extraPatched = ears.length === 6;
   const s16: Pin[] = inputs.map(({ number, source, socket, s16 }) => ({
     ...s16InputCenter(s16),
     label: String(s16),
@@ -88,6 +90,7 @@ export function RackChannelGuide({
       route: `${source} RX → split ${channel} → ${input} → CH ${channel}`,
     };
   });
+  const playback = playbackChannels(map);
   const x32: Pin[] = [
     ...wireless,
     {
@@ -100,7 +103,7 @@ export function RackChannelGuide({
       x: 169,
       y: 129,
       label: "USB",
-      route: "Mac USB playback → X32 expansion card USB → CH 29–32",
+      route: playback.map(s => `USB ${s.usb} → CH ${s.channel} ${s.label}`).join(" · "),
     },
   ];
   for (const mix of ears) {
@@ -116,14 +119,14 @@ export function RackChannelGuide({
       panel.push({ ...pin, ...rackOutputCenter(mix.device, out) });
     }
   }
-  const playback = housePlayback(map);
-  playback.forEach((stem) =>
+  for (const stem of playback) {
+    if (stem.port === null) continue;
     x32.push({
       ...rackOutputCenter("X32", stem.port),
       label: String(stem.channel),
       route: `CH ${stem.channel} ${stem.label} → X32 XLR OUT ${stem.port} → FOH line input ${stem.foh}`,
-    }),
-  );
+    });
+  }
   return (
     <div className="rack-guide">
       <p className="rack-flow">
@@ -186,6 +189,7 @@ export function RackChannelGuide({
         <div className="rack-link">
           <div className="rack-detail">
             <Image
+              className="rack-panel-artwork"
               alt="S16 rear AES50 block. Port A is on the left."
               src="/stage-plot/panels/s16-aes50.png"
               unoptimized
@@ -232,8 +236,7 @@ export function RackChannelGuide({
             </tbody>
           </table>
           <p>
-            Use AES50 A for S16 outputs and local XLR for X32 outputs. TX6
-            is an unpatched spare.
+            Use AES50 A for S16 outputs and local XLR for X32 outputs. {extraPatched ? "TX6 Extra feeds the matched guest bodypack." : "TX6 and its matched bodypack are available for guest use."}
           </p>
         </section>
         <section>
@@ -244,30 +247,23 @@ export function RackChannelGuide({
             <thead>
               <tr>
                 <th>X32 channel</th>
+                <th>USB</th>
                 <th>Destination</th>
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td>
-                  <b>29</b> Click
-                </td>
-                <td>Ears only</td>
-              </tr>
               {playback.map((stem) => (
                 <tr key={stem.channel}>
                   <td>
                     <b>{stem.channel}</b> {stem.label}
                   </td>
-                  <td>X32 XLR {stem.port} → FOH {stem.foh}</td>
+                  <td>{stem.usb}</td>
+                  <td>{stem.port === null ? "Band IEMs only" : `XLR ${stem.port} → FOH ${stem.foh}`}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p>
-            USB returns 1–4 feed CH 29–32 in order. Label the three line-level
-            house feeds separately from the 18 split tails.
-          </p>
+
         </section>
       </div>
       <small className="rack-credit">

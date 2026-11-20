@@ -15,7 +15,7 @@ function socketOnMap(panel: typeof upper, socket: Point): Point {
 }
 
 function PanelImage({ panel }: { panel: typeof upper }) {
-  return <image href={panel.src} x={panel.x} y={panel.y} width={panel.width * panel.scale} height={panel.height * panel.scale} />;
+  return <image className="rack-panel-artwork" href={panel.src} x={panel.x} y={panel.y} width={panel.width * panel.scale} height={panel.height * panel.scale} />;
 }
 
 function Wire({ path, label, end, direction }: {
@@ -38,9 +38,9 @@ function PortLabel({ x, y, label }: Point & { label: string }) {
 }
 
 type Mix = ReturnType<typeof earRoutes>[number];
-function IemTransmitter({ mix, cx }: { mix: Mix; cx: number }) {
+function IemTransmitter({ mix, cx, x32 }: { mix: Mix; cx: number; x32: typeof lower }) {
   const s16 = mix.device === "S16";
-  const panel = s16 ? upper : lower;
+  const panel = s16 ? upper : x32;
   return <g>
     <rect x={cx-59} y={boxTop} width="118" height={boxBottom-boxTop} rx="4" fill="#f3f6f4" stroke={ink} strokeWidth="1.7" />
     <g textAnchor="middle">
@@ -67,10 +67,10 @@ function IemTransmitter({ mix, cx }: { mix: Mix; cx: number }) {
 }
 
 type Receiver = ReturnType<typeof wirelessRoutes>[number];
-function MicReceiver({ rx, cx, local }: { rx: Receiver; cx: number; local: boolean }) {
+function MicReceiver({ rx, cx, local, x32 }: { rx: Receiver; cx: number; local: boolean; x32: typeof lower }) {
   const name = rx.source.replace(/ wireless vocal$/i,"");
   const splitX = cx-19;
-  const jack = socketOnMap(lower, x32WirelessCenter(local, rx.port));
+  const jack = socketOnMap(x32, x32WirelessCenter(local, rx.port));
   const house = { x: splitX+23, y: 316 };
   return <g>
     <rect x={cx-59} y={boxTop} width="118" height={boxBottom-boxTop} rx="4" fill="white" stroke={ink} strokeWidth="1.7" />
@@ -97,30 +97,35 @@ export function WirelessRackMap({ plot, map }: { plot: Plot; map: RackMap }) {
   const mixes = earRoutes(map).sort((a, b) =>
     a.device.localeCompare(b.device) || a.out - b.out
   );
+  const extraPatched = mixes.length === 6;
+  const receiverShift = extraPatched ? 129 : 0;
+  const x32 = { ...lower, x: lower.x + receiverShift };
   const receivers = wirelessRoutes(plot,map).sort((a,b) => b.port-a.port);
   const local = map.layout === "s16-v2";
   const description = [
+    "TX6 and its matched bodypack receiver are available for a guest or other use.",
     ...mixes.map(m => `${m.device} outputs ${m.out} and ${m.out + 1} to ${m.name}, IEM TX ${m.tx}, left and right.`),
     ...receivers.map(r => `${r.source} to split ${r.channel}, FOH tail ${r.channel} and X32 ${r.input}, channel ${r.channel}.`),
   ].join(" ");
   return <div className="patch-bank wireless-rack-map">
-    <svg viewBox="0 0 900 515" role="img" aria-label={description}>
+    <svg viewBox={`0 0 ${900 + receiverShift} 515`} role="img" aria-label={description}>
       <PanelImage panel={upper} />
-      <PanelImage panel={lower} />
+      <PanelImage panel={x32} />
       <g fill={ink}>
         <text x="650" y="51" fontSize="24" fontWeight="bold">S16</text>
         <text x="650" y="73" fontSize="15">Front panel</text>
         <text x="650" y="94" fontSize="15">XLR outputs</text>
         <text x="2" y="373" fontSize="24" fontWeight="bold">X32 Rack</text>
         <text x="2" y="394" fontSize="15">Rear panel</text>
-        <text x="2" y="425" fontSize="14">TX 6 is an unpatched spare.</text>
-        <text x="2" y="452" fontSize="14">Keep phantom off on both</text>
-        <text x="2" y="471" fontSize="14">wireless mic split legs.</text>
+        <text x="2" y="419" fontSize="14">TX6 + matched bodypack receiver</text>
+        <text x="2" y="437" fontSize="14">{extraPatched ? "Extra stereo mix for guest use." : "Patch for guest or other use."}</text>
+        <text x="2" y="463" fontSize="14">Keep phantom off on both</text>
+        <text x="2" y="481" fontSize="14">wireless mic split legs.</text>
       </g>
-      {mixes.map((mix, i) => <IemTransmitter key={mix.tx} mix={mix} cx={62 + 129*i} />)}
-      {receivers.map((rx,i) => <MicReceiver key={rx.channel} rx={rx} cx={707+129*i} local={local} />)}
-      <text x="360" y="336" fontSize="14" fontWeight="bold">XLR OUT</text>
-      <text x={local ? 816 : 528} y="336" fontSize="14" fontWeight="bold">{local ? "XLR IN" : "AUX IN"}</text>
+      {mixes.map((mix, i) => <IemTransmitter key={mix.tx} mix={mix} x32={x32} cx={62 + 129*i} />)}
+      {receivers.map((rx,i) => <MicReceiver key={rx.channel} rx={rx} x32={x32} cx={707+receiverShift+129*i} local={local} />)}
+      <text x={x32.x + (extraPatched ? 60 : 118)} y="336" fontSize="14" fontWeight="bold">XLR OUT</text>
+      <text x={receiverShift + (local ? 816 : 528)} y="336" fontSize="14" fontWeight="bold">{local ? "XLR IN" : "AUX IN"}</text>
     </svg>
   </div>;
 }

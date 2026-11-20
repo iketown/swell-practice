@@ -1640,6 +1640,12 @@
   .cover-check strong { display: block; font: bold 16pt/1.35 Arial; }
   .cover-check div > a { display: block; font: 11pt Arial; text-decoration: underline; margin: .1in 0; overflow-wrap: anywhere; }
 }
+.production-contact { white-space: pre-line; }
+.cover-contact { margin-top: .3in; }
+.wireless-detail-reference { text-decoration: underline; }
+@supports (content: target-counter(attr(href url), page)) {
+  .wireless-detail-reference::after { content: " on page " target-counter(attr(href url), page); }
+}
 .release-register { padding: 1rem 0 2rem; }
 .release-register > label { display: inline-flex; align-items: center; gap: .6rem; margin: .6rem 0; }
 .release-entry { border-top: 1px solid var(--line); padding: .8rem 0; overflow-wrap: anywhere; }
@@ -1664,6 +1670,7 @@
 .rack-inputs, .rack-lower { display:grid; grid-template-columns:1fr 1fr; gap:1.5em; }
 .rack-rear { display:grid; grid-template-columns:1.8fr 1fr; align-items:center; gap:1em; }
 .rack-panel { position:relative; margin:.4em 0; align-self:center; container-type:inline-size; }
+.rack-panel-artwork { opacity: 0.3; }
 .rack-panel img { display:block; width:100%; height:auto; }
 .rack-panel .rack-pin { position:absolute; transform:translate(-50%,-50%); display:grid; place-items:center; padding:0; border:1px solid white; border-radius:50%; background:#173e38; color:white; width:3.9cqw; height:3.9cqw; font:bold 1.85cqw/1 Arial,sans-serif; }
 .rack-panel.x32 .rack-pin { width:4.8cqw; height:4.8cqw; font-size:2cqw; }
@@ -1695,7 +1702,7 @@
   .print-sheet .rack-guide h2 { font:bold 13pt/1.1 Arial,sans-serif; margin:6pt 0 2pt; padding-bottom:2pt; }
   .print-sheet .rack-guide p { margin:2pt 0 3pt; font:9pt/1.24 Arial,sans-serif; }
   .print-sheet .rack-guide table { font:9pt/1.12 Arial,sans-serif; }
-  .print-sheet .rack-guide th,.print-sheet .rack-guide td { padding:1pt 2pt; color:#111; }
+  .print-sheet .rack-guide th,.print-sheet .rack-guide td { padding:.5pt 2pt; color:#111; }
   .rack-guide .rack-pin { print-color-adjust:exact; -webkit-print-color-adjust:exact; }
   .rack-inputs,.rack-lower { gap:8pt; }
   .rack-sheet .print-title > div:first-child { display:flex; align-items:baseline; gap:8pt; }

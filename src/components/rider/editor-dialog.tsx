@@ -39,6 +39,7 @@ export type EditTarget = {
 type Props = {
   plot: Plot;
   target: EditTarget;
+  overview?: boolean;
   onClose: () => void;
   onSave: (p: Plot, id?: string, nextTarget?: EditTarget) => void;
 };
@@ -74,7 +75,7 @@ async function uploadedImage(file: File) {
     bitmap.close();
   }
 }
-export function EditorDialog({ plot: p, target: t, onClose, onSave }: Props) {
+export function EditorDialog({ plot: p, target: t, overview, onClose, onSave }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -84,6 +85,8 @@ export function EditorDialog({ plot: p, target: t, onClose, onSave }: Props) {
     i = p.inputs.find((x) => x.id === t.id),
     g = p.gear.find((x) => x.id === t.id),
     c = p.cables.find((x) => x.id === t.id);
+  const editingIcon = overview && o?.overviewPosition;
+  const shownObject = o && editingIcon ? { ...o, ...editingIcon } : o;
   const lastCable = c ?? p.cables.find((run) => run.id === t.repeatOf);
   const cableGear = p.gear.find(
     (g) => g.id === (t.allocationId ?? lastCable?.gearId),
@@ -166,6 +169,9 @@ export function EditorDialog({ plot: p, target: t, onClose, onSave }: Props) {
         const entry: PlotObject = {
           id,
           asset: key,
+          ...(o?.overviewPosition && { overviewPosition: o.overviewPosition }),
+          ...(o?.overviewOnly && { overviewOnly: true }),
+          ...(key === "stage-riser" ? { riserHeightInches: n("riserHeightInches") } : {}),
           ...(o?.standId ? { standId: o.standId } : {}),
           ...(o?.placement || anchorEdited || asset !== initialShape.asset ? { placement: { x: anchorFraction.x * (v("w") ? n("w") : shape.w), y: anchorFraction.y * (v("h") ? n("h") : shape.h) } } : {}),
           ...(v("layer") ? { layer: v("layer") as PlotObject["layer"] } : {}),
@@ -176,6 +182,11 @@ export function EditorDialog({ plot: p, target: t, onClose, onSave }: Props) {
           h: v("h") ? n("h") : shape.h,
           opacity: v("opacity") ? n("opacity") / 100 : shape.opacity,
         };
+        if (editingIcon && o) {
+          entry.overviewPosition = { x: entry.x, y: entry.y };
+          entry.x = o.x;
+          entry.y = o.y;
+        }
         const objects = replace(p.objects, entry);
         if (v("order") === "front") {
           objects.splice(
@@ -237,6 +248,7 @@ export function EditorDialog({ plot: p, target: t, onClose, onSave }: Props) {
           patch: v("patch"),
           phantom: v("phantom"),
           notes: v("notes"),
+          ...(i?.overviewPosition && { overviewPosition: i.overviewPosition }),
           x: i?.x ?? p.width / 2,
           y: i?.y ?? p.depth / 2,
         };
@@ -332,7 +344,7 @@ export function EditorDialog({ plot: p, target: t, onClose, onSave }: Props) {
     field("station", "Station / performer", value);
   const endpoints = [
     ...p.objects
-      .filter((o) => o.asset !== "label")
+      .filter((o) => o.asset !== "label" && !o.overviewOnly)
       .map((o) => ({ id: o.id, name: pointFor(p, o.id)!.label })),
     ...p.stageBoxes.map((box) => ({
       id: box.id,
@@ -416,19 +428,20 @@ export function EditorDialog({ plot: p, target: t, onClose, onSave }: Props) {
               {field(
                 "x",
                 "Anchor from centreline (ft, − SR / + SL)",
-                o ? stageAnchor(o).x - p.width / 2 : 0,
+                shownObject ? stageAnchor(shownObject).x - p.width / 2 : 0,
                 true,
                 "number",
               )}
               {field(
                 "y",
                 "Anchor from front edge (ft)",
-                o ? p.depth - stageAnchor(o).y : p.depth / 2,
+                shownObject ? p.depth - stageAnchor(shownObject).y : p.depth / 2,
                 true,
                 "number",
               )}
-              {field("w", "Symbol width (ft)", o?.w ?? "", false, "number")}
-              {field("h", "Symbol height (ft)", o?.h ?? "", false, "number")}
+              {asset === "stage-riser" && field("riserHeightInches", "Deck height (in)", o?.riserHeightInches ?? 12, true, "number")}
+              {field("w", asset === "stage-riser" ? "Deck width (ft)" : "Symbol width (ft)", o?.w ?? "", false, "number")}
+              {field("h", asset === "stage-riser" ? "Deck depth (ft)" : "Symbol height (ft)", o?.h ?? "", false, "number")}
               {field(
                 "opacity",
                 "Opacity (%)",

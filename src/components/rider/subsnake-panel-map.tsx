@@ -72,7 +72,7 @@ export function SubsnakePanelMap({ inputs, print }: { inputs: RackInput[]; print
         <TailLabels rows={above} above />
         <svg viewBox={`0 0 ${width} ${height}`} role="img"
           aria-label={inputs.map(r => `${r.source}, subsnake tail ${tailLabel(r)}, split in ${r.number}, monitor tail ${r.number}, S16 input ${r.s16}, X32 channel ${r.number}`).join(". ")}>
-          <image href={s16Front.src} x={panelX} y={panelY} width={panelWidth} height={panelHeight}/>
+          <image className="rack-panel-artwork" href={s16Front.src} x={panelX} y={panelY} width={panelWidth} height={panelHeight}/>
           <text x="0" y={height / 2 - 8} fontSize="15">Behringer</text>
           <text x="0" y={height / 2 + 23} fontSize="32" fontWeight="700">S16</text>
           <text x="0" y={height / 2 + 45} className="patch-cap">FRONT PANEL</text>

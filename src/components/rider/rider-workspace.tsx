@@ -30,7 +30,8 @@ import {
   type Published,
 } from "@/lib/rider/model";
 import { moveStandPair } from "@/lib/rider/instrument-stands";
-import { boxFrame, boxColors } from "@/lib/rider/stage-box";
+import { boxFrame, boxColors, sideStageWidth } from "@/lib/rider/stage-box";
+import { clearBrowserDraft, draftKey, olderBrowserDrafts, restoreBrowserDraft } from "@/lib/rider/browser-drafts";
 import { riderRequest } from "@/lib/rider/version-client";
 import { standardVersionId, versionHref } from "@/lib/rider/versions";
 import { checkHref } from "@/lib/rider/releases";
@@ -87,24 +88,11 @@ const dateLabel = (s: string) =>
     timeZone: "UTC",
   });
 function restoreDraft(record: Published, uid: string) {
-  const prefix = "swell-stage-plot:draft:" + uid;
   try {
-    const saved =
-      localStorage.getItem(prefix + ":" + record.versionId) ??
-      (record.versionId === standardVersionId
-        ? localStorage.getItem(prefix)
-        : null);
-    if (saved) {
-      const data = JSON.parse(saved);
-      const parsed = plotSchema.safeParse(data.plot);
-      if (parsed.success && Number.isInteger(data.revision)) {
-        return { ...record, revision: data.revision, plot: parsed.data };
-      }
-    }
+    return restoreBrowserDraft(localStorage, record, uid);
   } catch {
-    /* Browser storage may be unavailable. */
+    return record;
   }
-  return record;
 }
 
 export function RiderWorkspace({
@@ -159,7 +147,7 @@ export function RiderWorkspace({
   }
   const [pages, setPages] = useState<readonly RiderPage[]>(() => defaultPages(issuedPacket ?? "Full rider"));
   const released = !!record.releaseNumber || !!record.releaseCode;
-  const staleDraft = released && !!draft && draft.revision !== record.revision;
+  const [olderDrafts, setOlderDrafts] = useState<ReturnType<typeof olderBrowserDrafts>>([]);
   const printOptions = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
     function dismiss(event: PointerEvent) {
@@ -186,8 +174,7 @@ export function RiderWorkspace({
         : current;
     });
   }
-  const legacyKey = "swell-stage-plot:draft:" + editorUid;
-  const storageKey = legacyKey + ":" + initial.versionId;
+  const storageKey = draft && initial.versionId ? draftKey(editorUid, initial.versionId, draft.revision) : "";
   useEffect(() => {
     if (issuedPacket || privateMode || !released) return;
     async function refresh() {
@@ -246,9 +233,7 @@ export function RiderWorkspace({
       );
       setRecord(latest);
       if (fresh) {
-        localStorage.removeItem(storageKey);
-        if (initial.versionId === standardVersionId)
-          localStorage.removeItem(legacyKey);
+        clearBrowserDraft(localStorage, latest, editorUid);
       }
       setDraft(fresh ? latest : restoreDraft(latest, editorUid));
       setConfirmReset(false);
@@ -268,13 +253,12 @@ export function RiderWorkspace({
         action: "save",
         id: initial.versionId!,
         revision: draft.revision,
+        expectedHead: draft.revision,
         plot: draft.plot,
       });
       setRecord(next);
       setDraft(next.releaseNumber ? null : next);
-      localStorage.removeItem(storageKey);
-      if (initial.versionId === standardVersionId)
-        localStorage.removeItem(legacyKey);
+      clearBrowserDraft(localStorage, draft, editorUid);
 
       select(null);
       setMessage(
@@ -369,6 +353,17 @@ export function RiderWorkspace({
       }
       const clip = (n: number, max: number) =>
         Math.round(Math.min(Math.max(0, max), Math.max(0, n)) * 100) / 100;
+      if (view === "Overview") {
+        const item = p.objects.find(o => o.id === id && o.overviewPosition);
+        const pin = p.inputs.find(i => i.id === id && i.overviewPosition);
+        if (item || pin) {
+          const overviewPosition = { x: clip(x, p.width + sideStageWidth - (item?.w ?? .4)), y: clip(y, p.depth - (item?.h ?? .5)) };
+          return { ...prev, plot: { ...p,
+            objects: item ? p.objects.map(o => o === item ? { ...o, overviewPosition } : o) : p.objects,
+            inputs: pin ? p.inputs.map(i => i === pin ? { ...i, overviewPosition } : i) : p.inputs,
+          } };
+        }
+      }
       return {
         ...prev,
         plot: {
@@ -387,14 +382,13 @@ export function RiderWorkspace({
       };
     });
   }
-  function downloadDraft() {
-    if (!draft) return;
+  function downloadDraft(raw: string, filename: string) {
     const url = URL.createObjectURL(
-      new Blob([JSON.stringify({ ...draft, plot: p }, null, 2)], { type: "application/json" }),
+      new Blob([raw], { type: "application/json" }),
     );
     const a = document.createElement("a");
     a.href = url;
-    a.download = "swell-stage-plot-draft.json";
+    a.download = filename;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
@@ -573,7 +567,7 @@ export function RiderWorkspace({
             </span>
             <small>
               {issuedPacket ? "Issued · " + record.releaseCode : !released
-                ? "Version 1 draft"
+                ? privateMode ? "Working draft · Rev " + record.revision : "Version 1 draft"
                 : privateMode
                   ? (editing ? "Editing" : "Saved") +
                     " · Rev " +
@@ -658,12 +652,6 @@ export function RiderWorkspace({
             {message}
           </div>
         )}
-        {editing && staleDraft && (
-          <p className="rider-message" role="status">
-            Your browser draft is based on an older revision. Download it or
-            load the latest revision in Draft options.
-          </p>
-        )}
         {editing && (
           <div className="rider-tools">
             <button onClick={() => setTarget({ kind: "object" })}>
@@ -682,12 +670,23 @@ export function RiderWorkspace({
               <SlidersHorizontal />
               Rider settings
             </button>
-            <details>
+            <details onToggle={(event) => {
+              if (!event.currentTarget.open) return;
+              try {
+                setOlderDrafts(olderBrowserDrafts(localStorage, record, editorUid));
+              } catch {
+                setOlderDrafts([]);
+              }
+            }}>
               <summary>Draft options</summary>
-              <button onClick={downloadDraft}>
+              <button onClick={() => downloadDraft(JSON.stringify({ ...draft, plot: p }, null, 2), "swell-stage-plot-draft.json")}>
                 <ArrowDownToLine />
                 Download draft
               </button>
+              {olderDrafts.map(({ revision, raw }) => <button key={revision}
+                onClick={() => downloadDraft(raw, `swell-stage-plot-draft-rev-${revision}.json`)}>
+                <ArrowDownToLine /> Download browser draft from revision {revision}
+              </button>)}
               <button
                 onClick={() =>
                   confirmReset ? edit(true) : setConfirmReset(true)
@@ -718,7 +717,7 @@ export function RiderWorkspace({
                   <button
                     className="primary"
                     onClick={saveRevision}
-                    disabled={busy || draft === record || staleDraft}
+                    disabled={busy || draft === record}
                   >
                     {busy
                       ? "Saving…"
@@ -736,7 +735,12 @@ export function RiderWorkspace({
             </div>
           </header>
           {internal && <div className="stage-view-selector" role="group" aria-label="Stage view">
-            {stageViews.map((name) => <button key={name} type="button" aria-pressed={view === name} onClick={() => { setView(name); if (name === "Stand placement" && !p.objects.some((o) => o.id === selected && isStandPlacementItem(o))) select(null); }}>{name}</button>)}
+            {stageViews.map(name => <button key={name} type="button" aria-pressed={view === name} onClick={() => {
+              setView(name);
+              const item = p.objects.find(o => o.id === selected);
+              if ((name === "Stand placement" && (!item || !isStandPlacementItem(item))) ||
+                  (name !== "Overview" && item?.overviewOnly)) select(null);
+            }}>{name}</button>)}
             <span className="hint">One layout · changes appear in every view</span>
           </div>}
           <StageViewport
@@ -871,7 +875,7 @@ export function RiderWorkspace({
                 onChange={(e) => choose(e.target.value)}
               >
                 <option value="">Choose an item</option>
-                {p.objects.filter((o) => view !== "Stand placement" || isStandPlacementItem(o)).map((o) => (
+                {p.objects.filter((o) => (view === "Overview" || !o.overviewOnly) && (view !== "Stand placement" || isStandPlacementItem(o))).map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.label}
                   </option>
@@ -1420,6 +1424,7 @@ export function RiderWorkspace({
               (target.id ?? target.repeatOf ?? target.allocationId ?? "")
             }
             plot={p}
+            overview={view === "Overview"}
             target={target}
             onClose={() => setTarget(null)}
             onSave={change}

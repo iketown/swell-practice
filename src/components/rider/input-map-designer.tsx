@@ -5,7 +5,7 @@ import type { Published } from "@/lib/rider/model";
 import {
   applyRackMap,
   standardRackMap,
-  standardS16Inputs, standardEarPairs, standardWirelessInputs, earRoutes,
+  standardS16Inputs, earPairOptions, standardWirelessInputs, earRoutes,
   housePlayback,
   supportsRackMap,
   type RackMap,
@@ -25,19 +25,20 @@ export function InputMapDesigner({
 }) {
   const [record, setRecord] = useState(initial);
   const [map, setMap] = useState<RackMap>(
-    { ...standardRackMap, ...initial.plot.rackMap, s16Inputs: initial.plot.rackMap?.s16Inputs ?? standardS16Inputs },
+    { ...(initial.plot.rackMap ?? standardRackMap), s16Inputs: initial.plot.rackMap?.s16Inputs ?? standardS16Inputs },
   );
   const [trace, setTrace] = useState(
     "Select a labeled socket to trace its connection.",
   );
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
+  const pairs = earPairOptions(map);
   const savedMap = record.plot.rackMap;
   const changed = !savedMap?.s16Inputs ||
     map.housePorts.some((n, i) => n !== savedMap.housePorts[i]) ||
     map.s16Inputs?.some((n, i) => n !== savedMap.s16Inputs?.[i]) ||
     standardWirelessInputs.some((n, i) => (map.wirelessInputs?.[i] ?? n) !== (savedMap.wirelessInputs?.[i] ?? n)) ||
-    standardEarPairs.some((n, i) => (map.earPairs?.[i] ?? n) !== (savedMap.earPairs?.[i] ?? n));
+    pairs.some((n, i) => (map.earPairs?.[i] ?? n) !== (savedMap.earPairs?.[i] ?? n));
   const inputs = rackInputs(record.plot, map);
   const preview = { ...record, plot: { ...record.plot, rackMap: map } };
   const compatible = template || supportsRackMap(record.plot);
@@ -51,7 +52,7 @@ export function InputMapDesigner({
     setTrace("Select a labeled socket to trace its connection.");
   }
   function swapPort(field: "s16Inputs" | "wirelessInputs" | "earPairs", channel: number, port: number) {
-    const defaults = { s16Inputs: standardS16Inputs, wirelessInputs: standardWirelessInputs, earPairs: standardEarPairs };
+    const defaults = { s16Inputs: standardS16Inputs, wirelessInputs: standardWirelessInputs, earPairs: pairs };
     const ports = [...(map[field] ?? defaults[field])];
     const other = ports.indexOf(port);
     ports[other] = ports[channel - 1];
@@ -119,7 +120,7 @@ export function InputMapDesigner({
                     disabled={busy}
                     onChange={(e) => setOutput(i, Number(e.target.value))}
                   >
-                    {[3, 4, 5, 6, 7, 8].map((port) => (
+                    {(map.housePorts.length === 4 ? [5, 6, 7, 8] : [3, 4, 5, 6, 7, 8]).map((port) => (
                       <option key={port}>{port}</option>
                     ))}
                   </select>
@@ -156,8 +157,8 @@ export function InputMapDesigner({
               </label>)}</div>
               <h3>Stereo transmitter feeds</h3><div>{earRoutes(map).map(mix => <label key={mix.tx}>
                 <span>TX {mix.tx} · {mix.name}</span>
-                <select aria-label={`Outputs for TX ${mix.tx}`} value={(map.earPairs ?? standardEarPairs)[mix.tx - 1]} disabled={busy} onChange={e => swapPort("earPairs", mix.tx, Number(e.target.value))}>
-                  {standardEarPairs.map(pair => <option key={pair} value={pair}>{pair === 5 ? "X32 Rack 1/2" : `S16 ${pair * 2 - 1}/${pair * 2}`}</option>)}
+                <select aria-label={`Outputs for TX ${mix.tx}`} value={(map.earPairs ?? pairs)[mix.tx - 1]} disabled={busy} onChange={e => swapPort("earPairs", mix.tx, Number(e.target.value))}>
+                  {pairs.map(pair => <option key={pair} value={pair}>{pair >= 5 ? `X32 Rack ${2 * pair - 9}/${2 * pair - 8}` : `S16 ${pair * 2 - 1}/${pair * 2}`}</option>)}
                 </select>
               </label>)}</div>
             </details>

@@ -2,10 +2,10 @@
   {
     "code": "11.20.26",
     "id": "standard",
-    "revision": 95,
-    "packet": { "file": "The-Swell-Production-Packet-11.20.26.pdf", "pages": 21 },
+    "revision": 110,
+    "packet": { "file": "The-Swell-Production-Packet-11.20.26.pdf", "pages": 19 },
     "documents": [
-      { "title": "Technical rider", "file": "The-Swell-Technical-Rider-11.20.26.pdf", "pages": 15 },
+      { "title": "Technical rider", "file": "The-Swell-Technical-Rider-11.20.26.pdf", "pages": 13 },
       { "title": "Rack channel guide", "file": "The-Swell-Rack-Channel-Guide-11.20.26.pdf", "pages": 6 }
     ]
   }

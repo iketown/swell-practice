@@ -126,6 +126,7 @@ export function PrintPacket({
             {!code && <p>Working copy. Request an issued edition before advancing the show.</p>}
           </div>
         </div>
+        {!guideOnly && p.contact && <div className="cover-contact"><strong>Production contact</strong><p className="production-contact">{p.contact}</p></div>}
         {guideFooter}
       </section>
       {pages.includes("Stage plot") && (
@@ -198,7 +199,7 @@ export function PrintPacket({
       {setupPages.filter((page) => preview && pages.includes(page)).map((view) => <div className="setup-print-group" key={view}><section className="print-sheet print-diagram-sheet">
         {title(view)}
         <StageCanvas printLayout plot={p} view={view} layers={viewLayers(view, defaultLayers)} editing={false} selected={null} active={null} onHover={noop} onSelect={noop} onMove={noop} />
-        {diagramFooter(<><b>Grid: 2 ft squares</b> · {view === "Stand placement" ? "Crosshairs mark the points measured from centreline and the downstage edge." : "Stage-box grids show plot inputs in socket order. Read left to right, starting at socket 1 in each box."}</>)}
+        {diagramFooter(<><b>Grid: 2 ft squares</b> · {view === "Stand placement" ? (p.objects.some(o => o.asset === "stage-riser") ? "Crosshairs mark the midpoint of each riser’s front edge and the front vocal stand bases. Measure from centreline and the downstage edge." : "Crosshairs mark the points measured from centreline and the downstage edge.") : "Stage-box grids show plot inputs in socket order. Read left to right, starting at socket 1 in each box."}</>)}
       </section>
         {view === "Stand placement" && <section className="print-sheet">{title("Stand placement schedule")}<StandPlacementPanel plot={p} selected={null} editing={false} printLayout onSelect={noop} onChange={noop} /></section>}
         {view === "Cable patch and routing" && <section className="print-sheet">{title("Cable patch schedule")}<CablePatchSchedule plot={p} /></section>}
