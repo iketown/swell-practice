@@ -69,13 +69,13 @@ export function PrintPacket({
   const boxesById = new Map(p.stageBoxes.map((b) => [b.id, b.label]));
   return (
     <article className="rider-print">
-      <style>{`@page {size: letter portrait; margin: 1in 1in 1.78in;
-        @bottom-left { width:75%; margin-bottom:1in; overflow-wrap:anywhere; border-top:.7pt solid #506562; padding-top:4pt; vertical-align:top; white-space:pre-line; content:${JSON.stringify("THE SWELL · " + visibleUrl + "\n" + issue + " · " + record.versionName + " · " + dateText).replaceAll("\\n", "\\A ")}; font:9pt Arial; line-height:1.4; }
-        @bottom-right { width:15%; margin-bottom:1in; border-top:.7pt solid #506562; padding-top:4pt; vertical-align:top; content:url("${qrDataUrl(qrUrl)}"); }
-        @bottom-center { width:10%; margin-bottom:1in; white-space:nowrap; vertical-align:top; padding-top:9pt; content:"Page " counter(page); font:8pt Arial; }
+      <style>{`@page {size: letter portrait; margin: .375in .375in 1.28in;
+        @bottom-left { width:75%; margin-bottom:.5in; overflow-wrap:anywhere; border-top:.7pt solid #506562; padding-top:4pt; vertical-align:top; white-space:pre-line; content:${JSON.stringify("THE SWELL · " + visibleUrl + "\n" + issue + " · " + record.versionName + " · " + dateText).replaceAll("\\n", "\\A ")}; font:9pt Arial; line-height:1.4; }
+        @bottom-right { width:15%; margin-bottom:.5in; border-top:.7pt solid #506562; padding-top:4pt; vertical-align:top; content:url("${qrDataUrl(qrUrl)}"); }
+        @bottom-center { width:10%; margin-bottom:.5in; white-space:nowrap; vertical-align:top; padding-top:9pt; content:"Page " counter(page); font:8pt Arial; }
       }
       @page riderMap {
-        size: letter landscape; margin: 1in 1in 1.18in;
+        size: letter landscape; margin: .375in .375in .68in;
         @bottom-left { content: none; border: 0; }
         @bottom-right { content: none; border: 0; }
         @bottom-center { padding: 0; vertical-align: middle; }

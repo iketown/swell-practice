@@ -1470,7 +1470,7 @@
   .print-diagram-sheet {
     box-sizing: border-box;
     page: riderMap;
-    height: calc(8.5in - 1in - 1.18in - 1px);
+    height: calc(8.5in - .375in - .68in - 1px);
     padding: 0;
     display: flex;
     flex-direction: column;
@@ -1591,8 +1591,8 @@
 
   .advance-sheet[data-advance="audio"] .advance-category { margin-bottom: 6pt; }
   .advance-sheet[data-advance="audio"] .advance-stage { break-inside: avoid; }
-  .advance-sheet[data-advance="audio"] .advance-category h2 { margin-top: 10pt; }
-  .advance-sheet[data-advance="audio"] .advance-table td { padding-block: 3pt; }
+  .advance-sheet[data-advance="audio"] .advance-category h2 { margin-top: 7pt; }
+  .advance-sheet[data-advance="audio"] .advance-table td { padding-block: 2.5pt; }
 }
 
 @media print {
@@ -1625,7 +1625,7 @@
 .rider-check form, .rider-check .version-button { margin-top: 1rem; }
 .rider-check form { display: grid; gap: 1rem; justify-items: start; }
 @media print {
-  .print-cover { break-after: page; padding: .42in .1in 0; }
+  .print-cover { break-after: page; padding: 0; }
   .print-cover > img { width: 2.6in; height: auto; margin-bottom: .32in; }
   .print-cover h1 { font: bold 32pt Arial; }
   .print-cover h2 { font: bold 17pt Arial; margin: .08in 0; }
