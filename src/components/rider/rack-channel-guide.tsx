@@ -2,6 +2,8 @@ import Image from "next/image";
 import { earRoutes, stems, type RackMap } from "@/lib/rider/rack-map";
 import { type wirelessRoutes, type RackInput } from "@/lib/rider/rack-inputs";
 
+import { s16Front, s16InputCenter } from "./s16-panel";
+
 type Pin = { x: number; y: number; label: string; route: string };
 function Panel({
   device,
@@ -13,8 +15,8 @@ function Panel({
   onTrace?: (route: string) => void;
 }) {
   const s16 = device === "s16";
-  const width = s16 ? 615 : 492;
-  const height = s16 ? 116 : 152;
+  const width = s16 ? s16Front.width : 492;
+  const height = s16 ? s16Front.height : 152;
   return (
     <div className="rack-panel-scroll">
       <figure className={"rack-panel " + device}>
@@ -25,7 +27,7 @@ function Panel({
               : "Behringer X32 Rack rear panel, viewed from behind"
           }
           src={
-            "/stage-plot/panels/" + (s16 ? "s16-front" : "x32-rear") + ".png"
+            s16 ? s16Front.src : "/stage-plot/panels/x32-rear.png"
           }
           width={width}
           height={height}
@@ -73,8 +75,7 @@ export function RackChannelGuide({
 }) {
   const ears = earRoutes(map);
   const s16: Pin[] = inputs.map(({ number, source, socket, s16 }) => ({
-    x: 51 + ((s16 - 1) % 8) * 33.2,
-    y: s16 <= 8 ? 37 : 86,
+    ...s16InputCenter(s16),
     label: String(s16),
     route: `${source} · ${socket} → split ${number} → S16 IN ${s16} → X32 CH ${number}`,
   }));
