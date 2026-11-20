@@ -26,7 +26,7 @@ export function qrArtwork(url: string) {
 
 export function qrDataUrl(url: string) {
   const { size, path } = qrArtwork(url);
-  return "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="77" height="77" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges"><rect width="${size}" height="${size}" fill="white"/><path d="${path}" fill="black"/></svg>`);
+  return "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="62" height="62" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges"><rect width="${size}" height="${size}" fill="white"/><path d="${path}" fill="black"/></svg>`);
 }
 
 export const PrintQr = memo(function PrintQr({ url, label }: { url: string; label: string }) {

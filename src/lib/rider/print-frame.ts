@@ -18,7 +18,7 @@ export function printFrame(p: Plot, view: StageView) {
     include(o.x, o.y, o.w, o.h + 0.5);
     if (view === "Stand placement" && (o.layer === "stands" || ["boom", "drum-boom", "drum-rug", "hercules-gs414b-plus"].includes(o.asset))) {
       const { x, y } = stageAnchor(o);
-      include(x - 3.5, y, 7, 1.9);
+      include(x - 3.5, y - .55, 7, 3.55);
     }
   }
   if (view !== "Stand placement") {

@@ -17,6 +17,13 @@ export function feetInches(feet: number) {
   const inches = Math.round(Math.abs(feet) * 12);
   return `${Math.floor(inches / 12)}′ ${inches % 12}″`;
 }
+function printedOffset(offset: number, compact: boolean) {
+  const feet = Math.round(Math.abs(offset));
+  if (!feet) return "On centreline";
+  if (compact) return feet + "′ " + (offset < 0 ? "SR" : "SL");
+  return feet + " ft " + (offset < 0 ? "stage right" : "stage left");
+}
+
 export function StandMeasurements({ plot: p, selected, printLayout = false }: {
   plot: Plot; selected: string | null; printLayout?: boolean;
 }) {
@@ -25,15 +32,16 @@ export function StandMeasurements({ plot: p, selected, printLayout = false }: {
     {stands.map((o, index) => {
       const b = standBase(o), hot = selected === o.id;
       const crowded = stands.some((other) => other.id !== o.id && Math.abs(standBase(other).x - b.x) < 3.6 && Math.abs(standBase(other).y - b.y) < 1.5);
-      const labelY = b.y + (crowded && index % 2 ? 1.35 : .6);
+      const stagger = crowded && index % 2 === 1;
+      const labelY = b.y + (printLayout ? .87 : .6) + (stagger ? (printLayout ? 1.25 : .75) : 0);
       return <g key={o.id}>
         {hot && <path d={`M${p.width / 2} ${b.y}H${b.x}V${p.depth}`} stroke="#196166" strokeWidth=".045" fill="none" strokeDasharray=".12 .1" />}
         <path d={`M${b.x - 0.16} ${b.y}h.32M${b.x} ${b.y - 0.16}v.32`} stroke="#196166" strokeWidth=".06" />
         <text x={b.x + 0.22} y={b.y - 0.16} fontSize=".38" fill="#203b38" stroke="#fffefa" strokeWidth=".10" paintOrder="stroke" fontWeight="700">{o.asset === "drum-rug" ? "RUG" : `S${index + 1}`}{!printLayout && !o.placement && "?"}</text>
-        {crowded && index % 2 === 1 && <path d={`M${b.x} ${b.y + .2}V${labelY - .38}`} stroke="#728780" strokeWidth=".025" />}
-        <text x={b.x} y={labelY} textAnchor="middle" fontSize=".38" fill="#203b38" stroke="#fffefa" strokeWidth=".12" paintOrder="stroke">
-          {Math.abs(b.x - p.width / 2) < 1 / 24 ? "On centreline" : `${feetInches(b.x - p.width / 2)} ${b.x < p.width / 2 ? "SR" : "SL"}`}
-          <tspan x={b.x} dy=".43">front: {feetInches(p.depth - b.y)}</tspan>
+        {stagger && <path d={`M${b.x} ${b.y + .2}V${labelY - .38}`} stroke="#728780" strokeWidth=".025" />}
+        <text x={b.x} y={labelY} textAnchor="middle" fontSize={printLayout ? .61 : .38} fontWeight={printLayout ? 600 : undefined} fill="#203b38" stroke="#fffefa" strokeWidth=".12" paintOrder="stroke">
+          {printLayout ? printedOffset(b.x - p.width / 2, true) : Math.abs(b.x - p.width / 2) < 1 / 24 ? "On centreline" : `${feetInches(b.x - p.width / 2)} ${b.x < p.width / 2 ? "SR" : "SL"}`}
+          <tspan x={b.x} dy={printLayout ? .67 : .43}>{printLayout ? `front ${Math.round(p.depth - b.y)}′` : `front: ${feetInches(p.depth - b.y)}`}</tspan>
         </text>
       </g>;
     })}
@@ -87,7 +95,7 @@ export function StandPlacementPanel({ plot: p, selected, editing, printLayout = 
     {error && <p role="alert">{error}</p>}
     <table><thead><tr><th>Item</th><th>Position / type</th><th>From centreline</th><th>From front edge</th>{!printLayout && <th>Base reference</th>}</tr></thead><tbody>{stands.map((o, index) => {
       const b = standBase(o), offset = b.x - p.width / 2;
-      return <tr key={o.id} data-stand-id={o.id}><td>{editing ? <button type="button" aria-pressed={selected === o.id} onClick={() => onSelect(o.id)}>{o.asset === "drum-rug" ? "RUG" : `S${index + 1}`}</button> : o.asset === "drum-rug" ? "RUG" : `S${index + 1}`}</td><td>{o.label}{o.asset === "drum-rug" && ` · ${feetInches(o.w)} × ${feetInches(o.h)} · downstage centre`}</td><td>{Math.abs(offset) < 1 / 24 ? "On centreline" : `${feetInches(offset)} ${offset < 0 ? "stage right" : "stage left"}`}</td><td>{feetInches(p.depth - b.y)} upstage</td>{!printLayout && <td>{o.placement ? "Set" : "Approximate ?"}</td>}</tr>;
+      return <tr key={o.id} data-stand-id={o.id}><td>{editing ? <button type="button" aria-pressed={selected === o.id} onClick={() => onSelect(o.id)}>{o.asset === "drum-rug" ? "RUG" : `S${index + 1}`}</button> : o.asset === "drum-rug" ? "RUG" : `S${index + 1}`}</td><td>{o.label}{o.asset === "drum-rug" && (printLayout ? ` · ${o.w} × ${o.h} ft · downstage centre` : ` · ${feetInches(o.w)} × ${feetInches(o.h)} · downstage centre`)}</td><td className="stand-distance">{printLayout ? printedOffset(offset, false) : Math.abs(offset) < 1 / 24 ? "On centreline" : `${feetInches(offset)} ${offset < 0 ? "stage right" : "stage left"}`}</td><td className="stand-distance">{printLayout ? Math.round(p.depth - b.y) + " ft" : feetInches(p.depth - b.y)} upstage</td>{!printLayout && <td>{o.placement ? "Set" : "Approximate ?"}</td>}</tr>;
     })}</tbody></table>
   </div>;
 }

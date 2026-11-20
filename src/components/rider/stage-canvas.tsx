@@ -258,7 +258,7 @@ export function StageCanvas({
             fontSize={Math.min(.4, o.w / 7.6)} fontWeight="700" fill="#203b38">
             {o.label}
             <tspan x={o.x + o.w / 2} dy=".47" fontWeight="500">
-              {feetInches(Math.max(o.w, o.h))} × {Math.round(Math.min(o.w, o.h) * 12)}″
+              {printLayout ? `${Math.max(o.w, o.h)} × ${Math.min(o.w, o.h)} ft` : `${feetInches(Math.max(o.w, o.h))} × ${Math.round(Math.min(o.w, o.h) * 12)}″`}
             </tspan>
           </text>
           {editing && selected === o.id && <rect x={o.x} y={o.y} width={o.w} height={o.h} className="rider-selected" />}

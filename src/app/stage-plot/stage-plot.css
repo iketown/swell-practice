@@ -1456,7 +1456,10 @@
   .cable-patch-schedule .stagebox-patch-table th { padding: 2pt 5pt; }
   .cable-patch-schedule strong { print-color-adjust: exact; }
 }
-@media print { .stand-placement-panel { padding: 0; overflow: visible; } }
+@media print {
+  .stand-placement-panel { padding: 0; overflow: visible; }
+  .stand-placement-panel .stand-distance { font-size: 11.5pt; font-weight: 600; }
+}
 @media print {
   .setup-print-group { break-before: page; }
   .setup-print-group + .setup-print-group { break-before: page; }
@@ -1467,7 +1470,7 @@
   .print-diagram-sheet {
     box-sizing: border-box;
     page: riderMap;
-    height: calc(8.5in - .28in - .3in - 1px);
+    height: calc(8.5in - 1in - 1.18in - 1px);
     padding: 0;
     display: flex;
     flex-direction: column;
