@@ -73,20 +73,14 @@ export function PrintPacket({
   const boxesById = new Map(p.stageBoxes.map((b) => [b.id, b.label]));
   return (
     <article className="rider-print">
-      <style>{`@page {size: letter portrait; margin: .375in .375in 1.28in;
-        @bottom-left { width:75%; margin-bottom:.5in; overflow-wrap:anywhere; border-top:.7pt solid #506562; padding-top:4pt; vertical-align:top; white-space:pre-line; content:${JSON.stringify("THE SWELL · " + visibleUrl + "\n" + issue + " · " + record.versionName + " · " + dateText).replaceAll("\\n", "\\A ")}; font:9pt Arial; line-height:1.4; }
-        @bottom-right { width:15%; margin-bottom:.5in; border-top:.7pt solid #506562; padding-top:4pt; vertical-align:top; content:url("${qrDataUrl(qrUrl)}"); }
-        @bottom-center { width:10%; margin-bottom:.5in; white-space:nowrap; vertical-align:top; padding-top:9pt; content:"Page " counter(page); font:8pt Arial; }
+      <style>{`@page {size: letter portrait; margin: .75in .75in 1.47in;
+        @bottom-left { width:75%; margin-bottom:.75in; overflow-wrap:anywhere; border-top:.7pt solid #506562; padding-top:4pt; vertical-align:top; white-space:pre-line; content:${JSON.stringify("THE SWELL · " + visibleUrl + "\n" + issue + " · " + record.versionName + " · " + dateText).replaceAll("\\n", "\\A ")}; font:9pt Arial; line-height:1.4; }
+        @bottom-right { width:15%; margin-bottom:.75in; border-top:.7pt solid #506562; padding-top:4pt; vertical-align:top; content:url("${qrDataUrl(qrUrl)}"); }
+        @bottom-center { width:10%; margin-bottom:.75in; white-space:nowrap; vertical-align:top; padding-top:9pt; content:"Page " counter(page); font:8pt Arial; }
       }
-      @page rackPatchMap {
-        /* The bottom band holds the QR and folio above the same .75in outer margin. */
-        size: letter landscape; margin: .75in .75in calc(.75in + .72in);
-        @bottom-left { margin-bottom: .75in; }
-        @bottom-center { margin-bottom: .75in; }
-        @bottom-right { margin-bottom: .75in; }
-      }
+      @page rackPatchMap { size: letter landscape; }
       @page riderMap {
-        size: letter landscape; margin: .375in .375in .68in;
+        size: letter landscape; margin-bottom: .93in;
         @bottom-left { content: none; border: 0; }
         @bottom-right { content: none; border: 0; }
         @bottom-center { padding: 0; vertical-align: middle; }

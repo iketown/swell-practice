@@ -1470,7 +1470,7 @@
   .print-diagram-sheet {
     box-sizing: border-box;
     page: riderMap;
-    height: calc(8.5in - .375in - .68in - 1px);
+    height: calc(8.5in - .75in - .93in - 1px);
     padding: 0;
     display: flex;
     flex-direction: column;
@@ -1538,7 +1538,7 @@
   .advance-sheet:is([data-advance="band"], [data-advance="unassigned"]) .advance-table td { padding: 2pt 4pt; }
   .advance-sheet:is([data-advance="band"], [data-advance="unassigned"]) .advance-note { margin-top: 1pt; }
   .advance-sheet .print-title, .advance-sheet .advance-intro { break-after: avoid; }
-  .print-input-key th, .print-input-key td { padding: 2pt 3pt; vertical-align: top; }
+  .print-input-key th, .print-input-key td { padding: 1.5pt 2pt; line-height: 1.15; vertical-align: top; }
   .print-input-key th { letter-spacing: .02em; }
   .print-input-key th:first-child { width: 23pt; }
   .print-input-key th:nth-child(2) { width: 80pt; }
@@ -1553,11 +1553,11 @@
   }
   .advance-category {
     break-inside: auto;
-    margin-bottom: 9pt;
+    margin-bottom: 5pt;
   }
   .advance-sheet .advance-category h2 {
     font-size: 13pt;
-    margin: 13pt 0 5pt;
+    margin: 8pt 0 3pt;
     border-bottom: 1pt solid #333;
     padding-bottom: 4pt;
   }
@@ -1574,7 +1574,7 @@
   .advance-sheet .advance-table th {
     vertical-align: top;
     text-align: left;
-    padding: 4pt 6pt;
+    padding: 2pt 4pt;
     overflow-wrap: anywhere;
     color: #111;
   }
@@ -1589,10 +1589,15 @@
   .advance-note { margin-top: 2pt; }
   .advance-sheet .advance-category p { font-size: 11pt; line-height: 1.4; }
 
-  .advance-sheet[data-advance="audio"] .advance-category { margin-bottom: 6pt; }
+  .advance-sheet[data-advance="audio"] .advance-category { margin-bottom: 4pt; }
+  .advance-sheet[data-advance="audio"] .advance-use { width: 96pt; }
+  .advance-sheet[data-advance="audio"] .print-title > div:first-child { display: flex; align-items: baseline; gap: 8pt; }
+  .advance-sheet[data-advance="audio"] .advance-note { margin-top: 1pt; }
+  .advance-sheet[data-advance="audio"] .advance-table { line-height: 1.16; }
   .advance-sheet[data-advance="audio"] .advance-stage { break-inside: avoid; }
-  .advance-sheet[data-advance="audio"] .advance-category h2 { margin-top: 7pt; }
-  .advance-sheet[data-advance="audio"] .advance-table td { padding-block: 2.5pt; }
+  .advance-sheet[data-advance="audio"] .advance-category h2 { margin: 4pt 0 2pt; padding-bottom: 2pt; }
+  .advance-sheet[data-advance="audio"] .advance-category p { margin: 2pt 0; line-height: 1.2; }
+  .advance-sheet[data-advance="audio"] .advance-table td { padding-block: 1.5pt; }
 }
 
 @media print {
@@ -1678,9 +1683,11 @@
   .print-sheet .rack-guide h2 { font:bold 13pt/1.1 Arial,sans-serif; margin:6pt 0 2pt; padding-bottom:2pt; }
   .print-sheet .rack-guide p { margin:2pt 0 3pt; font:9pt/1.24 Arial,sans-serif; }
   .print-sheet .rack-guide table { font:9pt/1.12 Arial,sans-serif; }
-  .print-sheet .rack-guide th,.print-sheet .rack-guide td { padding:1.5pt 2pt; color:#111; }
+  .print-sheet .rack-guide th,.print-sheet .rack-guide td { padding:1pt 2pt; color:#111; }
   .rack-guide .rack-pin { print-color-adjust:exact; -webkit-print-color-adjust:exact; }
-  .rack-inputs,.rack-lower { gap:12pt; }
+  .rack-inputs,.rack-lower { gap:8pt; }
+  .rack-sheet .print-title > div:first-child { display:flex; align-items:baseline; gap:8pt; }
+  .rack-sheet .print-title h1 { font-size:18pt; }
   .rack-credit { margin-top:4pt; }
 }
 .rack-link { display:flex; gap:.7em; align-items:center; }
