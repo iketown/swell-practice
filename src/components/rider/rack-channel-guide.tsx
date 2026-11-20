@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { earRoutes, stems, type RackMap } from "@/lib/rider/rack-map";
+import { earRoutes, housePlayback, type RackMap } from "@/lib/rider/rack-map";
 import { type wirelessRoutes, type RackInput } from "@/lib/rider/rack-inputs";
 
 import { rackOutputCenter, s16Front, s16InputCenter, x32Rear, x32WirelessCenter } from "./rack-panels";
@@ -113,11 +113,12 @@ export function RackChannelGuide({
       panel.push({ ...pin, ...rackOutputCenter(mix.device, out) });
     }
   }
-  stems.forEach((stem, i) =>
+  const playback = housePlayback(map);
+  playback.forEach((stem) =>
     x32.push({
-      ...rackOutputCenter("X32", map.housePorts[i]),
-      label: String(30 + i),
-      route: `CH ${30 + i} ${stem} → X32 XLR OUT ${map.housePorts[i]} → FOH line input`,
+      ...rackOutputCenter("X32", stem.port),
+      label: String(stem.channel),
+      route: `CH ${stem.channel} ${stem.label} → X32 XLR OUT ${stem.port} → FOH line input ${stem.foh}`,
     }),
   );
   return (
@@ -250,12 +251,12 @@ export function RackChannelGuide({
                 </td>
                 <td>Ears only</td>
               </tr>
-              {stems.map((stem, i) => (
-                <tr key={stem}>
+              {playback.map((stem) => (
+                <tr key={stem.channel}>
                   <td>
-                    <b>{30 + i}</b> {stem}
+                    <b>{stem.channel}</b> {stem.label}
                   </td>
-                  <td>X32 XLR {map.housePorts[i]} → FOH</td>
+                  <td>X32 XLR {stem.port} → FOH {stem.foh}</td>
                 </tr>
               ))}
             </tbody>

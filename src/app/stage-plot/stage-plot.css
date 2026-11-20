@@ -1758,3 +1758,16 @@
 .splitter-input-map svg { min-width:800px; }
 .splitter-source-name { height:100%; display:flex; align-items:center; justify-content:center; text-align:center; font:15px/1.18 Arial,sans-serif; overflow-wrap:anywhere; }
 @media print { .splitter-input-map svg { min-width:0; } }
+
+.foh-handoff table { width: 100%; border-collapse: collapse; margin-block: 1em; }
+.foh-handoff caption { font-size: 1.12em; font-weight: 700; text-align: left; }
+.foh-handoff :is(td, th) { text-align: left; }
+.foh-handoff th[scope="row"] { font-weight: bold; font-variant-numeric: tabular-nums; }
+@media print {
+  .foh-handoff table { font: 11pt/1.15 Arial, sans-serif; margin: 7pt 0; }
+  .foh-handoff caption { padding-bottom: 3pt; }
+  .foh-handoff :is(th, td) { padding: 2.2pt 4pt; }
+  .foh-handoff th[scope="row"] { font-size: 11pt; }
+  .foh-handoff th:first-child { width: 16%; }
+  .foh-handoff td:last-child { width: 30%; }
+}

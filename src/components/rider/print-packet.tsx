@@ -8,6 +8,7 @@ import {
 import type { RecipientPacket } from "@/lib/rider/releases";
 import { printedUrl } from "@/lib/rider/printed-version";
 import { RackChannelGuide } from "./rack-channel-guide";
+import { splitHouseChannel } from "@/lib/rider/rack-map";
 import { PatchDiagrams } from "./patch-diagrams";
 import { rackInputs, wirelessRoutes } from "@/lib/rider/rack-inputs";
 import { EquipmentAdvance } from "./equipment-advance";
@@ -163,7 +164,7 @@ export function PrintPacket({
                   <td>
                     {i.stageBoxId ? boxesById.get(i.stageBoxId) : "Unassigned"}
                   </td>
-                  <td>{i.foh || "TBC"}</td>
+                  <td>{p.rackMap?.s16Inputs ? splitHouseChannel(i) : i.foh || "TBC"}</td>
                   <td>
                     {[i.patch, i.phantom, i.notes]
                       .filter(Boolean)

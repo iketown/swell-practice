@@ -28,7 +28,20 @@ export const standardRackMap: RackMap = {
   housePorts: [3, 4, 5],
   s16Inputs: standardS16Inputs,
 };
-export const stems = ["Perc", "Inst", "Vox"] as const;
+const playbackStems = [
+  { label: "Perc", source: "Percussion playback", channel: 30, foh: 19 },
+  { label: "Inst", source: "Instrument playback", channel: 31, foh: 20 },
+  { label: "Vox", source: "Vocal playback", channel: 32, foh: 21 },
+] as const;
+
+export function housePlayback(map: RackMap) {
+  return playbackStems.map((stem, index) => ({ ...stem, port: map.housePorts[index] }));
+}
+
+export function splitHouseChannel(input: Plot["inputs"][number]) {
+  return input.foh.trim() || String(input.number);
+}
+
 export function earRoutes(map: RackMap) {
   const pairs = map.earPairs ?? standardEarPairs;
   return ["Joe", "Chris", "Brian", "Jackson", "Sam"].map(

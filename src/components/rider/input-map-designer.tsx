@@ -6,7 +6,7 @@ import {
   applyRackMap,
   standardRackMap,
   standardS16Inputs, standardEarPairs, standardWirelessInputs, earRoutes,
-  stems,
+  housePlayback,
   supportsRackMap,
   type RackMap,
 } from "@/lib/rider/rack-map";
@@ -110,12 +110,12 @@ export function InputMapDesigner({
           <>
             <div className="rack-edit-actions">
               <strong>House playback XLR outs</strong>
-              {stems.map((stem, i) => (
+              {housePlayback(map).map(({ label: stem, port }, i) => (
                 <label key={stem}>
                   {stem}
                   <select
                     aria-label={stem + " house output"}
-                    value={map.housePorts[i]}
+                    value={port}
                     disabled={busy}
                     onChange={(e) => setOutput(i, Number(e.target.value))}
                   >
