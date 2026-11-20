@@ -3,7 +3,7 @@ import type { Gear, Plot } from "./model";
 
 const port = z.number().int().min(3).max(8);
 export const rackMapSchema = z.object({
-  layout: z.literal("s16-v1"),
+  layout: z.enum(["s16-v1", "s16-v2"]),
   housePorts: z
     .tuple([port, port, port])
     .refine(
@@ -13,7 +13,7 @@ export const rackMapSchema = z.object({
 });
 export type RackMap = z.infer<typeof rackMapSchema>;
 export const standardRackMap: RackMap = {
-  layout: "s16-v1",
+  layout: "s16-v2",
   housePorts: [3, 4, 5],
 };
 export const stems = ["Perc", "Inst", "Vox"] as const;
@@ -41,14 +41,49 @@ export function supportsRackMap(p: Plot) {
   );
 }
 
+export function wirelessPort(map: RackMap, port: number) {
+  return map.layout === "s16-v2" ? `XLR IN ${port}` : `AUX IN ${port}`;
+}
+
+function patchWireless(p: Plot, map: RackMap): Plot {
+  const local = map.layout === "s16-v2";
+  return {
+    ...p,
+    rackMap: map,
+    gear: p.gear.map((row) => {
+      const receiver = /^wl-mic-lead-([12])$/.exec(row.id);
+      if (!receiver) return row;
+      const port = Number(receiver[1]);
+      return {
+        ...row,
+        spec: local
+          ? "Balanced XLR female to XLR male"
+          : "Balanced XLR female to ¼-inch TRS male",
+        notes: `Band split tail ${16 + port} → X32 Rack ${wirelessPort(map, port)} → CH ${16 + port}. Phantom off. Match the receiver output level at soundcheck.`,
+      };
+    }),
+    inputs: p.inputs.map((input) =>
+      input.number < 17
+        ? input
+        : {
+            ...input,
+            patch: `Receiver XLR → split ${input.number} → house tail and X32 Rack ${wirelessPort(map, input.number - 16)} → CH ${input.number}.`,
+            phantom: "Off",
+          },
+    ),
+  };
+}
+
 // Apply the physical patch to the selected working revision only. Keep the existing allocations and suppliers.
 export function applyRackMap(p: Plot, map: RackMap): Plot {
   if (!supportsRackMap(p))
     throw Error(
       "This guide requires the 16 wired inputs and Brian / Chris wireless channels 17 and 18.",
     );
-  if (p.rackMap) return { ...p, rackMap: map };
-  const gear = p.gear.map((row) => {
+  if (p.rackMap?.layout === map.layout) return { ...p, rackMap: map };
+  const patched = patchWireless(p, map);
+  if (p.rackMap) return patched;
+  const gear = patched.gear.map((row) => {
     const lead = /^wl-iem-lead-(\d+)$/.exec(row.id);
     if (lead) {
       const side = Number(lead[1]) - 1;
@@ -60,12 +95,6 @@ export function applyRackMap(p: Plot, map: RackMap): Plot {
           notes: `${mix.name} bus ${side + 1} → ${mix.device} XLR Out ${mix.out + (side % 2)} → IEM TX ${mix.tx} ${side % 2 ? "R" : "L"}. Confirm cable supplier and length.`,
         };
     }
-    const rx = /^wl-mic-lead-([12])$/.exec(row.id);
-    if (rx)
-      return {
-        ...row,
-        notes: `Band split tail ${16 + Number(rx[1])} → X32 Aux In ${rx[1]} (balanced TRS). Set receiver to line level and verify at soundcheck.`,
-      };
     return row;
   });
   const extra = (
@@ -115,18 +144,9 @@ export function applyRackMap(p: Plot, map: RackMap): Plot {
     ),
   );
   return {
-    ...p,
-    rackMap: map,
+    ...patched,
     gear,
     monitors:
       "Five independent stereo IEM mixes. S16 XLR Out 1–8 → TX1–4. X32 Rack XLR Out 1/2 → TX5 Sam. TX6 spare. See the stage-left rack channel guide for the analog split, wireless receivers and playback handoff.",
-    inputs: p.inputs.map((input) =>
-      input.number < 17
-        ? input
-        : {
-            ...input,
-            patch: `Receiver XLR → split ${input.number} → house tail and X32 Rack Aux In ${input.number - 16} (balanced TRS) → CH ${input.number}.`,
-          },
-    ),
   };
 }

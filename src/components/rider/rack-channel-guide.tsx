@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { ears, stems, type RackMap } from "@/lib/rider/rack-map";
+import { ears, stems, wirelessPort, type RackMap } from "@/lib/rider/rack-map";
 import type { RackInput } from "@/lib/rider/rack-inputs";
 
 type Pin = { x: number; y: number; label: string; route: string };
@@ -75,19 +75,18 @@ export function RackChannelGuide({
     label: String(number),
     route: `${source} · ${socket} → split ${number} → S16 IN ${number} → X32 CH ${number}`,
   }));
+  const local = map.layout === "s16-v2";
+  const wireless = ["Brian", "Chris"].map((name, i) => {
+    const channel = 17 + i;
+    return {
+      x: local ? 471 - i * 30 : 228 - i * 22,
+      y: local ? 31 : 20,
+      label: String(channel),
+      route: `${name} RX → split ${channel} → ${wirelessPort(map, i + 1)} → CH ${channel}`,
+    };
+  });
   const x32: Pin[] = [
-    {
-      x: 228,
-      y: 20,
-      label: "17",
-      route: "Brian wireless RX → split 17 → X32 AUX IN 1 (TRS) → CH 17",
-    },
-    {
-      x: 206,
-      y: 20,
-      label: "18",
-      route: "Chris wireless RX → split 18 → X32 AUX IN 2 (TRS) → CH 18",
-    },
+    ...wireless,
     {
       x: 391,
       y: 121,
@@ -170,11 +169,13 @@ export function RackChannelGuide({
           <Panel device="x32" pins={x32} onTrace={onTrace} />
           <div className="rack-wireless">
             <strong>Wireless mic receivers</strong>
-            <p>Brian RX → split 17 → AUX IN 1 → CH 17</p>
-            <p>Chris RX → split 18 → AUX IN 2 → CH 18</p>
+            {wireless.map((pin) => (
+              <p key={pin.label}>{pin.route}</p>
+            ))}
             <p>
-              Use separate CH 17/18 strips, line-level RX outputs, phantom off
-              and balanced TRS into AUX IN.
+              {local
+                ? "Patch Local 1/2 to separate CH 17/18. Keep phantom off on both split legs. Match RX mic/line level at soundcheck."
+                : "Use separate CH 17/18 strips, line-level RX outputs, phantom off and balanced TRS into AUX IN."}
             </p>
           </div>
         </div>
