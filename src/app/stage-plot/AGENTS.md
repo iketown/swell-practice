@@ -130,3 +130,5 @@ These rules apply to /stage-plot, its components under src/components/rider, its
 - Before the S16 map, print the FOH splitter input map on landscape Letter with ¾-inch margins. Show split inputs 1–18 in one horizontal row, the upstage box above, the stage-left box below left and both wireless mic receiver outputs below right. Derive every source and arrow from the revision’s split input and local tail assignment independently of the monitor-side port order.
 
 - Include a portrait FOH patch sheet with the rack diagrams on screen and in the full and audio packets. List every house split tail with its saved source and FOH assignment (default to its split number). Use the saved housePorts for the three separate line-level playback feeds: X32 CH 30 Perc, 31 Inst and 32 Vox to FOH 19, 20 and 21. CH 29 click and stereo IEM mixes stay with the band.
+
+- For Print guide, put the ¾-inch inset and revision/QR footer inside each sheet. Verify the actual button with Chrome’s native Save as PDF and both Default and None margins. Keep portrait and landscape sheets at US Letter size.

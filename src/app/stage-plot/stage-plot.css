@@ -1771,3 +1771,35 @@
   .foh-handoff th:first-child { width: 16%; }
   .foh-handoff td:last-child { width: 30%; }
 }
+
+/* Keep the guide's printable area even when the print dialog removes page margins. */
+@media print {
+  /* App notifications and route announcements after the last map can create an empty portrait page. */
+  body > .rider:has(.print-guide) ~ * { display: none !important; }
+  .print-guide { counter-reset: guide-sheet; }
+  .print-guide .print-sheet {
+    box-sizing: border-box;
+    min-height: calc(11in - 1px);
+    padding: .75in;
+    display: flex;
+    flex-direction: column;
+    counter-increment: guide-sheet;
+  }
+  .print-guide .patch-sheet:has(.subsnake-panel-map, .wireless-rack-map, .splitter-input-map) {
+    min-height: calc(8.5in - 1px);
+  }
+  .guide-sheet-footer {
+    margin-top: auto;
+    padding-top: 4pt;
+    border-top: .7pt solid #506562;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: start;
+    gap: 8pt;
+    font: 9pt/1.4 Arial, sans-serif;
+    overflow-wrap: anywhere;
+  }
+  .guide-sheet-number::after { content: "Page " counter(guide-sheet); }
+  .guide-sheet-footer .print-qr { justify-self: end; }
+  .guide-sheet-footer .print-qr, .guide-sheet-footer .print-qr svg { width: .65in; height: .65in; }
+}

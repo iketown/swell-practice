@@ -70,11 +70,22 @@ export function PrintPacket({
       <PrintQr url={qrUrl} label="Check this rider online" />
     </footer>
   );
+  const guideOnly = pages.length === 1 && pages[0] === "Rack channel guide";
+  const guideFooter = guideOnly && (
+    <footer className="guide-sheet-footer">
+      <div><a href={qrUrl}>{visibleUrl}</a><br />{issue} · {record.versionName} · {dateText}</div>
+      <span className="guide-sheet-number" />
+      <PrintQr url={qrUrl} label="Check this rider online" />
+    </footer>
+  );
   const inputs = byNumber(p);
   const boxesById = new Map(p.stageBoxes.map((b) => [b.id, b.label]));
   return (
-    <article className="rider-print">
-      <style>{`@page {size: letter portrait; margin: .75in .75in 1.47in;
+    <article className={guideOnly ? "rider-print print-guide" : "rider-print"}>
+      <style>{guideOnly ? `
+        @page { size: letter portrait; margin: 0; }
+        @page rackPatchMap { size: letter landscape; margin: 0; }
+      ` : `@page {size: letter portrait; margin: .75in .75in 1.47in;
         @bottom-left { width:75%; margin-bottom:.75in; overflow-wrap:anywhere; border-top:.7pt solid #506562; padding-top:4pt; vertical-align:top; white-space:pre-line; content:${JSON.stringify("THE SWELL · " + visibleUrl + "\n" + issue + " · " + record.versionName + " · " + dateText).replaceAll("\\n", "\\A ")}; font:9pt Arial; line-height:1.4; }
         @bottom-right { width:15%; margin-bottom:.75in; border-top:.7pt solid #506562; padding-top:4pt; vertical-align:top; content:url("${qrDataUrl(qrUrl)}"); }
         @bottom-center { width:10%; margin-bottom:.75in; white-space:nowrap; vertical-align:top; padding-top:9pt; content:"Page " counter(page); font:8pt Arial; }
@@ -115,6 +126,7 @@ export function PrintPacket({
             {!code && <p>Working copy. Request an issued edition before advancing the show.</p>}
           </div>
         </div>
+        {guideFooter}
       </section>
       {pages.includes("Stage plot") && (
         <section className="print-sheet print-diagram-sheet">
@@ -179,8 +191,9 @@ export function PrintPacket({
       {p.rackMap && packet !== "Backline" && pages.includes("Rack channel guide") && <><section className="print-sheet rack-sheet">
         {title("Rack channel guide")}
         <RackChannelGuide map={p.rackMap} inputs={rackInputs(p)} receivers={wirelessRoutes(p, p.rackMap)} />
+        {guideFooter}
       </section>
-        {p.rackMap.s16Inputs && <PatchDiagrams plot={p} map={p.rackMap} title={title} />}
+        {p.rackMap.s16Inputs && <PatchDiagrams plot={p} map={p.rackMap} title={title} footer={guideFooter} />}
       </>}
       {setupPages.filter((page) => preview && pages.includes(page)).map((view) => <div className="setup-print-group" key={view}><section className="print-sheet print-diagram-sheet">
         {title(view)}

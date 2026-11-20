@@ -8,11 +8,11 @@ import { WirelessRackMap } from "./wireless-rack-map";
 import { SplitterInputMap } from "./splitter-input-map";
 import { SubsnakePanelMap } from "./subsnake-panel-map";
 
-export function PatchDiagrams({ plot, map, title }: { plot: Plot; map: RackMap; title?: (name: string) => ReactNode }) {
+export function PatchDiagrams({ plot, map, title, footer }: { plot: Plot; map: RackMap; title?: (name: string) => ReactNode; footer?: ReactNode }) {
   const inputs = rackInputs(plot, map);
   const sheet = (key: string, name: string, content: ReactNode) =>
     <section key={key} className={title ? "print-sheet patch-sheet" : "patch-sheet"}>
-      {title ? title(name) : <h2>{name}</h2>}{content}
+      {title ? title(name) : <h2>{name}</h2>}{content}{footer}
     </section>;
   return <>
     {sheet("foh-handoff", "FOH patch sheet", <FohHandoff plot={plot} map={map} />)}
