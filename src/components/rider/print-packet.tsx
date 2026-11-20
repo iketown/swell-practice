@@ -78,6 +78,13 @@ export function PrintPacket({
         @bottom-right { width:15%; margin-bottom:.5in; border-top:.7pt solid #506562; padding-top:4pt; vertical-align:top; content:url("${qrDataUrl(qrUrl)}"); }
         @bottom-center { width:10%; margin-bottom:.5in; white-space:nowrap; vertical-align:top; padding-top:9pt; content:"Page " counter(page); font:8pt Arial; }
       }
+      @page subsnakeMap {
+        /* The bottom band holds the QR and folio above the same .75in outer margin. */
+        size: letter landscape; margin: .75in .75in calc(.75in + .72in);
+        @bottom-left { margin-bottom: .75in; }
+        @bottom-center { margin-bottom: .75in; }
+        @bottom-right { margin-bottom: .75in; }
+      }
       @page riderMap {
         size: letter landscape; margin: .375in .375in .68in;
         @bottom-left { content: none; border: 0; }

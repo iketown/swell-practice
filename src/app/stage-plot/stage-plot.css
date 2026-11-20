@@ -1749,3 +1749,23 @@
 @media print {
   .subsnake-panel-content { min-width:0; }
 }
+
+@media print {
+  .patch-sheet:has(.subsnake-panel-map) {
+    page: subsnakeMap;
+    break-inside: avoid;
+  }
+  .patch-sheet:has(.subsnake-panel-map) .print-title > div:first-child {
+    display: flex;
+    align-items: baseline;
+    gap: 10pt;
+  }
+  .patch-sheet:has(.subsnake-panel-map) .print-title h1 { font-size: 18pt; }
+  .subsnake-panel-map { margin: 5pt 0; }
+  .subsnake-panel-map + .patch-handoff {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 15pt;
+  }
+  .subsnake-panel-map + .patch-handoff h3 { grid-column: 1 / -1; margin: 3pt 0 0; }
+}

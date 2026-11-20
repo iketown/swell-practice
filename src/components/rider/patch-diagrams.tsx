@@ -80,7 +80,7 @@ export function PatchDiagrams({ plot, map, title }: { plot: Plot; map: RackMap; 
       const name = code === "U" ? "Upstage subsnake" : code === "L" ? "Stage-left subsnake" : label ?? "Unassigned wired inputs";
       return sheet(id ?? "unassigned", name, <div className="patch-body">
         <p>{id ? <>Find the numbered tail from the {label}. Plug it into the marked analog split input at stage left.</> : <>Assign these sources to a subsnake before patching.</>}</p>
-        {(code === "U" || code === "L") ? <SubsnakePanelMap code={code} inputs={rows} /> : [1,9].map(first => <InputBank key={first} first={first} inputs={rows} code={code} />)}
+        {(code === "U" || code === "L") ? <SubsnakePanelMap print={Boolean(title)} code={code} inputs={rows} /> : [1,9].map(first => <InputBank key={first} first={first} inputs={rows} code={code} />)}
         <div className="patch-handoff"><h3>At the split</h3>
           <p><b>Monitor leg</b> → S16 front input shown above → AES50 A → X32 channel with the split number.</p>
           <p><b>House leg</b> → hand FOH the tail labeled with the split number and source.</p>

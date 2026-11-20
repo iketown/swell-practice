@@ -2,12 +2,10 @@ import type { RackInput } from "@/lib/rider/rack-inputs";
 import { s16Front, s16InputCenter } from "./s16-panel";
 
 const width = 744;
-const height = 350;
 const panelWidth = 578;
 const scale = panelWidth / s16Front.width;
 const panelX = width - panelWidth;
 const panelHeight = s16Front.height * scale;
-const panelY = (height - panelHeight) / 2;
 
 type TailGroup = { rows: RackInput[]; above: boolean; code: "U" | "L" };
 function TailLabels({ rows, above, code }: TailGroup) {
@@ -26,7 +24,8 @@ function TailLabels({ rows, above, code }: TailGroup) {
   );
 }
 
-function CableArrows({ rows, above, code }: TailGroup) {
+function CableArrows({ rows, above, code, height }: TailGroup & { height: number }) {
+  const panelY = (height - panelHeight) / 2;
   const direction = above ? 1 : -1;
   const edge = above ? 0 : height;
   const labelY = above ? panelY - 14 : panelY + panelHeight + 14;
@@ -54,7 +53,9 @@ function CableArrows({ rows, above, code }: TailGroup) {
   });
 }
 
-export function SubsnakePanelMap({ inputs, code }: { inputs: RackInput[]; code: "U" | "L" }) {
+export function SubsnakePanelMap({ inputs, code, print }: { inputs: RackInput[]; code: "U" | "L"; print: boolean }) {
+  const height = print ? 216 : 350;
+  const panelY = (height - panelHeight) / 2;
   const above: RackInput[] = [];
   const below: RackInput[] = [];
   for (const row of inputs) {
@@ -71,8 +72,8 @@ export function SubsnakePanelMap({ inputs, code }: { inputs: RackInput[]; code: 
           <text x="0" y={height / 2 - 8} fontSize="15">Behringer</text>
           <text x="0" y={height / 2 + 23} fontSize="32" fontWeight="700">S16</text>
           <text x="0" y={height / 2 + 45} className="patch-cap">FRONT PANEL</text>
-          <CableArrows code={code} rows={above} above />
-          <CableArrows code={code} rows={below} above={false} />
+          <CableArrows height={height} code={code} rows={above} above />
+          <CableArrows height={height} code={code} rows={below} above={false} />
         </svg>
         <TailLabels code={code} rows={below} above={false} />
       </div>
