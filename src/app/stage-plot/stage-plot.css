@@ -1729,16 +1729,16 @@
 }
 
 @media print {
-  .patch-sheet:has(.subsnake-panel-map, .wireless-rack-map) {
+  .patch-sheet:has(.subsnake-panel-map, .wireless-rack-map, .splitter-input-map) {
     page: rackPatchMap;
     break-inside: avoid;
   }
-  .patch-sheet:has(.subsnake-panel-map, .wireless-rack-map) .print-title > div:first-child {
+  .patch-sheet:has(.subsnake-panel-map, .wireless-rack-map, .splitter-input-map) .print-title > div:first-child {
     display: flex;
     align-items: baseline;
     gap: 10pt;
   }
-  .patch-sheet:has(.subsnake-panel-map, .wireless-rack-map) .print-title h1 { font-size: 18pt; }
+  .patch-sheet:has(.subsnake-panel-map, .wireless-rack-map, .splitter-input-map) .print-title h1 { font-size: 18pt; }
   .subsnake-panel-map { margin: 5pt 0; }
 
 }
@@ -1746,3 +1746,8 @@
 .wireless-rack-map { margin: .5em 0; }
 .wireless-rack-map svg { min-width: 780px; }
 @media print { .wireless-rack-map svg { min-width: 0; } }
+
+.splitter-input-map { margin:.65em 0; }
+.splitter-input-map svg { min-width:800px; }
+.splitter-source-name { height:100%; display:flex; align-items:center; justify-content:center; text-align:center; font:15px/1.18 Arial,sans-serif; overflow-wrap:anywhere; }
+@media print { .splitter-input-map svg { min-width:0; } }
