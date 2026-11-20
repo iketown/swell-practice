@@ -8,9 +8,7 @@ export function productionDownloads(edition: RiderRelease) {
   );
   if (!entry) return null;
   const base = "/production-documents/" + entry.code + "/";
-  return {
-    packet: base + entry.packet.file,
-    pages: entry.packet.pages,
-    documents: entry.documents.map(doc => ({ ...doc, href: base + doc.file })),
-  };
+  const documents = entry.documents.map(doc => ({ ...doc, href: base + doc.file }));
+  const packet = entry.packet && { ...entry.packet, href: base + entry.packet.file };
+  return { packet, featured: packet ? undefined : documents[0], documents };
 }

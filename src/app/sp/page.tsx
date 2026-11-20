@@ -21,12 +21,16 @@ export default async function ProductionDocuments({ searchParams }: {
   const files = edition && productionDownloads(edition);
   const recipient = packetFromQuery(packet);
   const printHref = edition && checkHref(edition.code, recipient, "/sp/rider");
-  const updatedPdf = recipient === "Full rider" && files ? files.packet : undefined;
+  const featured = files?.packet
+    ? { ...files.packet, title: "Complete production packet", detail: "Technical rider and rack channel guide" }
+    : files?.featured;
+  const individual = files?.featured ? files.documents.slice(1) : files?.documents;
+  const updatedDownload = recipient === "Full rider" ? featured : undefined;
   const title = target
-    ? copy?.replacement ? "Please print this updated version." : "Thank you for checking! You have the correct version."
+    ? copy?.replacement ? "This version has been replaced." : "Thank you for checking! You have the correct version."
     : draft ? "This copy is a working draft." : ver !== undefined || legacy ? "We couldn’t verify this version." : "Check your printed version";
   const detail = target
-    ? copy?.replacement ? `Replace ${copy.code} with ${target.code} for ${target.name}.` : `${target.name} · Version ${target.code}`
+    ? copy?.replacement ? `${target.code} replaces ${copy.code} for ${target.name}.` : `${target.name} · Version ${target.code}`
     : draft || legacy || ver !== undefined
       ? "Check the version on your cover or confirm your setup with The Swell before using this copy."
       : "Enter the version printed on your cover, or browse the documents below.";
@@ -37,21 +41,26 @@ export default async function ProductionDocuments({ searchParams }: {
           <Image src="/01-swell-logo.svg" alt="The Swell" width={128} height={56} priority />
           <VersionCheck key={JSON.stringify([ver, draft, legacy, packet])} title={title} detail={detail} code={value} prompt={!target}
             packet={recipient !== "Full rider" ? packet : undefined}
-            update={copy?.replacement && printHref && target ? { href: updatedPdf ?? printHref, pdf: !!updatedPdf } : undefined} />
+            update={copy?.replacement && printHref ? {
+              href: updatedDownload?.href ?? printHref,
+              pdf: !!updatedDownload,
+              label: files?.featured && updatedDownload ? "Download updated technical rider"
+                : updatedDownload ? "Download updated packet" : "Open updated rider to print",
+            } : undefined} />
         </header>
         <h1>Production documents</h1>
         {edition && printHref ? (
           <section aria-labelledby="edition-name">
             <header className="sp-edition"><h2 id="edition-name">{edition.name}</h2><span>Version {edition.code}</span></header>
-            {files ? (
+            {featured && individual ? (
               <>
-                <a className="sp-packet" href={files.packet} download>
-                  <span><strong>Complete production packet</strong><small>Technical rider and rack channel guide · {files.pages} pages · PDF</small></span>
+                <a className="sp-packet" href={featured.href} download>
+                  <span><strong>{featured.title}</strong><small>{"detail" in featured ? featured.detail + " · " : ""}{featured.pages} pages · PDF</small></span>
                   <span className="sp-download"><Download size={19} aria-hidden="true" /> Download</span>
                 </a>
-                <h3>Individual documents</h3>
+                <h3>{files?.packet ? "Individual documents" : "Companion documents"}</h3>
                 <ul className="sp-docs">
-                  {files.documents.map(({ title, href, pages }) =>
+                  {individual.map(({ title, href, pages }) =>
                     <li key={href}><a href={href} download><span>{title}</span><small>{pages} pages · PDF <Download size={17} aria-hidden="true" /></small></a></li>
                   )}
                 </ul>

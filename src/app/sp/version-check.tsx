@@ -9,7 +9,7 @@ type Props = {
   code: string;
   prompt: boolean;
   packet?: string;
-  update?: { href: string; pdf: boolean };
+  update?: { href: string; pdf: boolean; label: string };
 };
 
 export function VersionCheck({ title, detail, code, prompt, packet, update }: Props) {
@@ -33,13 +33,13 @@ export function VersionCheck({ title, detail, code, prompt, packet, update }: Pr
         {prompt ? (
           <form action="/sp" method="get">
             <label htmlFor="printed-version">Version on your cover</label>
-            <input id="printed-version" name="ver" defaultValue={code} placeholder="e.g. 11.20.26" required maxLength={64} autoCapitalize="none" spellCheck={false} />
+            <input id="printed-version" name="ver" defaultValue={code} placeholder="e.g. 11.21.26" required maxLength={64} autoCapitalize="none" spellCheck={false} />
             {packet && <input type="hidden" name="packet" value={packet} />}
             <button className="sp-primary" type="submit">Check version</button>
           </form>
         ) : update && (
           <a className="sp-primary" href={update.href} download={update.pdf || undefined}>
-            {update.pdf ? "Download updated packet" : "Open updated rider to print"}
+            {update.label}
           </a>
         )}
         <button className={prompt || update ? "sp-secondary" : "sp-primary"} type="button" onClick={() => dialog.current?.close()}>
