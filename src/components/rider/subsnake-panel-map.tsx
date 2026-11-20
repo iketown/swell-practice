@@ -1,5 +1,5 @@
 import type { RackInput } from "@/lib/rider/rack-inputs";
-import { s16Front, s16InputCenter } from "./s16-panel";
+import { s16Front, s16InputCenter } from "./rack-panels";
 
 const width = 744;
 const panelWidth = 578;

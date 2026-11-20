@@ -2,7 +2,7 @@ import Image from "next/image";
 import { earRoutes, stems, type RackMap } from "@/lib/rider/rack-map";
 import { type wirelessRoutes, type RackInput } from "@/lib/rider/rack-inputs";
 
-import { s16Front, s16InputCenter } from "./s16-panel";
+import { rackOutputCenter, s16Front, s16InputCenter, x32Rear, x32WirelessCenter } from "./rack-panels";
 
 type Pin = { x: number; y: number; label: string; route: string };
 function Panel({
@@ -15,8 +15,8 @@ function Panel({
   onTrace?: (route: string) => void;
 }) {
   const s16 = device === "s16";
-  const width = s16 ? s16Front.width : 492;
-  const height = s16 ? s16Front.height : 152;
+  const width = s16 ? s16Front.width : x32Rear.width;
+  const height = s16 ? s16Front.height : x32Rear.height;
   return (
     <div className="rack-panel-scroll">
       <figure className={"rack-panel " + device}>
@@ -27,7 +27,7 @@ function Panel({
               : "Behringer X32 Rack rear panel, viewed from behind"
           }
           src={
-            s16 ? s16Front.src : "/stage-plot/panels/x32-rear.png"
+            s16 ? s16Front.src : x32Rear.src
           }
           width={width}
           height={height}
@@ -82,8 +82,7 @@ export function RackChannelGuide({
   const local = map.layout === "s16-v2";
   const wireless = receivers.map(({ channel, source, input, port }) => {
     return {
-      x: local ? 471 - (port - 1) * 30 : 228 - (port - 1) * 22,
-      y: local ? 31 : 20,
+      ...x32WirelessCenter(local, port),
       label: String(channel),
       route: `${source} RX → split ${channel} → ${input} → CH ${channel}`,
     };
@@ -110,15 +109,13 @@ export function RackChannelGuide({
         label: mix.tx + side,
         route: `Bus ${mix.bus + index} → ${mix.device} OUT ${out} → TX${mix.tx} ${side} · ${mix.name}`,
       };
-      if (mix.device === "S16")
-        s16.push({ ...pin, x: 332 + (out - 1) * 33.1, y: 86 });
-      else x32.push({ ...pin, x: 228 - (out - 1) * 29.7, y: 76 });
+      const panel = mix.device === "S16" ? s16 : x32;
+      panel.push({ ...pin, ...rackOutputCenter(mix.device, out) });
     }
   }
   stems.forEach((stem, i) =>
     x32.push({
-      x: 228 - (map.housePorts[i] - 1) * 29.7,
-      y: 76,
+      ...rackOutputCenter("X32", map.housePorts[i]),
       label: String(30 + i),
       route: `CH ${30 + i} ${stem} → X32 XLR OUT ${map.housePorts[i]} → FOH line input`,
     }),

@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import type { Plot } from "@/lib/rider/model";
-import { earRoutes, type RackMap } from "@/lib/rider/rack-map";
-import { boxCode, rackInputs, wirelessRoutes, type RackInput } from "@/lib/rider/rack-inputs";
+import { type RackMap } from "@/lib/rider/rack-map";
+import { boxCode, rackInputs, type RackInput } from "@/lib/rider/rack-inputs";
 
+import { WirelessRackMap } from "./wireless-rack-map";
 import { SubsnakePanelMap } from "./subsnake-panel-map";
 
 function InputBank({ inputs, first, code }: { inputs: RackInput[]; first: number; code: string }) {
@@ -39,30 +40,6 @@ function InputBank({ inputs, first, code }: { inputs: RackInput[]; first: number
   </svg></div>;
 }
 
-function WirelessAndEars({ plot, map }: { plot: Plot; map: RackMap }) {
-  return <div className="patch-body">
-    <h3>Wireless microphones</h3>
-    {wirelessRoutes(plot, map).map(rx => <div className="patch-rx" key={rx.channel}>
-      <div><b>{rx.source}</b><small>Receiver XLR out</small></div>
-      <span className="patch-wire" />
-      <div className="patch-socket"><small>Split in</small><b>{rx.channel}</b></div>
-      <svg viewBox="0 0 44 70" preserveAspectRatio="none" aria-hidden="true"><path d="M0 35 H12 V16 H43 M12 35 V54 H43" fill="none" stroke="currentColor" strokeWidth="2"/></svg>
-      <div className="patch-legs"><span><b>X32 Rack {rx.input}</b> → CH {rx.channel}</span><span>House tail <b>{rx.channel}</b> → FOH</span></div>
-    </div>)}
-    <p>Keep phantom off on both wireless split legs.</p>
-    <h3>Stereo in-ear monitors</h3>
-    <div className="patch-iem-head"><span>Mix buses L / R</span><span>Physical XLR outputs</span><span>Transmitter inputs</span></div>
-    {earRoutes(map).map(mix => <div key={mix.tx} className="patch-iem">
-      <div><b>{mix.name}</b><small>Bus {mix.bus} / {mix.bus + 1}</small></div>
-      <div className="patch-iem-outs"><b>{mix.device === "X32" ? "X32 Rack" : "S16"} OUT</b>
-        {[0,1].map(i => <span key={i}>{mix.out + i}</span>)}</div>
-      <div className="patch-pair"><span className="patch-wire" /><span className="patch-wire" /></div>
-      <div className="patch-iem-ins"><span>L</span><span>R</span><b>TX {mix.tx}</b></div>
-    </div>)}
-    <p>TX 6 is the spare. Leave its audio inputs open.</p>
-  </div>;
-}
-
 export function PatchDiagrams({ plot, map, title }: { plot: Plot; map: RackMap; title?: (name: string) => ReactNode }) {
   const groups = new Map<string | undefined, RackInput[]>();
   for (const row of rackInputs(plot, map)) {
@@ -87,6 +64,6 @@ export function PatchDiagrams({ plot, map, title }: { plot: Plot; map: RackMap; 
         </div>
       </div>);
     })}
-    {sheet("rack-wireless-ears", "Wireless mics & stereo ears", <WirelessAndEars plot={plot} map={map}/>)}
+    {sheet("rack-wireless-ears", "Wireless mics & stereo ears", <WirelessRackMap plot={plot} map={map}/>)}
   </>;
 }
