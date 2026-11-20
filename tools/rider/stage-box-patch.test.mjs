@@ -11,3 +11,14 @@ test("box channels follow plot numbers independently of saved order, box names a
   const reassigned = inputs.map(input => input.number === 2 ? { ...input, stageBoxId: "sl" } : input);
   assert.deepEqual(channels(reassigned), [1, 1, 2, 3, 2, 3, null]);
 });
+
+test("the saved stage-left box fits onstage and feeds the rack overview from that position", async () => {
+  const { rackOverview } = await import("../../src/lib/rider/rack-overview.ts");
+  const box = { id: "left", label: "stage left box", x: 20.75, y: 2.79 };
+  const plot = { width: 24, depth: 20, stageBoxes: [box], inputs: [{ number: 3, stageBoxId: box.id }],
+    gear: [], cables: [], rackMap: { s16Inputs: Array.from({ length: 16 }, (_, i) => i + 1) } };
+  const [frame] = rackOverview(plot, "Cable patch and routing").boxes;
+  assert.deepEqual([frame.x, frame.y, frame.code], [box.x, box.y, "L"]);
+  assert.ok(frame.x + frame.width < plot.width);
+  assert.equal(rackOverview(plot, "Overview"), null);
+});

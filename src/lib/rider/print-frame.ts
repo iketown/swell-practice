@@ -1,3 +1,4 @@
+import { rackOverview, rackOverviewWidth } from "./rack-overview";
 import { stageAnchor } from "./placement";
 import type { Plot } from "./model";
 import type { StageView } from "./plot-layers";
@@ -5,7 +6,7 @@ import { boxFrame, sideStageWidth } from "./stage-box";
 
 // Crop spare editing space, not physical geometry. Keep real outlying equipment,
 // box frames and cable nodes in print even when a version uses the stage margins.
-export function printFrame(p: Plot, view: StageView) {
+export function printFrame(p: Plot, view: StageView, overview = rackOverview(p, view)) {
   let left = -1.1, top = -1.05;
   let right = p.width + sideStageWidth + 0.2, bottom = p.depth + 2.4;
   function include(x: number, y: number, w = 0, h = 0) {
@@ -13,6 +14,10 @@ export function printFrame(p: Plot, view: StageView) {
     top = Math.min(top, y - 0.2);
     right = Math.max(right, x + w + 0.2);
     bottom = Math.max(bottom, y + h + 0.2);
+  }
+  if (overview) {
+    include(p.width + rackOverviewWidth + .65, overview.rear);
+    include(p.width, overview.bottom);
   }
   for (const o of p.objects) {
     include(o.x, o.y, o.w, o.h + 0.5);

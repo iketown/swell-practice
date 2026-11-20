@@ -21,6 +21,9 @@ import {
 } from "@/lib/rider/plot-layers";
 import { CableLayer, type RoutingControls } from "./cable-layer";
 import { StandMeasurements, feetInches, isStand } from "./stand-placement";
+import { boxCode } from "@/lib/rider/rack-inputs";
+import { rackOverview, rackOverviewWidth, rackCable } from "@/lib/rider/rack-overview";
+import { SidestageRouting } from "./sidestage-routing";
 import { StageCableGuide } from "./stage-cable-guide";
 
 type Props = {
@@ -64,7 +67,10 @@ export function StageCanvas({
     startY: number;
   } | null>(null);
   const grid = useId().replaceAll(":", "");
-  const side = sideStageWidth;
+  const tracingRackCable = routing?.selected && p.cables.some(run => run.id === routing.selected && rackCable(run));
+  const overview = tracingRackCable ? null : rackOverview(p, view);
+  const side = overview ? rackOverviewWidth : sideStageWidth;
+  const sideDepth = Math.max(p.depth, overview?.bottom ?? 0);
   const sortedInputs = byNumber(p);
   const colorsByBox = new Map(
     p.stageBoxes.map((b) => [b.id, boxColors[b.color]]),
@@ -74,7 +80,8 @@ export function StageCanvas({
   const drumBox = p.stageBoxes.find(box => box.id === kick?.stageBoxId)
     ?? p.stageBoxes.find(box => /\b(drum|upstage)\b/i.test(box.label));
   const drumFrame = drumBox && boxFrame(p, drumBox, p.inputs.filter(input => input.stageBoxId === drumBox.id));
-  const sideBox = p.stageBoxes.find(box => box !== drumBox && box.x >= w);
+  const sideBox = p.stageBoxes.find(box => boxCode(box.label) === "L")
+    ?? p.stageBoxes.find(box => box !== drumBox && box.x >= w);
   const sideFrame = sideBox && boxFrame(p, sideBox, p.inputs.filter(input => input.stageBoxId === sideBox.id));
   const drumRug = p.objects.find(object => object.asset === "drum-rug");
   const chrisStand = p.objects.find(object => object.id === "mic-chris");
@@ -165,11 +172,11 @@ export function StageCanvas({
       ref={svg}
       className={"rider-canvas" + (editing ? " editing" : "")}
       aria-label="The Swell stage plot, viewed from the audience"
-      viewBox={printLayout ? printFrame(p, view) : [
+      viewBox={printLayout ? printFrame(p, view, overview) : [
         -plotPerimeter.left,
-        -plotPerimeter.top,
+        Math.min(-plotPerimeter.top, (overview?.rear ?? 0) - .2),
         w + side + plotPerimeter.left + plotPerimeter.right,
-        h + plotPerimeter.top + plotPerimeter.bottom,
+        sideDepth + Math.max(plotPerimeter.top, .2 - (overview?.rear ?? 0)) + plotPerimeter.bottom,
       ].join(" ")}
     >
       <title>{`The Swell · ${w} ft wide × ${h} ft deep playing area · 2 ft grid squares`}</title>
@@ -185,7 +192,7 @@ export function StageCanvas({
       </defs>
       <rect x="0" y="0" width={w} height={h} fill="#fff" />
       <rect x="0" y="0" width={w} height={h} fill={"url(#" + grid + ")"} />
-      <rect x={w} width={side} height={h} fill="#eef1ed" />
+      <rect x={w} width={side} height={sideDepth} fill="#eef1ed" />
       <rect
         width={w + side}
         height={h}
@@ -206,7 +213,7 @@ export function StageCanvas({
         <text x={w + side / 2} y={0.89}>
           SIDESTAGE
         </text>
-        <text x={w + side / 2} y={1.48} fontSize=".34">2 FT GRID</text>
+        <text x={w + side / 2} y={1.48} fontSize=".34">{overview ? "SIGNAL FLOW" : "2 FT GRID"}</text>
         <text x={0.32} y={h + 0.71} textAnchor="start">
           STAGE RIGHT
         </text>
@@ -265,6 +272,8 @@ export function StageCanvas({
         </g>
       ))}
       {p.objects.map((o) => {
+        if (overview && (overview.devices.has(o.id) || o.asset === "x32" ||
+          /^wl-(section$|rx-caption-|tx-caption-|iem-tx-)/.test(o.id))) return null;
         if (o.asset === "drum-rug" || o.asset === "monitor-table" || (view === "Stand placement" && !isStand(o))) return null;
         const selectable = view !== "Stand placement" || isStand(o);
         const hot = selectable && (active === o.id || highlighted.includes(o.id));
@@ -384,7 +393,8 @@ export function StageCanvas({
           </g>
         );
       })}
-      {layers.cables && (routing || view === "Cable patch and routing") && <CableLayer plot={p} labels={view === "Cable patch and routing"} symbolScale={symbolScale} {...(routing ?? { selected: null, onSelect: () => {} })} />}
+      {layers.cables && (routing || view === "Cable patch and routing") && <CableLayer plot={p} bundleRack={Boolean(overview)} labels={view === "Cable patch and routing"} symbolScale={symbolScale} {...(routing ?? { selected: null, onSelect: () => {} })} />}
+      {overview && layers.cables && <SidestageRouting width={w} layout={overview} />}
       {layers.stageBoxes &&
         p.stageBoxes.map((box) => {
           const members = sortedInputs.filter((i) => i.stageBoxId === box.id);
@@ -525,6 +535,7 @@ export function StageCanvas({
       {layers.inputs &&
         p.inputs.map((i) => {
           const hot = active === i.id || highlighted.includes(i.id);
+          if (overview && (i.number === 17 || i.number === 18)) return null;
           const di = i.kind === "DI";
           const boxColor = i.stageBoxId
             ? colorsByBox.get(i.stageBoxId)

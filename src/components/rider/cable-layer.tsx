@@ -10,6 +10,7 @@ import {
   dragPlacement,
   type Point,
 } from "@/lib/rider/cable-routing";
+import { rackCable } from "@/lib/rider/rack-overview";
 import type { Plot } from "@/lib/rider/model";
 import { symbolTransform } from "@/lib/rider/screen-layout";
 
@@ -24,9 +25,10 @@ export function CableLayer({
   symbolScale,
   selected,
   labels = false,
+  bundleRack = false,
   onSelect,
   onChange,
-}: { plot: Plot; symbolScale: number; labels?: boolean } & RoutingControls) {
+}: { plot: Plot; symbolScale: number; labels?: boolean; bundleRack?: boolean } & RoutingControls) {
   const group = useRef<SVGGElement>(null);
   const [drag, setDrag] = useState<{
     id: string;
@@ -58,17 +60,22 @@ export function CableLayer({
         : plot,
     [drag, plot, placement],
   );
-  const routes = useMemo(() => drawCables(preview), [preview]);
+  const routes = useMemo(() => {
+    const runs = drawCables(preview);
+    return bundleRack ? runs.filter(route => !rackCable(route.run)) : runs;
+  }, [preview, bundleRack]);
   const owners = useMemo(() => {
     const map = new Map<string, string[]>();
-    for (const c of plot.cables)
+    for (const c of plot.cables) {
+      if (bundleRack && rackCable(c)) continue;
       for (const id of c.nodeIds) {
         const runs = map.get(id);
         if (runs) runs.push(c.id);
         else map.set(id, [c.id]);
       }
+    }
     return map;
-  }, [plot.cables]);
+  }, [plot.cables, bundleRack]);
   const active = routes.find((r) => r.run.id === (hover ?? selected));
   function local(e: { clientX: number; clientY: number }) {
     const ctm = group.current?.getScreenCTM();

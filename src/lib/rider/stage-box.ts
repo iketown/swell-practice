@@ -18,10 +18,13 @@ export const boxRowHeight = 0.64;
 export function boxFrame(plot: Plot, box: StageBox, inputs: Input[]) {
   const columns = Math.max(3, Math.ceil(Math.sqrt(inputs.length / 1.4)));
   const rows = Math.max(1, Math.ceil(inputs.length / columns));
-  const width = Math.max(
+  const naturalWidth = Math.max(
     columns * 0.82,
     Math.min(6, box.label.length * 0.22 + 0.24),
   );
+  // Let an onstage label use the available space when its channel cells already fit.
+  const onstageSpace = plot.width - box.x - .05;
+  const width = onstageSpace >= columns * .82 ? Math.min(naturalWidth, onstageSpace) : naturalWidth;
   const height = boxHeaderHeight + rows * boxRowHeight + 0.08;
   const inset = 0.18;
   const x = Math.max(

@@ -86,7 +86,8 @@ export function StageCableGuide({
   // Leave space between the direction guides and the individual perimeter runs.
   const cableView = view === "Cable patch and routing";
   const west = cableView ? -0.2 : 0.25;
-  const east = cableView && stageLeftBox
+  const boxOnstage = stageLeftBox && stageLeftBox.x < w;
+  const east = cableView && stageLeftBox && !boxOnstage
     ? Math.min(w + 0.25, stageLeftBox.x - edgeGap - 0.25)
     : w - 0.25;
   const clearLeft = w * 0.36;
@@ -108,10 +109,15 @@ export function StageCableGuide({
   const westApproach = westBottom
     ? ` H${westBottom.x} V${westBottom.y}`
     : ` Q${west} ${westY} ${west + rearRadius} ${westY} H${westEnd}`;
-  const eastY = stageLeftBox
+  const enterFromBelow = boxOnstage && east <= stageLeftBox.x + stageLeftBox.width;
+  const eastY = enterFromBelow ? stageLeftBox.y + stageLeftBox.height + edgeGap : stageLeftBox
     ? stageLeftBox.y + stageLeftBox.height * (cableView ? 0.27 : 0.5)
     : h * 0.24;
-  const eastEnd = stageLeftBox ? ` H${stageLeftBox.x - edgeGap}` : "";
+  let eastEnd = "";
+  if (stageLeftBox && !enterFromBelow) {
+    const edge = boxOnstage ? stageLeftBox.x + stageLeftBox.width + edgeGap : stageLeftBox.x - edgeGap;
+    eastEnd = ` H${edge}`;
+  }
   const chris = chrisBase ?? { x: w / 3, y: leadY };
   const brian = brianBase ?? { x: w * 2 / 3, y: leadY };
   const paths: Guide[] = [
