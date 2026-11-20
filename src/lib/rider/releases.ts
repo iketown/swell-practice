@@ -63,3 +63,14 @@ export function replaceCopies(
       : row,
   );
 }
+
+export function resolveProductionEdition(rows: RiderRelease[], code?: string) {
+  const copy = rows.find(row => row.code === code);
+  const target = copy?.replacement
+    ? rows.find(row => row.code === copy.replacement && row.id === copy.id && !row.replacement)
+    : copy;
+  const standard = rows
+    .filter(row => row.id === "standard" && !row.replacement)
+    .sort((a, b) => b.revision - a.revision)[0];
+  return { copy, target, standard };
+}

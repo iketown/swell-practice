@@ -115,8 +115,8 @@ export function PrintPacket({
       </footer>
       <section className="print-sheet print-cover">
         <Image alt="The Swell" src="/01-swell-logo.svg" width={240} height={104} unoptimized priority />
-        <h1>Technical rider</h1>
-        <h2>{record.versionName} · {packet}</h2>
+        <h1>{guideOnly ? "Rack channel guide" : "Technical rider"}</h1>
+        <h2>{record.versionName}{!guideOnly && <> · {packet}</>}</h2>
         <p>{issue} · {dateText}</p>
         <div className="cover-check">
           <PrintQr url={qrUrl} label="Check this rider online" />

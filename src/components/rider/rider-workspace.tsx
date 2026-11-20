@@ -155,10 +155,7 @@ export function RiderWorkspace({
   function defaultPages(target: Packet): readonly RiderPage[] {
     if (target === "Backline") return ["Stage plot", "Equipment advance"];
     if (!privateMode) return riderPages;
-    const sections = privateMode === "edit" && target === "Full rider"
-      ? riderPages.filter(section => section !== "Rack channel guide")
-      : riderPages;
-    return [...sections, ...setupPages];
+    return [...riderPages, ...setupPages];
   }
   const [pages, setPages] = useState<readonly RiderPage[]>(() => defaultPages(issuedPacket ?? "Full rider"));
   const released = !!record.releaseNumber || !!record.releaseCode;

@@ -5,6 +5,7 @@ import {
   packetFromQuery,
   releaseCode,
   replaceCopies,
+  resolveProductionEdition,
 } from "../../src/lib/rider/releases.ts";
 import { printedUrl } from "../../src/lib/rider/printed-version.ts";
 
@@ -52,4 +53,29 @@ test("printed codes and recipient survive a scan and unissued drafts have no rel
     printedUrl(undefined, "Backline"),
     "https://theswell.live/sp?draft=1",
   );
+});
+
+test("every catalogued production download exists as a PDF", async () => {
+  const { readFileSync } = await import("node:fs");
+  const root = new URL("../../public/production-documents/", import.meta.url);
+  const catalog = JSON.parse(readFileSync(new URL("catalog.json", root), "utf8"));
+  for (const entry of catalog) {
+    for (const file of [entry.packet, ...entry.documents]) {
+      const bytes = readFileSync(new URL(entry.code + "/" + file.file, root));
+      assert.equal(bytes.toString("ascii", 0, 5), "%PDF-");
+    }
+  }
+});
+
+test("a scan follows its own setup, while browsing defaults to the latest approved Standard", () => {
+  const standard = edition("standard-a", 95, "standard");
+  const hawaii = edition("hawaii-2027", 4, "hawaii");
+  const retired = edition("hawaii-2026", 2, "hawaii", hawaii.code);
+  const compatible = edition("hawaii-small", 3, "hawaii");
+  const rows = [standard, retired, compatible, hawaii];
+  assert.equal(resolveProductionEdition(rows).standard, standard);
+  assert.equal(resolveProductionEdition(rows, "unknown").target, undefined);
+  assert.equal(resolveProductionEdition(rows, retired.code).target, hawaii);
+  assert.equal(resolveProductionEdition(rows, compatible.code).target, compatible);
+  assert.equal(resolveProductionEdition([{ ...retired, replacement: standard.code }, standard], retired.code).target, undefined);
 });
