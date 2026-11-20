@@ -28,7 +28,7 @@ function combineCableLengths(rows: Requirement[]): Requirement[] {
   for (const row of result) row.cableLengths?.sort((a, b) => (Number.parseFloat(b.spec) || 0) - (Number.parseFloat(a.spec) || 0) || a.spec.localeCompare(b.spec));
   return result;
 }
-const categories = ["Instruments", "Drums", "Stands and hardware", "Drum microphones", "Microphones and DI boxes", "Side Stage Cables", "Main Stage Cables", "Analog Drop Snakes", "Monitors and audio systems", "Stage, risers and power", "Personnel", "Accessories and other equipment"] as const;
+const categories = ["Instruments", "Drums", "Stands and hardware", "Drum microphones", "Microphones and DI boxes", "Side Stage Cables", "Main Stage Cables", "Analog Drop Snakes", "Analog splitter", "Monitors and audio systems", "Wireless handheld vocal system", "Stage, risers and power", "Personnel", "Accessories and other equipment"] as const;
 type Category = typeof categories[number];
 function isDrumMicrophone(g: Plot["gear"][number], plot: Plot) {
   return /microphone|\bmic\b|condenser|\bsm57\b|\bksm32\b|beta 52a/i.test(`${g.item} ${g.spec}`)
@@ -42,6 +42,8 @@ function category(row: Requirement, plot?: Plot): Category {
   if (/technician|engineer|personnel|operator|crew/.test(item)) return "Personnel";
   if (/^(drum kit|drums|drum rug|cymbals?|drum hardware|drum throne)$/.test(item) || (item === "instrument / backline" && /^drums?$/i.test(row.spec))) return "Drums";
   if (/stand|mount|hardware|throne/.test(item)) return "Stands and hardware";
+  if (/^analog splitter\b/.test(item)) return "Analog splitter";
+  if (/^wireless handheld vocal systems?$/.test(item)) return "Wireless handheld vocal system";
   if (/splitter/.test(item) || /digital stage.?box/.test(text)) return "Monitors and audio systems";
   if (/stage.?box|drop snake|subsnake/.test(item)) return "Analog Drop Snakes";
   if (/cable|snake|loom/.test(item)) {
@@ -76,7 +78,16 @@ function supplierNotes(g: Requirement, plot: Plot): string[] {
   }))];
 }
 
+function monitorOrder(g: Requirement) {
+  if (/\bX32\b/i.test(g.item)) return 0;
+  if (/\bS16\b/i.test(g.item)) return 1;
+  if (/wireless IEM transmitters?/i.test(g.item)) return 2;
+  return 3;
+}
+
 function requestName(g: Requirement) {
+  if (g.item === "X32 console" && /Behringer X32 Rack/i.test(g.spec)) return "Behringer X32 Rack console";
+  if (g.item === "Wireless IEM transmitter" && g.quantity > 1) return "Wireless IEM transmitters";
   if (g.item !== "Instrument / backline") return g.item;
   if (/acoustic|aco gtr/i.test(g.spec)) return "Acoustic guitar";
   if (/drum/i.test(g.spec)) return "Drum kit";
@@ -124,7 +135,7 @@ function Requirements({ rows, plot, rackCables, unresolved = false }: { rows: Re
   return <>{categories.map(name => {
     const firstChannel = (g: Requirement) => Math.min(...g.allocations.flatMap(a => a.sourceIds).map(id => plot.inputs.find(input => input.id === id)?.number ?? Infinity));
     const standOrder = (g: Requirement) => /vocal mic stands/i.test(g.item) ? 0 : /stands for drum mics/i.test(g.item) ? 1 : /stands for sax\/cello/i.test(g.item) ? 2 : 3;
-    const group = rows.filter(row => category(row, plot) === name).sort((a, b) => (name === "Drum microphones" ? firstChannel(a) - firstChannel(b) : name === "Stands and hardware" ? standOrder(a) - standOrder(b) : 0) || a.item.localeCompare(b.item) || a.spec.localeCompare(b.spec));
+    const group = rows.filter(row => category(row, plot) === name).sort((a, b) => (name === "Drum microphones" ? firstChannel(a) - firstChannel(b) : name === "Stands and hardware" ? standOrder(a) - standOrder(b) : name === "Monitors and audio systems" ? monitorOrder(a) - monitorOrder(b) : 0) || a.item.localeCompare(b.item) || a.spec.localeCompare(b.spec));
     const patch = name === "Side Stage Cables" && rackCables?.included.size ? rackCables : undefined;
     if (!group.length && !patch) return null;
     const packages = group.filter(g => drumSections(g).length > 0);
@@ -147,9 +158,10 @@ function Requirements({ rows, plot, rackCables, unresolved = false }: { rows: Re
         <tbody>{tableRows.map(g => {
           const channels = [...new Set(g.allocations.flatMap(a => a.sourceIds).map(id => plot.inputs.find(i => i.id === id)?.number).filter((n): n is number => n !== undefined))].sort((a, b) => a - b);
           const notes = supplierNotes(g, plot);
+          const useSpecAsName = g.item === name && !!g.spec;
           return <tr key={g.allocations[0].id}>
             <td>{quantityText(g)}</td>
-            <td><strong>{requestName(g)}</strong>{!g.required && <span> (optional)</span>}{g.spec && g.item !== "Instrument / backline" && <div>{g.spec}</div>}{g.cableLengths && <ul className="advance-note-list">{g.cableLengths.map(length => <li key={length.spec}>{quantityText(length)} @ {length.spec || "length to confirm"}</li>)}</ul>}<RequirementNotes notes={notes} /></td>
+            <td><strong>{useSpecAsName ? g.spec : requestName(g)}</strong>{!g.required && <span> (optional)</span>}{!useSpecAsName && g.spec && g.item !== "Instrument / backline" && <div>{g.spec}</div>}{g.cableLengths && <ul className="advance-note-list">{g.cableLengths.map(length => <li key={length.spec}>{quantityText(length)} @ {length.spec || "length to confirm"}</li>)}</ul>}<RequirementNotes notes={notes} /></td>
             <td>{unresolved && <div>Supplier to confirm</div>}{[...g.stations].join(", ")}{channels.length > 0 && <div>#{channels.join(", #")}</div>}</td>
           </tr>;
         })}</tbody>
