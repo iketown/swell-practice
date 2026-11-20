@@ -1815,3 +1815,9 @@
   .guide-sheet-footer .print-qr { justify-self: end; }
   .guide-sheet-footer .print-qr, .guide-sheet-footer .print-qr svg { width: .65in; height: .65in; }
 }
+
+@media print {
+  .side-stage-cables { break-inside: avoid; }
+  .side-stage-cables h3 { font-weight: 700; margin-top: 4pt; }
+  .side-stage-cables .advance-note-list { margin-top: 0; }
+}

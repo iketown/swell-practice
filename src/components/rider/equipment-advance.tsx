@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { quantityText, rollup, type Plot } from "@/lib/rider/model";
+import { sideStageCables } from "@/lib/rider/side-stage-cables";
 import type { Packet } from "./print-packet";
 
 type Requirement = ReturnType<typeof rollup>[number] & {
@@ -145,7 +146,8 @@ function Requirements({ rows, plot, unresolved = false }: { rows: Requirement[];
 
 export function EquipmentAdvance({ plot, packet, title }: { plot: Plot; packet: Packet; title: (name: string) => ReactNode }) {
   // Confirmation belongs in the editor, not the supplier order or its grouping key.
-  const requests = plot.gear.map(g => ({ ...g, confirmed: false }));
+  const rackCables = sideStageCables(plot);
+  const requests = plot.gear.filter(g => !rackCables.included.has(g.id)).map(g => ({ ...g, confirmed: false }));
   // A drum SM57 and a sax/cello spare must retain their distinct uses even if
   // their procurement item/specification is identical.
   const rows = combineCableLengths([
@@ -168,6 +170,15 @@ export function EquipmentAdvance({ plot, packet, title }: { plot: Plot; packet: 
       {title("Audio requirements")}
       <p className="advance-intro">Provided by venue production. Quantities below are totals. See the audio input key for channel details; items with unassigned suppliers are listed separately.</p>
       <section className="advance-category"><h2>Monitors</h2><p>{plot.monitors || "Monitor system, mix count and output connections need to be specified."}</p></section>
+      {rackCables.included.size > 0 && <section className="advance-category side-stage-cables">
+        <h2>Side stage cable needs</h2>
+        <p>Allow approximately 10 ft per run between adjacent units on the stage-left rack table.</p>
+        {([["Monitors", rackCables.monitors], ["Wireless mics", rackCables.wireless]] as const).map(([heading, lines]) =>
+          lines.length > 0 && <div key={heading}><h3>{heading}</h3>
+            <ul className="advance-note-list">{lines.map(line => <li key={line}>{line}</li>)}</ul>
+          </div>
+        )}
+      </section>}
       <Requirements rows={audio} plot={plot} />
       <section className="advance-category"><h2>Power and production details</h2><p>{plot.power || "Power requirements need to be specified."}</p>
         {!audio.some(g => /riser|platform/i.test(g.item)) && <p>Risers: no requirement recorded; confirm whether any are needed.</p>}

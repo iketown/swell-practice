@@ -1,6 +1,8 @@
 import { z } from "zod";
 import type { Gear, Plot } from "./model";
 
+export const rackTableXlr = "Balanced XLR female to XLR male, approx. 10 ft";
+
 const port = z.number().int().min(3).max(8);
 export const standardS16Inputs = Array.from({ length: 16 }, (_, index) => index + 1);
 export const standardWirelessInputs = [1, 2];
@@ -86,7 +88,7 @@ function patchWireless(p: Plot, map: RackMap): Plot {
       return {
         ...row,
         spec: local
-          ? "Balanced XLR female to XLR male"
+          ? (row.spec === rackTableXlr ? rackTableXlr : "Balanced XLR female to XLR male")
           : "Balanced XLR female to ¼-inch TRS male",
         notes: `Band split tail ${16 + port} → X32 Rack ${wirelessPort(map, port)} → CH ${16 + port}. Phantom off. Match the receiver output level at soundcheck.`,
       };
@@ -124,8 +126,8 @@ export function applyRackMap(p: Plot, map: RackMap): Plot {
       if (mix)
         return {
           ...row,
-          spec: "Balanced XLR female to XLR male",
-          notes: `${mix.name} bus ${side + 1} → ${mix.device} XLR Out ${mix.out + (side % 2)} → IEM TX ${mix.tx} ${side % 2 ? "R" : "L"}. Confirm cable length.`,
+          spec: row.spec === rackTableXlr ? rackTableXlr : "Balanced XLR female to XLR male",
+          notes: `${mix.name} bus ${side + 1} → ${mix.device} XLR Out ${mix.out + (side % 2)} → IEM TX ${mix.tx} ${side % 2 ? "R" : "L"}.`,
         };
     }
     return row;
