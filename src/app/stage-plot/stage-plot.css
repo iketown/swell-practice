@@ -1693,20 +1693,13 @@
 .patch-sheet { font-family:Arial,sans-serif; color:#19352d; }
 .rack-design .patch-sheet { background:white; border:1px solid #bfcdc4; margin:20px 0; padding:clamp(16px,3vw,36px); }
 .rack-design .patch-sheet h2 { font-size:1.65rem; font-weight:750; }
-.patch-body { font-size:16px; }
-.patch-body p { margin:.65em 0; line-height:1.4; }
-.patch-body h3 { font-size:1.15em; font-weight:700; margin:1.2em 0 .45em; }
 .patch-bank { margin:1.4em 0; overflow-x:auto; }
 .patch-bank svg { width:100%; display:block; min-width:580px; font-family:Arial,sans-serif; }
 .patch-cap { font-weight:700; font-size:12px; letter-spacing:.06em; fill:#42564d; }
-.patch-handoff { border-top:1px solid #80938a; }
-.patch-handoff h3 { margin-top:.55em; }
 @media print {
-  .patch-body { color:#111; font:11pt/1.35 Arial,sans-serif; }
-  .patch-sheet .patch-body p { font:11pt/1.35 Arial,sans-serif; margin:5pt 0; }
   .patch-bank { overflow:visible; margin:8pt 0; }
   .patch-bank svg { min-width:0; }
-  .patch-bank,.patch-handoff { break-inside:avoid; }
+  .patch-bank { break-inside:avoid; }
 }
 .rack-port-editor { margin:16px 0; }
 .rack-port-editor summary { cursor:pointer; font-weight:bold; }
@@ -1715,14 +1708,22 @@
 .rack-port-editor label { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:4px 0; border-bottom:1px solid #c4cec9; }
 .rack-port-editor h3 { margin-top:12px; font-weight:700; }
 
-.subsnake-panel-content { min-width:660px; }
-.subsnake-tail-labels { display:grid; align-items:stretch; }
-.subsnake-tail-labels > div { display:flex; flex-direction:column; align-items:center; text-align:center; padding:0 4px; line-height:1.2; }
-.subsnake-tail-labels strong { font-size:1.3em; }
-.subsnake-tail-labels b { font-weight:500; margin:.16em 0 .45em; overflow-wrap:anywhere; }
-.subsnake-tail-labels span { font-size:.89em; font-weight:700; border:1px solid #6d8179; border-radius:3px; padding:2px 6px; }
-.subsnake-tail-labels:first-child span { margin-top:auto; }
-.subsnake-tail-labels:last-child span { margin-bottom:.45em; }
+.subsnake-panel-content { min-width:760px; }
+.subsnake-tail-labels { display:grid; text-align:center; line-height:1.18; }
+.split-route,.split-source,.split-terminals { display:flex; flex-direction:column; }
+.split-source { flex:1; padding:3px; overflow-wrap:anywhere; }
+.split-source strong { font-size:1.25em; }
+.split-source b { font-weight:500; }
+.split-terminals { background:#f0f3f2; border:1px solid #89978f; padding:2px; }
+.split-terminals span:first-child { font-weight:700; }
+.split-terminals span:last-child { font-size:.85em; }
+.from-below,.from-below .split-terminals { flex-direction:column-reverse; }
+.split-console-link { padding-top:.4em; border-top:1px solid #89978f; font-size:.95em; }
+.split-handoff { display:flex; align-items:center; justify-content:center; gap:10px; padding:3px 0 8px; }
+.split-handoff b { font-weight:700; }
+.split-handoff small,.split-handoff span { display:block; }
+.split-handoff span { line-height:1.6; }
+.split-handoff svg { flex:none; min-width:0; width:42px; }
 @media print {
   .subsnake-panel-content { min-width:0; }
 }
@@ -1739,12 +1740,7 @@
   }
   .patch-sheet:has(.subsnake-panel-map, .wireless-rack-map) .print-title h1 { font-size: 18pt; }
   .subsnake-panel-map { margin: 5pt 0; }
-  .subsnake-panel-map + .patch-handoff {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    column-gap: 15pt;
-  }
-  .subsnake-panel-map + .patch-handoff h3 { grid-column: 1 / -1; margin: 3pt 0 0; }
+
 }
 
 .wireless-rack-map { margin: .5em 0; }
