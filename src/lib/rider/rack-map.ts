@@ -2,8 +2,19 @@ import { z } from "zod";
 import type { Gear, Plot } from "./model";
 
 const port = z.number().int().min(3).max(8);
+export const standardS16Inputs = Array.from({ length: 16 }, (_, index) => index + 1);
+export const standardWirelessInputs = [1, 2];
+export const standardEarPairs = [1, 2, 3, 4, 5];
+function portOrder(size: number) {
+  return z.array(z.number().int().min(1).max(size)).length(size)
+    .refine(ports => new Set(ports).size === size, "Assign each port once.").optional();
+}
 export const rackMapSchema = z.object({
   layout: z.enum(["s16-v1", "s16-v2"]),
+  // Index is the split / console channel minus one. Presence enables the patch sheets.
+  s16Inputs: portOrder(16),
+  wirelessInputs: portOrder(2),
+  earPairs: portOrder(5),
   housePorts: z
     .tuple([port, port, port])
     .refine(
@@ -15,17 +26,21 @@ export type RackMap = z.infer<typeof rackMapSchema>;
 export const standardRackMap: RackMap = {
   layout: "s16-v2",
   housePorts: [3, 4, 5],
+  s16Inputs: standardS16Inputs,
 };
 export const stems = ["Perc", "Inst", "Vox"] as const;
-export const ears = ["Joe", "Chris", "Brian", "Jackson", "Sam"].map(
+export function earRoutes(map: RackMap) {
+  const pairs = map.earPairs ?? standardEarPairs;
+  return ["Joe", "Chris", "Brian", "Jackson", "Sam"].map(
   (name, i) => ({
     name,
     tx: i + 1,
     bus: 2 * i + 1,
-    device: i === 4 ? "X32" : "S16",
-    out: i === 4 ? 1 : 2 * i + 1,
+    device: pairs[i] === 5 ? "X32" : "S16",
+    out: pairs[i] === 5 ? 1 : 2 * pairs[i] - 1,
   }),
 );
+}
 
 export function supportsRackMap(p: Plot) {
   return (
@@ -41,7 +56,8 @@ export function supportsRackMap(p: Plot) {
   );
 }
 
-export function wirelessPort(map: RackMap, port: number) {
+export function wirelessPort(map: RackMap, receiver: number) {
+  const port = map.wirelessInputs?.[receiver - 1] ?? receiver;
   return map.layout === "s16-v2" ? `XLR IN ${port}` : `AUX IN ${port}`;
 }
 
@@ -80,9 +96,13 @@ export function applyRackMap(p: Plot, map: RackMap): Plot {
     throw Error(
       "This guide requires the 16 wired inputs and Brian / Chris wireless channels 17 and 18.",
     );
-  if (p.rackMap?.layout === map.layout) return { ...p, rackMap: map };
-  const patched = patchWireless(p, map);
-  if (p.rackMap) return patched;
+  const sameWireless = p.rackMap?.layout === map.layout && standardWirelessInputs.every((n, i) =>
+    (p.rackMap?.wirelessInputs?.[i] ?? n) === (map.wirelessInputs?.[i] ?? n));
+  const patched = sameWireless ? { ...p, rackMap: map } : patchWireless(p, map);
+  const sameEars = p.rackMap && standardEarPairs.every((n,i) => (p.rackMap?.earPairs?.[i] ?? n) === (map.earPairs?.[i] ?? n));
+  if (sameEars) return patched;
+  const ears = earRoutes(map);
+  const monitors = "Five independent stereo IEM mixes. " + ears.map(m => `${m.device} OUT ${m.out}/${m.out + 1} → TX${m.tx} ${m.name}`).join(" · ") + ". TX6 spare.";
   const gear = patched.gear.map((row) => {
     const lead = /^wl-iem-lead-(\d+)$/.exec(row.id);
     if (lead) {
@@ -97,6 +117,7 @@ export function applyRackMap(p: Plot, map: RackMap): Plot {
     }
     return row;
   });
+  if (p.rackMap) return { ...patched, gear, monitors };
   const extra = (
     id: string,
     item: string,
@@ -146,7 +167,6 @@ export function applyRackMap(p: Plot, map: RackMap): Plot {
   return {
     ...patched,
     gear,
-    monitors:
-      "Five independent stereo IEM mixes. S16 XLR Out 1–8 → TX1–4. X32 Rack XLR Out 1/2 → TX5 Sam. TX6 spare. See the stage-left rack channel guide for the analog split, wireless receivers and playback handoff.",
+    monitors,
   };
 }

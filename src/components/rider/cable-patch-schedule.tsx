@@ -1,4 +1,5 @@
 import { stageBoxPatch, pointFor, type Plot } from "@/lib/rider/model";
+import { boxCode } from "@/lib/rider/rack-inputs";
 import { boxColors } from "@/lib/rider/stage-box";
 import { estimateInputXlr, inputXlrAllocation } from "@/lib/rider/input-xlr";
 
@@ -21,11 +22,6 @@ export function CablePatchSchedule({
     return pointFor(p, id)?.label;
   }
 
-  const boxCode = (label: string) => {
-    if (/^upstage(?: box)?$/i.test(label.trim())) return "U";
-    if (/^stage[ -]left(?: box)?$/i.test(label.trim())) return "L";
-    return null;
-  };
   const boxLegend = p.stageBoxes
     .filter(box => boxCode(box.label))
     .map(box => `${boxCode(box.label)} = ${box.label}`)

@@ -37,7 +37,7 @@ export default async function InputMapPage({
         { id: "U", label: "upstage box", color: "Teal", x: 0, y: 0 },
         { id: "L", label: "stage left box", color: "Teal", x: 0, y: 0 },
       ],
-      inputs: standardInputs.map((row) => ({
+      inputs: [...standardInputs, {source:"Brian wireless vocal", socket:"", number:17}, {source:"Chris wireless vocal", socket:"", number:18}].map((row) => ({
         id: "template-" + row.number,
         number: row.number,
         source: row.source,

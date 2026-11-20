@@ -8,7 +8,8 @@ import {
 import type { RecipientPacket } from "@/lib/rider/releases";
 import { printedUrl } from "@/lib/rider/printed-version";
 import { RackChannelGuide } from "./rack-channel-guide";
-import { rackInputs } from "@/lib/rider/rack-inputs";
+import { PatchDiagrams } from "./patch-diagrams";
+import { rackInputs, wirelessRoutes } from "@/lib/rider/rack-inputs";
 import { EquipmentAdvance } from "./equipment-advance";
 import { PrintQr, qrDataUrl } from "./print-qr";
 import { CablePatchSchedule } from "./cable-patch-schedule";
@@ -173,10 +174,12 @@ export function PrintPacket({
           </table>
         </section>
       )}
-      {p.rackMap && packet !== "Backline" && pages.includes("Rack channel guide") && <section className="print-sheet rack-sheet">
+      {p.rackMap && packet !== "Backline" && pages.includes("Rack channel guide") && <><section className="print-sheet rack-sheet">
         {title("Rack channel guide")}
-        <RackChannelGuide map={p.rackMap} inputs={rackInputs(p)} />
-      </section>}
+        <RackChannelGuide map={p.rackMap} inputs={rackInputs(p)} receivers={wirelessRoutes(p, p.rackMap)} />
+      </section>
+        {p.rackMap.s16Inputs && <PatchDiagrams plot={p} map={p.rackMap} title={title} />}
+      </>}
       {setupPages.filter((page) => preview && pages.includes(page)).map((view) => <div className="setup-print-group" key={view}><section className="print-sheet print-diagram-sheet">
         {title(view)}
         <StageCanvas printLayout plot={p} view={view} layers={viewLayers(view, defaultLayers)} editing={false} selected={null} active={null} onHover={noop} onSelect={noop} onMove={noop} />

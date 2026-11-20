@@ -1,26 +1,37 @@
 import { stageBoxPatch, type Plot } from "./model";
+import { wirelessPort, type RackMap } from "./rack-map";
 
-export type RackInput = { number: number; source: string; socket: string };
-export function rackInputs(plot: Plot): RackInput[] {
+export function boxCode(label: string) {
+  if (/^upstage(?: box)?$/i.test(label.trim())) return "U";
+  if (/^stage[ -]left(?: box)?$/i.test(label.trim())) return "L";
+  return null;
+}
+
+export type RackInput = ReturnType<typeof rackInputs>[number];
+export function rackInputs(plot: Plot, map = plot.rackMap) {
   return stageBoxPatch(plot)
     .filter(({ input }) => input.number <= 16)
     .map(({ input, box, channel }) => ({
       number: input.number,
       source: input.source,
-      socket: box
-        ? (/^upstage box$/i.test(box.label)
-            ? "U"
-            : /^stage left box$/i.test(box.label)
-              ? "L"
-              : box.label) +
-          "·" +
-          channel
-        : "Unassigned",
+      boxId: box?.id,
+      boxName: box?.label,
+      channel,
+      socket: box ? (boxCode(box.label) ?? box.label) + "·" + channel : "Unassigned",
+      s16: map?.s16Inputs?.[input.number - 1] ?? input.number,
     }));
 }
 
+export function wirelessRoutes(plot: Plot, map: RackMap) {
+  return [1, 2].map(port => {
+    const channel = 16 + port;
+    const source = plot.inputs.find(input => input.number === channel)?.source ?? "Wireless vocal";
+    return { channel, port: map.wirelessInputs?.[port - 1] ?? port, source, input: wirelessPort(map, port) };
+  });
+}
+
 // Public design template. Saved rider packets always read their own revision's input key.
-export const standardInputs: RackInput[] = [
+export const standardInputs = [
   ["Joe vocal", "U·1"],
   ["Chris wired vocal backup", "U·2"],
   ["Brian wired vocal backup", "L·1"],

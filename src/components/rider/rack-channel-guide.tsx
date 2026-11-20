@@ -1,6 +1,6 @@
 import Image from "next/image";
-import { ears, stems, wirelessPort, type RackMap } from "@/lib/rider/rack-map";
-import type { RackInput } from "@/lib/rider/rack-inputs";
+import { earRoutes, stems, type RackMap } from "@/lib/rider/rack-map";
+import { type wirelessRoutes, type RackInput } from "@/lib/rider/rack-inputs";
 
 type Pin = { x: number; y: number; label: string; route: string };
 function Panel({
@@ -62,27 +62,29 @@ function Panel({
 
 export function RackChannelGuide({
   inputs,
+  receivers,
   map,
   onTrace,
 }: {
   inputs: RackInput[];
+  receivers: ReturnType<typeof wirelessRoutes>;
   map: RackMap;
   onTrace?: (route: string) => void;
 }) {
-  const s16: Pin[] = inputs.map(({ number, source, socket }) => ({
-    x: 51 + ((number - 1) % 8) * 33.2,
-    y: number <= 8 ? 37 : 86,
-    label: String(number),
-    route: `${source} · ${socket} → split ${number} → S16 IN ${number} → X32 CH ${number}`,
+  const ears = earRoutes(map);
+  const s16: Pin[] = inputs.map(({ number, source, socket, s16 }) => ({
+    x: 51 + ((s16 - 1) % 8) * 33.2,
+    y: s16 <= 8 ? 37 : 86,
+    label: String(s16),
+    route: `${source} · ${socket} → split ${number} → S16 IN ${s16} → X32 CH ${number}`,
   }));
   const local = map.layout === "s16-v2";
-  const wireless = ["Brian", "Chris"].map((name, i) => {
-    const channel = 17 + i;
+  const wireless = receivers.map(({ channel, source, input, port }) => {
     return {
-      x: local ? 471 - i * 30 : 228 - i * 22,
+      x: local ? 471 - (port - 1) * 30 : 228 - (port - 1) * 22,
       y: local ? 31 : 20,
       label: String(channel),
-      route: `${name} RX → split ${channel} → ${wirelessPort(map, i + 1)} → CH ${channel}`,
+      route: `${source} RX → split ${channel} → ${input} → CH ${channel}`,
     };
   });
   const x32: Pin[] = [
@@ -133,8 +135,7 @@ export function RackChannelGuide({
         </h2>
         <Panel device="s16" pins={s16} onTrace={onTrace} />
         <p>
-          <strong>Inputs 1–16</strong> · Each split number matches its S16 input
-          and X32 channel. U = upstage subsnake. L = stage-left subsnake.
+          <strong>Inputs 1–16</strong> · Split numbers match X32 channels. Follow the S16 input assignment below. U = upstage subsnake. L = stage-left subsnake.
         </p>
         <div className="rack-inputs">
           {[inputs.slice(0, 8), inputs.slice(8)].map((rows, index) => (
@@ -142,7 +143,7 @@ export function RackChannelGuide({
               <thead>
                 <tr>
                   <th>Socket</th>
-                  <th>Split / IN / CH</th>
+                  <th>Split / CH</th><th>S16 IN</th>
                   <th>Source</th>
                 </tr>
               </thead>
@@ -153,6 +154,7 @@ export function RackChannelGuide({
                     <td>
                       <b>{row.number}</b>
                     </td>
+                    <td>{row.s16}</td>
                     <td>{row.source}</td>
                   </tr>
                 ))}
@@ -174,7 +176,7 @@ export function RackChannelGuide({
             ))}
             <p>
               {local
-                ? "Patch Local 1/2 to separate CH 17/18. Keep phantom off on both split legs. Match RX mic/line level at soundcheck."
+                ? "Use separate CH 17/18 strips. Keep phantom off on both split legs. Match RX mic/line level at soundcheck."
                 : "Use separate CH 17/18 strips, line-level RX outputs, phantom off and balanced TRS into AUX IN."}
             </p>
           </div>
@@ -194,7 +196,7 @@ export function RackChannelGuide({
           <p>
             <strong>AES50 A ↔ A</strong> · S16 rear A (left) to X32 rear A
             (right). Use shielded Cat5e etherCON. X32 internal clock, S16
-            standard mode, outputs 1–8. Patch AES50 A inputs 1–16 to CH 1–16.
+            standard mode, outputs 1–8. Assign each AES50 A input to the X32 channel listed above.
           </p>
         </div>
       </section>
@@ -228,7 +230,7 @@ export function RackChannelGuide({
             </tbody>
           </table>
           <p>
-            Send buses 1–8 to AES50 A 1–8. Send buses 9/10 to local XLR 1/2. TX6
+            Use AES50 A for S16 outputs and local XLR for X32 outputs. TX6
             is an unpatched spare.
           </p>
         </section>
