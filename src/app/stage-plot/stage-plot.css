@@ -1667,6 +1667,18 @@
 .rack-panel img { display:block; width:100%; height:auto; }
 .rack-panel .rack-pin { position:absolute; transform:translate(-50%,-50%); display:grid; place-items:center; padding:0; border:1px solid white; border-radius:50%; background:#173e38; color:white; width:3.9cqw; height:3.9cqw; font:bold 1.85cqw/1 Arial,sans-serif; }
 .rack-panel.x32 .rack-pin { width:4.8cqw; height:4.8cqw; font-size:2cqw; }
+/* Stack the IEM prefix and stereo leg within the space between adjacent sockets. */
+.rack-panel .rack-pin.iem-output {
+  width: 4.95cqw;
+  height: auto;
+  padding-block: .2cqw;
+  border-radius: .65cqw;
+  font-size: 1.95cqw;
+  line-height: 1;
+  text-align: center;
+  white-space: normal;
+}
+.rack-panel.x32 .rack-pin.iem-output { width: 5.8cqw; font-size: 2.45cqw; }
 .rack-panel button.rack-pin:hover,.rack-panel button.rack-pin:focus-visible { background:#803b16; outline:2px solid #eaa83c; z-index:1; }
 .rack-credit { display:block; color:#4a615a; margin-top:1em; font-size:.72em; }
 .rack-trace { position:sticky; top:4px; z-index:2; padding:.55em .8em; background:#e6efe6; border-left:3px solid #366057; }

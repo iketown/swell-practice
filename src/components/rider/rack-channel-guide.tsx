@@ -4,7 +4,7 @@ import { type wirelessRoutes, type RackInput } from "@/lib/rider/rack-inputs";
 
 import { rackOutputCenter, s16Front, s16InputCenter, x32Rear, x32WirelessCenter } from "./rack-panels";
 
-type Pin = { x: number; y: number; label: string; route: string };
+type Pin = { x: number; y: number; label: string; route: string; iem?: boolean };
 function Panel({
   device,
   pins,
@@ -39,12 +39,13 @@ function Panel({
             left: (pin.x / width) * 100 + "%",
             top: (pin.y / height) * 100 + "%",
           };
+          const className = pin.iem ? "rack-pin iem-output" : "rack-pin";
           return onTrace ? (
             <button
               type="button"
               key={pin.route}
               style={style}
-              className="rack-pin"
+              className={className}
               title={pin.route}
               aria-label={pin.route}
               onClick={() => onTrace(pin.route)}
@@ -52,7 +53,7 @@ function Panel({
               {pin.label}
             </button>
           ) : (
-            <span key={pin.route} style={style} className="rack-pin">
+            <span key={pin.route} style={style} className={className}>
               {pin.label}
             </span>
           );
@@ -105,9 +106,11 @@ export function RackChannelGuide({
   for (const mix of ears) {
     for (const [index, side] of ["L", "R"].entries()) {
       const out = mix.out + index;
+      const label = `IEM ${mix.tx}${side}`;
       const pin = {
-        label: mix.tx + side,
-        route: `Bus ${mix.bus + index} → ${mix.device} OUT ${out} → TX${mix.tx} ${side} · ${mix.name}`,
+        iem: true,
+        label,
+        route: `${label} · Bus ${mix.bus + index} → ${mix.device} OUT ${out} → TX${mix.tx} ${side} · ${mix.name}`,
       };
       const panel = mix.device === "S16" ? s16 : x32;
       panel.push({ ...pin, ...rackOutputCenter(mix.device, out) });
