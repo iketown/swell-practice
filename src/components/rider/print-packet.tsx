@@ -1,6 +1,6 @@
 import Image from "next/image";
+import type { ReactNode } from "react";
 import {
-
   byNumber,
   micFor,
   type Published,
@@ -56,14 +56,29 @@ export function PrintPacket({
       </div>
     </header>
   );
+  const diagramFooter = (legend: ReactNode) => (
+    <footer className="diagram-footer">
+      <div>
+        <div className="print-legend">{legend}</div>
+        <a href={qrUrl}>{visibleUrl}</a>
+      </div>
+      <PrintQr url={qrUrl} label="Check this rider online" />
+    </footer>
+  );
   const inputs = byNumber(p);
   const boxesById = new Map(p.stageBoxes.map((b) => [b.id, b.label]));
   return (
     <article className="rider-print">
-      <style>{`@page {size: letter landscape; margin: .25in .25in 1.3in;
-        @bottom-left { width:75%; margin-left:.5in; border-top:.7pt solid #506562; padding-top:8pt; vertical-align:top; white-space:pre-line; content:${JSON.stringify("THE SWELL · " + visibleUrl + "\n" + issue + " · " + record.versionName + " · " + dateText).replaceAll("\\n", "\\A ")}; font:9pt Arial; line-height:1.4; }
-        @bottom-right { width:15%; margin-right:.5in; border-top:.7pt solid #506562; padding-top:8pt; vertical-align:top; content:url("${qrDataUrl(qrUrl)}"); }
-        @bottom-center { width:10%; white-space:nowrap; vertical-align:bottom; padding-bottom:5pt; content:"Page " counter(page); font:8pt Arial; }
+      <style>{`@page {size: letter portrait; margin: .45in .45in 1.04in;
+        @bottom-left { width:75%;  border-top:.7pt solid #506562; padding-top:8pt; vertical-align:top; white-space:pre-line; content:${JSON.stringify("THE SWELL · " + visibleUrl + "\n" + issue + " · " + record.versionName + " · " + dateText).replaceAll("\\n", "\\A ")}; font:9pt Arial; line-height:1.4; }
+        @bottom-right { width:15%;  border-top:.7pt solid #506562; padding-top:8pt; vertical-align:top; content:url("${qrDataUrl(qrUrl)}"); }
+        @bottom-center { width:10%; white-space:nowrap; vertical-align:top; padding-top:9pt; content:"Page " counter(page); font:8pt Arial; }
+      }
+      @page riderMap {
+        size: letter landscape; margin: .28in .34in .3in;
+        @bottom-left { content: none; border: 0; }
+        @bottom-right { content: none; border: 0; }
+        @bottom-center { padding: 0; vertical-align: middle; }
       }`}</style>
       <footer className="print-version-footer">
         <div>
@@ -82,7 +97,7 @@ export function PrintPacket({
         <PrintQr url={qrUrl} label={unsaved ? "Open the latest rider online" : "Check this printed revision online"} />
       </footer>
       <section className="print-sheet print-cover">
-        <Image alt="The Swell" src="/swell-logo-horizontal-stripes.svg" width={190} height={85} unoptimized priority />
+        <Image alt="The Swell" src="/01-swell-logo.svg" width={240} height={104} unoptimized priority />
         <h1>Technical rider</h1>
         <h2>{record.versionName} · {packet}</h2>
         <p>{issue} · {dateText}</p>
@@ -108,20 +123,20 @@ export function PrintPacket({
             onSelect={noop}
             onMove={noop}
           />
-          <div className="print-legend">
+          {diagramFooter(<>
             <b>Grid: 2 ft squares</b> · <b>Input key</b> □ Number = mic / line &nbsp; ▣ DI = direct input
             &nbsp; ⚡ = AC drop{" "}
             {p.stageBoxes.length > 0 &&
               " · Outlined box = assigned plot inputs"}{" "}
             &nbsp; · &nbsp; Audience at bottom. Symbols illustrative.
-          </div>
+          </>)}
         </section>
       )}
       {pages.includes("Equipment advance") && <EquipmentAdvance plot={p} packet={packet} title={title} />}
       {pages.includes("Audio input key") && (
         <section className="print-sheet">
           {title("Audio input key")}
-          <table>
+          <table className="print-input-key">
             <thead>
               <tr>
                 <th>Plot #</th>
@@ -158,7 +173,7 @@ export function PrintPacket({
       {setupPages.filter((page) => preview && pages.includes(page)).map((view) => <div className="setup-print-group" key={view}><section className="print-sheet print-diagram-sheet">
         {title(view)}
         <StageCanvas printLayout plot={p} view={view} layers={viewLayers(view, defaultLayers)} editing={false} selected={null} active={null} onHover={noop} onSelect={noop} onMove={noop} />
-        <div className="print-legend"><b>Grid: 2 ft squares</b> · {view === "Stand placement" ? "Crosshairs mark the points measured from centreline and the downstage edge." : "Stage-box grids show plot inputs in socket order. Read left to right, starting at socket 1 in each box."}</div>
+        {diagramFooter(<><b>Grid: 2 ft squares</b> · {view === "Stand placement" ? "Crosshairs mark the points measured from centreline and the downstage edge." : "Stage-box grids show plot inputs in socket order. Read left to right, starting at socket 1 in each box."}</>)}
       </section>
         {view === "Stand placement" && <section className="print-sheet">{title("Stand placement schedule")}<StandPlacementPanel plot={p} selected={null} editing={false} printLayout onSelect={noop} onChange={noop} /></section>}
         {view === "Cable patch and routing" && <section className="print-sheet">{title("Cable patch schedule")}<CablePatchSchedule plot={p} /></section>}

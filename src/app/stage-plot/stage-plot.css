@@ -1026,8 +1026,7 @@
   }
   .print-sheet {
     margin: 0;
-    /* Keep an inset in the document even when the macOS print dialog overrides @page. */
-    padding: 0.5in;
+    padding: 0;
     box-decoration-break: clone;
     -webkit-box-decoration-break: clone;
   }
@@ -1279,9 +1278,6 @@
   color: #654314;
 }
 @media print {
-  .print-sheet {
-    padding-bottom: 0.08in;
-  }
   .print-version-footer {
     position: fixed;
     bottom: 0;
@@ -1466,13 +1462,13 @@
   .setup-print-group + .setup-print-group { break-before: page; }
 }
 
-/* Diagram sheets give their remaining page area to the drawing. Table sheets
-   retain their existing padding and continuation behavior. */
+/* Match the named Letter landscape page with a little rounding tolerance. */
 @media print {
   .print-diagram-sheet {
     box-sizing: border-box;
-    height: 6.9in;
-    padding: .2in .25in .08in;
+    page: riderMap;
+    height: calc(8.5in - .28in - .3in - 1px);
+    padding: 0;
     display: flex;
     flex-direction: column;
     break-inside: avoid;
@@ -1498,9 +1494,19 @@
     height: 0;
     width: 100%;
   }
-  .print-diagram-sheet .print-legend {
-    flex-shrink: 0;
-    margin-top: 3pt;
+  .diagram-footer {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 10pt;
+    flex: none;
+  }
+  .diagram-footer .print-legend { margin: 0 0 2pt; }
+  .diagram-footer a { font-size: 8pt; overflow-wrap: anywhere; }
+  .diagram-footer .print-qr, .diagram-footer .print-qr svg {
+    flex: none;
+    width: .62in;
+    height: .62in;
   }
 }
 .artwork-dialog { width: min(850px, calc(100vw - 32px)); }
@@ -1512,9 +1518,31 @@
 @media (max-width: 600px) { .artwork-anchor-editor { grid-template-columns: 1fr; } .artwork-anchor-editor svg { height: 250px; } }
 
 @media print {
-  .advance-sheet {
-    padding-top: .25in;
+  /* Keep the two coordination sections together after the supplier orders. */
+  .advance-sheet[data-advance="band"] + [data-advance="unassigned"] {
+    break-before: auto;
+    margin-top: 12pt;
   }
+  .advance-sheet:is([data-advance="band"], [data-advance="unassigned"]) {
+    .print-title > div:first-child { display: flex; align-items: baseline; gap: 8pt; }
+    .print-title h1 { font-size: 17pt; }
+    .advance-intro { margin: 4pt 0 5pt; }
+    .advance-use { width: 75pt; }
+    .advance-table th:first-child { padding-inline: 3pt; white-space: nowrap; }
+  }
+  .advance-sheet:is([data-advance="band"], [data-advance="unassigned"]) .advance-category { margin-bottom: 3pt; }
+  .advance-sheet:is([data-advance="band"], [data-advance="unassigned"]) .advance-category h2 { margin: 6pt 0 2pt; padding-bottom: 2pt; }
+  .advance-sheet:is([data-advance="band"], [data-advance="unassigned"]) .advance-table td { padding: 2pt 4pt; }
+  .advance-sheet:is([data-advance="band"], [data-advance="unassigned"]) .advance-note { margin-top: 1pt; }
+  .advance-sheet .print-title, .advance-sheet .advance-intro { break-after: avoid; }
+  .print-input-key th, .print-input-key td { padding: 2pt 3pt; vertical-align: top; }
+  .print-input-key th { letter-spacing: .02em; }
+  .print-input-key th:first-child { width: 23pt; }
+  .print-input-key th:nth-child(2) { width: 80pt; }
+  .print-input-key th:nth-child(3) { width: 39pt; }
+  .print-input-key th:nth-child(4) { width: 67pt; }
+  .print-input-key th:nth-child(5) { width: 64pt; }
+  .print-input-key th:nth-child(6) { width: 25pt; }
   .advance-sheet .advance-intro {
     font-size: 10pt;
     line-height: 1.3;
@@ -1537,8 +1565,8 @@
     line-height: 1.25;
     border-collapse: collapse;
   }
-  .advance-table .advance-qty { width: 42pt; }
-  .advance-table .advance-use { width: 116pt; }
+  .advance-table .advance-qty { width: 32pt; }
+  .advance-table .advance-use { width: 84pt; }
   .advance-sheet .advance-table td,
   .advance-sheet .advance-table th {
     vertical-align: top;
@@ -1594,8 +1622,8 @@
 .rider-check form, .rider-check .version-button { margin-top: 1rem; }
 .rider-check form { display: grid; gap: 1rem; justify-items: start; }
 @media print {
-  .print-cover { break-after: page; padding: .5in; }
-  .print-cover > img { width: 2in; height: auto; margin-bottom: .32in; }
+  .print-cover { break-after: page; padding: .42in .1in 0; }
+  .print-cover > img { width: 2.6in; height: auto; margin-bottom: .32in; }
   .print-cover h1 { font: bold 32pt Arial; }
   .print-cover h2 { font: bold 17pt Arial; margin: .08in 0; }
   .print-cover p { font: 12pt Arial; }
