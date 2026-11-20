@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 const baseTabs = [
   { href: "/songs", label: "Songs" },
   { href: "/members", label: "Members" },
+  { href: "/stage-plot", label: "Stage plot" },
   { href: "/assignments", label: "Assignments" },
 ] as const;
 
