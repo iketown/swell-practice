@@ -1885,3 +1885,7 @@ The Standard layout has seven parked instruments: four electric guitars, two
 basses and one acoustic guitar. Colour variants are illustration choices and do
 not add finish requirements to the existing Telecaster/Strat backline category.
 
+
+### Stage-left rack channel guide
+
+`/stage-plot/input-map` previews the Standard wiring and traces labeled sockets on the S16 and X32 Rack. Its `?version=ID` editor uses the existing administrator authorization and revision library. A saved plot can carry `rackMap` with layout `s16-v1` and three distinct local XLR outputs (3–8) for Perc, Inst and Vox. Saving creates a private revision and checks the expected head. The printed guide reads that revision’s subsnake allocations, input labels and output assignments. Earlier revisions without a rack map and backline-only packets omit the guide.

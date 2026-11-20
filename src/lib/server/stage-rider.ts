@@ -265,6 +265,7 @@ export async function changeVersion(action: VersionAction) {
     if (!head.exists) throw missing();
     const date = today();
     if (action.action === "save") {
+      if (action.expectedHead !== undefined && head.get("revision") !== action.expectedHead) throw conflict();
       const releaseNumber =
         (await tx.get(currentDoc())).get("releaseNumber") ?? 0;
       if (

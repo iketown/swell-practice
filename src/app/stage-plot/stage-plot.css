@@ -1643,3 +1643,49 @@
 .release-dialog label:has([type="checkbox"]) { display: flex; align-items: baseline; gap: .5rem; margin: .55rem 0; }
 .release-dialog input[type="checkbox"] { width: auto; }
 .release-dialog fieldset { margin: 1rem 0; }
+
+/* Stage-left rack guide, shared with the portrait rider sheet. */
+.rack-design { max-width: 1050px; margin: auto; padding: 24px clamp(16px,4vw,44px) 48px; }
+.rack-design nav, .rack-edit-actions { display:flex; align-items:center; flex-wrap:wrap; gap:12px; }
+.rack-design nav { justify-content: space-between; margin-bottom:24px; }
+.rack-design h1 { font-size:clamp(29px,4vw,46px); font-weight:750; line-height:1.15; }
+.rack-design .rack-guide { margin:20px 0; background:white; color:#193831; padding:clamp(14px,3vw,36px); border:1px solid #bfcdc4; }
+.rack-guide h2 { display:flex; align-items:baseline; flex-wrap:wrap; gap:.65em; font-weight:750; font-size:1.45em; border-bottom:1px solid #64817b; padding-bottom:.12em; margin:.8em 0 .35em; }
+.rack-guide h2 small { font:600 .57em Arial,sans-serif; color:#4a615a; }
+.rack-guide p { margin:.35em 0 .55em; line-height:1.32; }
+.rack-guide table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+.rack-guide th, .rack-guide td { padding:.18em .36em; text-align:left; border-bottom:1px solid #c4cec9; }
+.rack-guide th { color:#445e55; font-size:.78em; }
+.rack-inputs, .rack-lower { display:grid; grid-template-columns:1fr 1fr; gap:1.5em; }
+.rack-rear { display:grid; grid-template-columns:1.8fr 1fr; align-items:center; gap:1em; }
+.rack-panel { position:relative; margin:.4em 0; align-self:center; container-type:inline-size; }
+.rack-panel img { display:block; width:100%; height:auto; }
+.rack-panel .rack-pin { position:absolute; transform:translate(-50%,-50%); display:grid; place-items:center; padding:0; border:1px solid white; border-radius:50%; background:#173e38; color:white; width:3.9cqw; height:3.9cqw; font:bold 1.85cqw/1 Arial,sans-serif; }
+.rack-panel.x32 .rack-pin { width:4.8cqw; height:4.8cqw; font-size:2cqw; }
+.rack-panel button.rack-pin:hover,.rack-panel button.rack-pin:focus-visible { background:#803b16; outline:2px solid #eaa83c; z-index:1; }
+.rack-credit { display:block; color:#4a615a; margin-top:1em; font-size:.72em; }
+.rack-trace { position:sticky; top:4px; z-index:2; padding:.55em .8em; background:#e6efe6; border-left:3px solid #366057; }
+.rack-edit-actions label { display:flex; align-items:center; gap:.35em; }
+.rack-edit-actions select { padding:.35em; border:1px solid #718a82; border-radius:3px; }
+@media screen and (max-width:680px) {
+  .rack-inputs, .rack-rear, .rack-lower { grid-template-columns:1fr; gap:.5em; }
+  .rack-panel { min-width:540px; }
+  .rack-panel-scroll { overflow-x:auto; }
+  .rack-rear { min-width:0; }
+}
+@media print {
+  .print-sheet .rack-guide { font:9pt/1.22 Arial,sans-serif; color:#111; }
+  .print-sheet .rack-guide h2 { font:bold 13pt/1.1 Arial,sans-serif; margin:6pt 0 2pt; padding-bottom:2pt; }
+  .print-sheet .rack-guide p { margin:2pt 0 3pt; font:9pt/1.24 Arial,sans-serif; }
+  .print-sheet .rack-guide table { font:9pt/1.12 Arial,sans-serif; }
+  .print-sheet .rack-guide th,.print-sheet .rack-guide td { padding:1.5pt 2pt; color:#111; }
+  .rack-guide .rack-pin { print-color-adjust:exact; -webkit-print-color-adjust:exact; }
+  .rack-inputs,.rack-lower { gap:12pt; }
+  .rack-credit { margin-top:4pt; }
+}
+.rack-link { display:flex; gap:.7em; align-items:center; }
+.rack-detail { position:relative; width:68px; flex:none; }
+.rack-detail img { width:100%; height:auto; }
+.rack-detail span { position:absolute; left:26%; top:48%; transform:translate(-50%,-50%); font:700 11px Arial; color:white; background:#173e38; padding:1px 3px; border-radius:3px; print-color-adjust:exact; }
+.rack-design .rack-edit-actions { margin:18px 0 10px; }
+.rack-design nav a { text-decoration:underline; text-underline-offset:3px; }

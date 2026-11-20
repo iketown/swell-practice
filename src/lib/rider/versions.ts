@@ -17,7 +17,7 @@ export const versionAction = z.discriminatedUnion("action", [
     newId: z.uuid(),
     name: z.string().trim().min(1).max(80),
   }),
-  z.object({ action: z.literal("save"), ...ref, plot: plotSchema }),
+  z.object({ action: z.literal("save"), ...ref, expectedHead: revisionSchema.optional(), plot: plotSchema }),
   z.object({
     action: z.literal("issue"),
     code: releaseCode,

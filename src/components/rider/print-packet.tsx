@@ -7,6 +7,8 @@ import {
 } from "@/lib/rider/model";
 import type { RecipientPacket } from "@/lib/rider/releases";
 import { printedUrl } from "@/lib/rider/printed-version";
+import { RackChannelGuide } from "./rack-channel-guide";
+import { rackInputs } from "@/lib/rider/rack-inputs";
 import { EquipmentAdvance } from "./equipment-advance";
 import { PrintQr, qrDataUrl } from "./print-qr";
 import { CablePatchSchedule } from "./cable-patch-schedule";
@@ -18,6 +20,7 @@ export const riderPages = [
   "Stage plot",
   "Equipment advance",
   "Audio input key",
+  "Rack channel guide",
 ] as const;
 export const setupPages = ["Stand placement", "Cable patch and routing"] as const;
 export type RiderPage = (typeof riderPages)[number] | (typeof setupPages)[number];
@@ -170,6 +173,10 @@ export function PrintPacket({
           </table>
         </section>
       )}
+      {p.rackMap && packet !== "Backline" && pages.includes("Rack channel guide") && <section className="print-sheet rack-sheet">
+        {title("Rack channel guide")}
+        <RackChannelGuide map={p.rackMap} inputs={rackInputs(p)} />
+      </section>}
       {setupPages.filter((page) => preview && pages.includes(page)).map((view) => <div className="setup-print-group" key={view}><section className="print-sheet print-diagram-sheet">
         {title(view)}
         <StageCanvas printLayout plot={p} view={view} layers={viewLayers(view, defaultLayers)} editing={false} selected={null} active={null} onHover={noop} onSelect={noop} onMove={noop} />

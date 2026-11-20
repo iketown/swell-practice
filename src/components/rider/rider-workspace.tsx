@@ -622,12 +622,12 @@ export function RiderWorkspace({
               <div className="print-menu">
                 <fieldset>
                   <legend>Pages to print</legend>
-                  {[...riderPages, ...(privateMode && allowed ? setupPages : [])].map((page) => (
+                  {[...riderPages, ...(privateMode && allowed ? setupPages : [])].filter(page => page !== "Rack channel guide" || (p.rackMap && packet !== "Backline")).map((page) => (
                     <label key={page}>
                       <input
                         type="checkbox"
                         checked={pages.includes(page)}
-                        disabled={pages.length === 1 && pages.includes(page)}
+                        disabled={pages.filter(value => value !== "Rack channel guide" || (p.rackMap && packet !== "Backline")).length === 1 && pages.includes(page)}
                         onChange={() => togglePage(page)}
                       />
                       {page}
@@ -703,6 +703,7 @@ export function RiderWorkspace({
               <MapPin size={15} /> Stage plan
             </span>
             <div className="plot-actions">
+              {(!issuedPacket && privateMode !== "history") && <a className="version-button" href={editing ? "/stage-plot/input-map?version=" + encodeURIComponent(record.versionId!) : "/stage-plot/input-map"}>Rack channel guide</a>}
               <small>Audience view</small>{" "}
               {allowed && !privateMode && (
                 <a className="version-button" href="/stage-plot/list">

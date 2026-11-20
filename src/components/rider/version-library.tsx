@@ -19,14 +19,15 @@ import {
 } from "@/lib/rider/versions";
 import type { Published } from "@/lib/rider/model";
 import { ReleaseRegister, IssueDialog } from "./release-manager";
+import { InputMapDesigner } from "./input-map-designer";
 import { RiderWorkspace } from "./rider-workspace";
 
 type Selection = Pick<VersionSummary, "id" | "name" | "revision">;
 const errorText = (e: unknown) =>
   e instanceof Error ? e.message : "Could not load the rider library.";
-type Location = { version?: string; revision?: string };
+type Location = { version?: string; revision?: string; inputMap?: boolean };
 
-export function VersionLibrary({ version, revision }: Location) {
+export function VersionLibrary({ version, revision, inputMap, designPreview }: Location & { designPreview?: Published }) {
   const admin = useAdmin();
   const [login, setLogin] = useState(false);
   if (
@@ -36,11 +37,13 @@ export function VersionLibrary({ version, revision }: Location) {
     return (
       <LibraryBody
         key={admin.user.uid}
+        inputMap={inputMap}
         uid={admin.user.uid}
         version={version}
         revision={revision}
       />
     );
+  if (designPreview) return <InputMapDesigner initial={designPreview} template />;
   return (
     <main className="rider">
       <div className="rider-screen version-library">
@@ -72,7 +75,7 @@ export function VersionLibrary({ version, revision }: Location) {
   );
 }
 
-function LibraryBody({ uid, version, revision }: Location & { uid: string }) {
+function LibraryBody({ uid, version, revision, inputMap }: Location & { uid: string }) {
   const [list, setList] = useState<VersionList | null>(null);
   const [record, setRecord] = useState<Published | null>(null);
   const [reload, setReload] = useState(0);
@@ -134,6 +137,7 @@ function LibraryBody({ uid, version, revision }: Location & { uid: string }) {
     setPublish(null);
     setReload((n) => n + 1);
   }
+  if (version && record && inputMap) return <InputMapDesigner key={version} initial={record} />;
   if (version && record)
     return (
       <RiderWorkspace

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { rackMapSchema } from "./rack-map";
 import artwork from "./assets.json";
 import { objectAnchor } from "./placement";
 import { reconcileEquipment } from "./equipment";
@@ -82,6 +83,7 @@ const rawPlotSchema = z
     configuration: name,
     contact: detail,
     monitors: detail,
+    rackMap: rackMapSchema.optional(),
     power: detail,
     objects: z.array(object).max(300),
     stageBoxes: z
