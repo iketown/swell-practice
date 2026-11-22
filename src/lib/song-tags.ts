@@ -15,6 +15,7 @@ import {
 
 import type { Song, SongTag } from "@/lib/domain";
 import { slugify } from "@/lib/domain";
+import { tagFromDoc } from "@/lib/assignment-records";
 import { db, hasFirebaseConfig } from "@/lib/firebase";
 
 const DEMO_STORE_KEY = "swell-parts:song-tags:v1";
@@ -106,14 +107,6 @@ function validateLabel(label: string) {
 
 function sortTags(tags: SongTag[]) {
   return [...tags].sort((left, right) => left.label.localeCompare(right.label));
-}
-
-function tagFromDoc(id: string, data: Record<string, unknown>): SongTag {
-  return {
-    id,
-    label: String(data.label ?? ""),
-    filteredByDefault: data.filteredByDefault === true,
-  };
 }
 
 async function ensureUniqueLabel(label: string, ignoredTagId?: string) {

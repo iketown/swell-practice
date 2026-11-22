@@ -3,10 +3,43 @@
     "code": "11.20.26",
     "id": "standard",
     "revision": 110,
-    "packet": { "file": "The-Swell-Production-Packet-11.20.26.pdf", "pages": 19 },
+    "packet": {
+      "file": "The-Swell-Production-Packet-11.20.26.pdf",
+      "pages": 19
+    },
     "documents": [
-      { "title": "Technical rider", "file": "The-Swell-Technical-Rider-11.20.26.pdf", "pages": 13 },
-      { "title": "Rack channel guide", "file": "The-Swell-Rack-Channel-Guide-11.20.26.pdf", "pages": 6 }
+      {
+        "title": "Technical rider",
+        "file": "The-Swell-Technical-Rider-11.20.26.pdf",
+        "pages": 13
+      },
+      {
+        "title": "Rack channel guide",
+        "file": "The-Swell-Rack-Channel-Guide-11.20.26.pdf",
+        "pages": 6
+      }
+    ]
+  },
+  {
+    "code": "11.21.26",
+    "id": "standard",
+    "revision": 111,
+    "documents": [
+      {
+        "title": "Technical rider",
+        "file": "The-Swell-Technical-Rider-11.21.26.pdf",
+        "pages": 4
+      },
+      {
+        "title": "Detailed production advance",
+        "file": "The-Swell-Detailed-Production-Advance-11.21.26.pdf",
+        "pages": 12
+      },
+      {
+        "title": "Rack channel guide",
+        "file": "The-Swell-Rack-Channel-Guide-11.21.26.pdf",
+        "pages": 6
+      }
     ]
   }
 ]

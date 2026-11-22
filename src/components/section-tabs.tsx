@@ -11,7 +11,6 @@ const baseTabs = [
   { href: "/songs", label: "Songs" },
   { href: "/members", label: "Members" },
   { href: "/stage-plot", label: "Stage plot" },
-  { href: "/assignments", label: "Assignments" },
 ] as const;
 
 function tabClassName(active: boolean) {
@@ -29,7 +28,7 @@ export function SectionTabs() {
   const tabs = admin.isAdmin
     ? [
         ...baseTabs,
-        ...(admin.user ? [{ href: "/projects", label: "Projects" }] : []),
+        ...(admin.isSignedInAdmin ? [{ href: "/assignments", label: "Assignments" }] : []),
         { href: "/setups", label: "Setups" },
         { href: "/gear", label: "Gear" },
         { href: "/money", label: "Money" },

@@ -1,0 +1,14 @@
+.logo {
+  aspect-ratio: 800 / 532.46;
+  width: 100%;
+  max-width: 42rem;
+  background: #165d62;
+  mask: url("/02-swell-sounds-of.svg") center / contain no-repeat;
+}
+
+.waves {
+  display: block;
+  width: 100%;
+  height: 64%;
+  pointer-events: none;
+}

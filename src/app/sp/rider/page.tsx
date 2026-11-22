@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { productionDownloads } from "@/lib/rider/production-documents";
 import { RiderWorkspace } from "@/components/rider/rider-workspace";
 import { checkHref, packetFromQuery, releaseCode } from "@/lib/rider/releases";
 import { publicReleaseList, readIssuedRider } from "@/lib/server/stage-rider";
@@ -24,6 +25,8 @@ export default async function IssuedRider({
   const recipient = packetFromQuery(packet);
   if (!edition || edition.replacement)
     redirect(checkHref(code.data, recipient));
+  const featured = productionDownloads(edition)?.featured;
+  if (recipient === "Full rider" && featured) redirect(featured.href);
   return (
     <RiderWorkspace
       key={edition.code + recipient}

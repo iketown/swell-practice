@@ -2,25 +2,15 @@
 
 import Link from "next/link";
 import { ArrowRightIcon, UserRoundIcon } from "lucide-react";
-import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { MemberAvatar } from "@/components/member-avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { Skeleton } from "@/components/ui/skeleton";
-import { listMembers } from "@/lib/assignments";
 import type { BandMember } from "@/lib/domain";
 
-export function MemberIndexClient() {
-  const [members, setMembers] = useState<BandMember[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    listMembers().then((items) => setMembers(items.filter((member) => !member.hidden))).finally(() => setLoading(false));
-  }, []);
-
+export function MemberIndexClient({ members }: { members: BandMember[] }) {
   return (
     <AppShell>
       <section className="swell-panel flex flex-col gap-1 p-4 sm:p-5">
@@ -35,9 +25,7 @@ export function MemberIndexClient() {
           <CardDescription>Each page combines normal assignments with the selected band&apos;s exceptions.</CardDescription>
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <div className="flex flex-col gap-2"><Skeleton className="h-16 w-full" /><Skeleton className="h-16 w-full" /></div>
-          ) : members.length ? (
+          {members.length ? (
             <div className="grid gap-2 sm:grid-cols-2">
               {members.map((member) => (
                 <div key={member.id} data-member={member.firstName.trim().toLowerCase()} className="swell-member-card flex items-center justify-between gap-3 rounded-lg border-2 bg-card p-3">

@@ -68,8 +68,7 @@ service cloud.firestore {
     }
 
     match /members/{memberId} {
-      allow read: if true;
-      allow create, update, delete: if isAdmin();
+      allow read, create, update, delete: if isAdmin();
     }
 
     match /timingAttributes/{attributeId} {
@@ -87,21 +86,14 @@ service cloud.firestore {
     }
 
     match /bands/{bandId} {
-      allow read: if true;
-      allow create, update, delete: if isAdmin();
+      allow read, create, update, delete: if isAdmin();
     }
 
     match /bandSongArrangements/{arrangementId} {
-      allow read: if true;
-      allow create, update, delete: if isAdmin();
+      allow read, create, update, delete: if isAdmin();
     }
 
     match /collaboration/{collaborationId} {
-      allow read: if true;
-      allow create, update, delete: if isAdmin();
-    }
-
-    match /contributionProjects/{projectId} {
       allow read, create, update, delete: if isAdmin();
     }
 
@@ -222,13 +214,11 @@ service cloud.firestore {
     }
 
     match /memberSongDefaults/{assignmentId} {
-      allow read: if true;
-      allow create, update, delete: if isAdmin();
+      allow read, create, update, delete: if isAdmin();
     }
 
     match /bandSongOverrides/{overrideId} {
-      allow read: if true;
-      allow create, update, delete: if isAdmin();
+      allow read, create, update, delete: if isAdmin();
     }
 
     match /admins/{uid} {

@@ -36,6 +36,10 @@ export async function requireServerAdmin(request: Request) {
   const token = authorization.startsWith("Bearer ")
     ? authorization.slice("Bearer ".length).trim()
     : "";
+  await requireAdminToken(token);
+}
+
+async function requireAdminToken(token: string) {
   const firebaseApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 
   if (!token || !firebaseApiKey) {
@@ -61,5 +65,15 @@ export async function requireServerAdmin(request: Request) {
 
   if (!email || !serverAdminEmails().includes(email)) {
     throw new ServerRouteError("Administrator access is required.", 403);
+  }
+}
+
+export async function hasVerifiedAdminToken(token: unknown) {
+  if (typeof token !== "string") return false;
+  try {
+    await requireAdminToken(token);
+    return true;
+  } catch {
+    return false;
   }
 }

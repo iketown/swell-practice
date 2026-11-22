@@ -60,7 +60,7 @@ test("every catalogued production download exists as a PDF", async () => {
   const root = new URL("../../public/production-documents/", import.meta.url);
   const catalog = JSON.parse(readFileSync(new URL("catalog.json", root), "utf8"));
   for (const entry of catalog) {
-    for (const file of [entry.packet, ...entry.documents]) {
+    for (const file of [...(entry.packet ? [entry.packet] : []), ...entry.documents]) {
       const bytes = readFileSync(new URL(entry.code + "/" + file.file, root));
       assert.equal(bytes.toString("ascii", 0, 5), "%PDF-");
     }
@@ -68,12 +68,13 @@ test("every catalogued production download exists as a PDF", async () => {
 });
 
 test("a scan follows its own setup, while browsing defaults to the latest approved Standard", () => {
-  const standard = edition("standard-a", 95, "standard");
+  const standard = edition("11.21.26", 111, "standard");
   const hawaii = edition("hawaii-2027", 4, "hawaii");
   const retired = edition("hawaii-2026", 2, "hawaii", hawaii.code);
   const compatible = edition("hawaii-small", 3, "hawaii");
   const rows = [standard, retired, compatible, hawaii];
   assert.equal(resolveProductionEdition(rows).standard, standard);
+  assert.equal(resolveProductionEdition(rows, "11.21.2026").target, standard);
   assert.equal(resolveProductionEdition(rows, "unknown").target, undefined);
   assert.equal(resolveProductionEdition(rows, retired.code).target, hawaii);
   assert.equal(resolveProductionEdition(rows, compatible.code).target, compatible);

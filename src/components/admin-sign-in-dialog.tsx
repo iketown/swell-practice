@@ -19,7 +19,7 @@ export function AdminSignInDialog({
   open,
   onOpenChange,
   title = "Admin sign in",
-  description = "Use one of the Firebase email/password admin accounts.",
+  description = "Use your administrator account.",
   onSignedIn,
 }: {
   open: boolean;
@@ -93,9 +93,7 @@ export function AdminSignInDialog({
                 aria-invalid={Boolean(error)}
                 required
               />
-              <FieldDescription>
-                {error ?? "Gear locations can only be updated by an approved account."}
-              </FieldDescription>
+              {error && <FieldDescription>{error}</FieldDescription>}
             </Field>
           </FieldGroup>
           <Button type="submit" disabled={submitting || !email.trim() || !password}>

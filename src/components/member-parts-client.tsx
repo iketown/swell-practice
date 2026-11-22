@@ -4,6 +4,7 @@ import Link from "next/link";
 import { BookOpenCheckIcon, EyeOffIcon, ListFilterIcon, XIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { loadBandMemberParts } from "@/app/members/actions";
 import { AppShell } from "@/components/app-shell";
 import { MemberAvatar } from "@/components/member-avatar";
 import { Badge } from "@/components/ui/badge";
@@ -13,8 +14,8 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAdmin } from "@/hooks/use-admin";
-import { getMemberAssignmentPage, type MemberAssignmentPageData } from "@/lib/assignments";
 import { isSongPublished, partLabel } from "@/lib/domain";
+import type { MemberAssignmentPageData } from "@/lib/member-assignment-page";
 
 function defaultTagIdsForPage(data: MemberAssignmentPageData | null) {
   if (!data) return [];
@@ -104,16 +105,22 @@ function restoredTagIdsForPage(data: MemberAssignmentPageData | null) {
 
 export function MemberPartsClient({ memberSlug }: { memberSlug: string }) {
   const admin = useAdmin();
+  const adminUser = admin.isSignedInAdmin ? admin.user : null;
   const [data, setData] = useState<MemberAssignmentPageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
 
+  const requestParts = useCallback(async (bandId?: string) => {
+    const token = await adminUser?.getIdToken().catch(() => undefined);
+    return loadBandMemberParts(memberSlug, bandId, token);
+  }, [adminUser, memberSlug]);
+
   const load = useCallback(async (bandId?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const next = await getMemberAssignmentPage(memberSlug, bandId);
+      const next = await requestParts(bandId);
       setData(next);
       setSelectedTagIds(restoredTagIdsForPage(next));
       if (!next) setError("This member is not part of a saved band yet.");
@@ -122,11 +129,11 @@ export function MemberPartsClient({ memberSlug }: { memberSlug: string }) {
     } finally {
       setLoading(false);
     }
-  }, [memberSlug]);
+  }, [requestParts]);
 
   useEffect(() => {
     let active = true;
-    getMemberAssignmentPage(memberSlug)
+    requestParts()
       .then((next) => {
         if (!active) return;
         setData(next);
@@ -142,7 +149,7 @@ export function MemberPartsClient({ memberSlug }: { memberSlug: string }) {
     return () => {
       active = false;
     };
-  }, [memberSlug]);
+  }, [requestParts]);
 
   const visibleRows = useMemo(
     () => data?.rows.filter((row) => admin.isAdmin || isSongPublished(row.song)) ?? [],

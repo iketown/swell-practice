@@ -21,30 +21,26 @@ import type {
   BandMember,
   BandSongOverride,
   MemberSongDefault,
-  Song,
   SongAssignmentBundle,
-  SongTag,
   VocalPartSlug,
 } from "@/lib/domain";
 import {
-  ASSIGNMENT_STEM_PART_BY_INSTRUMENT_ID,
   createBandCode,
-  DEFAULT_PARTS,
   samePartSlugs,
   slugify,
   sortPartSlugs,
   VOCAL_PART_SLUGS,
 } from "@/lib/domain";
 import { db, hasFirebaseConfig, storage } from "@/lib/firebase";
-import { getSongBundle, listBandSongArrangements, listSongs } from "@/lib/firestore";
+import { getSongBundle } from "@/lib/firestore";
+import { bandFromDoc, memberFromDoc, publicMember } from "@/lib/assignment-records";
 import {
   sampleBands,
   sampleBandSongOverrides,
   sampleMembers,
   sampleMemberSongDefaults,
 } from "@/lib/sample-assignments";
-import { sampleSongBundle, sampleSongList } from "@/lib/sample-data";
-import { applyDemoSongTags, listSongTags } from "@/lib/song-tags";
+import { sampleSongBundle } from "@/lib/sample-data";
 
 const DEMO_STORE_KEY = "swell-parts:assignments:v1";
 
@@ -57,19 +53,6 @@ interface DemoAssignmentStore {
   bands: Band[];
   defaults: MemberSongDefault[];
   overrides: BandSongOverride[];
-}
-
-export interface MemberSongAssignmentRow {
-  song: Song;
-  partSlugs: string[];
-}
-
-export interface MemberAssignmentPageData {
-  member: BandMember;
-  bands: Band[];
-  selectedBand: Band;
-  tags: SongTag[];
-  rows: MemberSongAssignmentRow[];
 }
 
 export interface AssignmentChange {
@@ -116,22 +99,6 @@ function writeDemoStore(store: DemoAssignmentStore) {
   window.localStorage.setItem(DEMO_STORE_KEY, JSON.stringify(store));
 }
 
-function memberFromDoc(id: string, data: Record<string, unknown>): BandMember {
-  return {
-    id,
-    firstName: String(data.firstName ?? ""),
-    lastName: String(data.lastName ?? ""),
-    displayName: String(data.displayName ?? data.firstName ?? ""),
-    slug: String(data.slug ?? id),
-    hidden: data.hidden === true,
-    photoUrl: typeof data.photoUrl === "string" ? data.photoUrl : undefined,
-    photoStoragePath: typeof data.photoStoragePath === "string" ? data.photoStoragePath : undefined,
-    email: typeof data.email === "string" ? data.email : undefined,
-    phone: typeof data.phone === "string" ? data.phone : undefined,
-    notes: typeof data.notes === "string" ? data.notes : undefined,
-  };
-}
-
 function blobToDataUrl(blob: Blob) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -139,27 +106,6 @@ function blobToDataUrl(blob: Blob) {
     reader.onerror = () => reject(new Error("Could not prepare this headshot."));
     reader.readAsDataURL(blob);
   });
-}
-
-function bandFromDoc(id: string, data: Record<string, unknown>): Band {
-  const vocalPartData = data.vocalPartByMemberId && typeof data.vocalPartByMemberId === "object"
-    ? data.vocalPartByMemberId as Record<string, unknown>
-    : {};
-  const vocalPartByMemberId = Object.fromEntries(
-    Object.entries(vocalPartData).flatMap(([memberId, value]) =>
-      typeof value === "string" && VOCAL_PART_SLUGS.includes(value as VocalPartSlug)
-        ? [[memberId, value as VocalPartSlug]]
-        : [],
-    ),
-  );
-
-  return {
-    id,
-    title: String(data.title ?? ""),
-    code: String(data.code ?? ""),
-    memberIds: Array.isArray(data.memberIds) ? data.memberIds.map(String) : [],
-    vocalPartByMemberId,
-  };
 }
 
 function cleanVocalPartMap(
@@ -232,10 +178,6 @@ async function nextMemberSlug(value: string, ignoredMemberId?: string) {
   }
 }
 
-function publicMember(member: BandMember): BandMember {
-  return { ...member, email: undefined, phone: undefined, notes: undefined };
-}
-
 export async function listMembers(includePrivate = false): Promise<BandMember[]> {
   if (isDemoAssignments() || !db) {
     return readDemoStore().members
@@ -257,17 +199,6 @@ export async function listMembers(includePrivate = false): Promise<BandMember[]>
       notes: typeof privateData.notes === "string" ? privateData.notes : undefined,
     } : member;
   });
-}
-
-export async function getMemberBySlug(slug: string) {
-  if (isDemoAssignments() || !db) {
-    const member = readDemoStore().members.find((item) => item.slug === slug);
-    return member ? publicMember(member) : null;
-  }
-
-  const snaps = await getDocs(query(collection(db, "members"), where("slug", "==", slug), limit(1)));
-  const snap = snaps.docs[0];
-  return snap ? memberFromDoc(snap.id, snap.data()) : null;
 }
 
 export async function createMember(input: Omit<BandMember, "id" | "slug">) {
@@ -629,112 +560,6 @@ export async function saveAssignmentChanges(
     }
   }
   await batch.commit();
-}
-
-const STARTUP_MEMBER_ORDER = ["ike", "jackson", "joe", "sam", "cron"] as const;
-
-function assignmentMemberIdsForBand(band: Band, members: BandMember[]) {
-  const memberMap = new Map(members.map((member) => [member.id, member]));
-  const usedParts = new Set<VocalPartSlug>();
-  const orderedMemberIds = band.memberIds.flatMap((memberId) => {
-    const vocalPart = band.vocalPartByMemberId[memberId];
-    if (!memberMap.has(memberId) || !vocalPart || usedParts.has(vocalPart)) return [];
-    usedParts.add(vocalPart);
-    return [{ memberId, vocalPart }];
-  });
-
-  if (Object.keys(band.vocalPartByMemberId).length) {
-    return orderedMemberIds
-      .sort(
-        (left, right) =>
-          VOCAL_PART_SLUGS.indexOf(left.vocalPart)
-          - VOCAL_PART_SLUGS.indexOf(right.vocalPart),
-      )
-      .map(({ memberId }) => memberId);
-  }
-
-  const fallbackMemberIds = band.title.trim().toLowerCase().includes("startup")
-    ? [...band.memberIds].sort((leftId, rightId) => {
-        const leftName = memberMap.get(leftId)?.displayName.trim().toLowerCase() ?? "";
-        const rightName = memberMap.get(rightId)?.displayName.trim().toLowerCase() ?? "";
-        const leftOrder = STARTUP_MEMBER_ORDER.indexOf(
-          leftName as (typeof STARTUP_MEMBER_ORDER)[number],
-        );
-        const rightOrder = STARTUP_MEMBER_ORDER.indexOf(
-          rightName as (typeof STARTUP_MEMBER_ORDER)[number],
-        );
-        return (leftOrder < 0 ? 99 : leftOrder) - (rightOrder < 0 ? 99 : rightOrder);
-      })
-    : band.memberIds;
-
-  return fallbackMemberIds
-    .filter((memberId) => memberMap.has(memberId))
-    .slice(0, VOCAL_PART_SLUGS.length);
-}
-
-export async function getMemberAssignmentPage(memberSlug: string, bandId?: string): Promise<MemberAssignmentPageData | null> {
-  const [member, bands, members, songs, tags] = await Promise.all([
-    getMemberBySlug(memberSlug),
-    listBands(),
-    listMembers(),
-    isDemoAssignments()
-      ? Promise.resolve(applyDemoSongTags(sampleSongList()))
-      : listSongs(),
-    listSongTags(),
-  ]);
-  if (!member) return null;
-  const memberBands = bands.filter((band) => band.memberIds.includes(member.id));
-  if (!memberBands.length) return null;
-  const selectedBand = memberBands.find((band) => band.id === bandId) ?? memberBands[0];
-  const arrangements = isDemoAssignments()
-    ? []
-    : await listBandSongArrangements(selectedBand.id);
-  const arrangementBySongId = new Map(
-    arrangements.map((arrangement) => [arrangement.songId, arrangement]),
-  );
-  const assignmentMemberIds = assignmentMemberIdsForBand(selectedBand, members);
-  const memberSlotIndex = assignmentMemberIds.indexOf(member.id);
-  const usesConfiguredVocalParts = Boolean(
-    Object.keys(selectedBand.vocalPartByMemberId).length,
-  );
-
-  const rows = songs.map((song) => {
-    const arrangement = arrangementBySongId.get(song.id);
-    const instrumentAssignments =
-      arrangement?.instrumentAssignments ?? song.instrumentAssignments;
-    const instrumentAssignment = memberSlotIndex >= 0
-      ? instrumentAssignments.players[memberSlotIndex]
-      : null;
-    const instrumentPartSlug = typeof instrumentAssignment === "string"
-      ? ASSIGNMENT_STEM_PART_BY_INSTRUMENT_ID[instrumentAssignment]
-      : undefined;
-    const vocalPartSlug = arrangement?.vocalAssignments === undefined
-      ? selectedBand.vocalPartByMemberId[member.id]
-        ?? (!usesConfiguredVocalParts && memberSlotIndex >= 0
-          ? VOCAL_PART_SLUGS[memberSlotIndex]
-          : undefined)
-      : arrangement.vocalAssignments.find(
-          (assignment) => assignment.memberId === member.id,
-        )?.partSlug;
-
-    return {
-      song,
-      partSlugs: sortPartSlugs(
-        [instrumentPartSlug, vocalPartSlug].filter(
-          (partSlug): partSlug is string => Boolean(partSlug),
-        ),
-        DEFAULT_PARTS,
-      ),
-    };
-  });
-
-  return {
-    member,
-    bands: memberBands,
-    selectedBand,
-    tags,
-    rows,
-  };
 }
 
 export async function resetAssignmentDemo() {

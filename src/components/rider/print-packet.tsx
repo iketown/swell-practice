@@ -28,6 +28,8 @@ export const setupPages = ["Stand placement", "Cable patch and routing"] as cons
 export type RiderPage = (typeof riderPages)[number] | (typeof setupPages)[number];
 
 const noop = () => {};
+const versionReminder = "PLEASE CHECK LINK FOR LATEST VERSION";
+
 export function PrintPacket({
   record,
   packet,
@@ -44,9 +46,19 @@ export function PrintPacket({
   const { plot: p, revision, date } = record;
   const code = unsaved ? undefined : record.releaseCode;
   const issue = code ? "Issued · " + code : unsaved ? "Unsaved draft" : "Working draft · Rev " + revision;
+  const editionLabel = record.versionName ? `${issue} · ${record.versionName}` : issue;
   const dateText = unsaved ? "Based on " + date : date;
   const qrUrl = printedUrl(code, packet);
   const visibleUrl = qrUrl.replace("https://", "");
+  const footerCheck = (
+    <>
+      <div className="print-footer-check">
+        <PrintQr url={qrUrl} label="Check this rider online" />
+        <a href={qrUrl}>{visibleUrl}</a>
+      </div>
+      <strong className="print-footer-reminder">{versionReminder}</strong>
+    </>
+  );
   const title = (name: string) => (
     <header className="print-title">
       <div>
@@ -63,19 +75,19 @@ export function PrintPacket({
   );
   const diagramFooter = (legend: ReactNode) => (
     <footer className="diagram-footer">
-      <div>
-        <div className="print-legend">{legend}</div>
-        <a href={qrUrl}>{visibleUrl}</a>
-      </div>
-      <PrintQr url={qrUrl} label="Check this rider online" />
+      <div className="print-legend">{legend}</div>
+      {footerCheck}
     </footer>
   );
   const guideOnly = pages.length === 1 && pages[0] === "Rack channel guide";
   const guideFooter = guideOnly && (
     <footer className="guide-sheet-footer">
-      <div><a href={qrUrl}>{visibleUrl}</a><br />{issue} · {record.versionName} · {dateText}</div>
-      <span className="guide-sheet-number" />
-      <PrintQr url={qrUrl} label="Check this rider online" />
+      <div>
+        {editionLabel}<br />
+        {dateText}<br />
+        <span className="guide-sheet-number" />
+      </div>
+      {footerCheck}
     </footer>
   );
   const inputs = byNumber(p);
@@ -86,33 +98,17 @@ export function PrintPacket({
         @page { size: letter portrait; margin: 0; }
         @page rackPatchMap { size: letter landscape; margin: 0; }
       ` : `@page {size: letter portrait; margin: .75in .75in 1.47in;
-        @bottom-left { width:75%; margin-bottom:.75in; overflow-wrap:anywhere; border-top:.7pt solid #506562; padding-top:4pt; vertical-align:top; white-space:pre-line; content:${JSON.stringify("THE SWELL · " + visibleUrl + "\n" + issue + " · " + record.versionName + " · " + dateText).replaceAll("\\n", "\\A ")}; font:9pt Arial; line-height:1.4; }
-        @bottom-right { width:15%; margin-bottom:.75in; border-top:.7pt solid #506562; padding-top:4pt; vertical-align:top; content:url("${qrDataUrl(qrUrl)}"); }
-        @bottom-center { width:10%; margin-bottom:.75in; white-space:nowrap; vertical-align:top; padding-top:9pt; content:"Page " counter(page); font:8pt Arial; }
+        @bottom-left { width:33.33%; margin-bottom:.75in; overflow-wrap:anywhere; border-top:.7pt solid #506562; padding-top:4pt; vertical-align:top; white-space:pre-line; content:${JSON.stringify("THE SWELL\n" + editionLabel + "\n" + dateText).replaceAll("\\n", "\\A ")} "\\A Page " counter(page); font:8.5pt/1.25 Arial; }
+        @bottom-center { width:33.34%; margin-bottom:.75in; border-top:.7pt solid #506562; padding-top:2pt; vertical-align:top; white-space:pre-line; overflow-wrap:anywhere; content:url("${qrDataUrl(qrUrl)}") "\\A " ${JSON.stringify(visibleUrl)}; font:8pt/1.15 Arial; }
+        @bottom-right { width:33.33%; margin-bottom:.75in; border-top:.7pt solid #506562; padding-left:8pt; vertical-align:bottom; text-align:right; text-wrap:balance; content:${JSON.stringify(versionReminder)}; font:bold 8.5pt/1.15 Arial; }
       }
       @page rackPatchMap { size: letter landscape; }
       @page riderMap {
         size: letter landscape; margin-bottom: .93in;
         @bottom-left { content: none; border: 0; }
         @bottom-right { content: none; border: 0; }
-        @bottom-center { padding: 0; vertical-align: middle; }
+        @bottom-center { border: 0; padding: 0; vertical-align: middle; content: "Page " counter(page); }
       }`}</style>
-      <footer className="print-version-footer">
-        <div>
-          <strong>
-            {code
-              ? "Check your printed revision"
-              : "Online stage plot"}
-          </strong>
-          <span>
-            <a href={qrUrl}>{visibleUrl}</a>
-          </span>
-          <small>
-            {issue} · {record.versionName} · {dateText}
-          </small>
-        </div>
-        <PrintQr url={qrUrl} label={unsaved ? "Open the latest rider online" : "Check this printed revision online"} />
-      </footer>
       <section className="print-sheet print-cover">
         <Image alt="The Swell" src="/01-swell-logo.svg" width={240} height={104} unoptimized priority />
         <h1>{guideOnly ? "Rack channel guide" : "Technical rider"}</h1>

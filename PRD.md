@@ -22,7 +22,6 @@ This is not the public marketing site and not the full band OS. It is a practica
 - Give every song a separate test mixer at `/songs/[songSlug]/player`.
 - Give administrators a live band assignment table at `/assignments`.
 - Give administrators a percentage-based timing workspace at `/songs/timing` for totaling arbitrary attributes across every song.
-- Give administrators a project contribution workspace that weights steps, tracks dependencies, and rolls contributor shares up in hours and percent.
 - Let administrators create, rename, and delete reusable song tags, assign multiple tags per song, and let members filter their set list by tag.
 - Give every part a detail page at `/parts/[partSlug]`.
 - Upload audio, PDFs, videos, zip files, and related rehearsal files once.
@@ -43,7 +42,7 @@ This is not the public marketing site and not the full band OS. It is a practica
 - No payroll, tax, travel-booking, billing, or capability/proficiency logic. Gear location, packing, and backline requirements are the only logistics in scope.
 - No show bible, public EPK, or marketing-site work.
 - No complex role hierarchy beyond admin vs viewer.
-- No login-specific personalization; member pages are shareable read-only URLs.
+- Member pages are shareable, read-only URLs within the password-protected band library.
 - No duplicate file uploads for the same chart/demo when one asset belongs to many parts.
 - No stem trimming or PDF annotation tools. Waveform editing is limited to song-section annotation boundaries.
 
@@ -51,14 +50,13 @@ This is not the public marketing site and not the full band OS. It is a practica
 
 | Route | Purpose |
 | --- | --- |
-| `/` | Song index with quick links to songs and common parts. |
+| `/` | Branded homepage with public links to production documents, the band bio, and the password-protected member directory. A sign-in icon opens administrator sign-in. |
 | `/docs` | Living system blueprint and, as features ship, operating guides for stage planning, signal routing, inventory, containers, and packing. |
 | `/songs/[songSlug]` | Song page showing all parts and their assigned assets. Admins can upload files and edit assignments here. |
 | `/songs/[songSlug]/player` | Song-scoped multitrack player that loads one administrator-defined stem mix at a time, kept separate from rehearsal assets. |
-| `/assignments` | Canonical band-aware live arrangement table with member-ordered instrument and vocal assignments, multi-instrument Trax assignments, original-recording playback, and stem-player shortcuts. |
+| `/assignments` | Administrator-only live arrangement table with member-ordered instrument and vocal assignments, multi-instrument Trax assignments, original-recording playback, and stem-player shortcuts. |
 | `/songs/inst` | Compatibility redirect to `/assignments`. |
 | `/songs/timing` | All-song timeline workspace for assigning arbitrary attributes to percentage ranges and totaling their seconds across the library. |
-| `/projects` | Admin project contribution workspace with tag filtering, required weighted steps, dependency blocking, contributor splits, duplication, and composite hour/percentage rollups. |
 | `/songs/align` | Admin lyric-alignment library and create flow for a title, pasted lyrics, and source MP3. |
 | `/songs/align/[songSlug]` | Song-specific lyric timing editor with ElevenLabs forced alignment, waveform auditioning, autosave, and source resets. |
 | `/parts/[partSlug]` | Part page showing every song that has assets assigned to that part. |
@@ -68,7 +66,8 @@ This is not the public marketing site and not the full band OS. It is a practica
 | `/admin/members` | Member CRUD and contact details. |
 | `/admin/bands` | Band CRUD and roster editing. |
 | `/assignments/[songSlug]` | Legacy compatibility redirect to the canonical `/assignments` board. |
-| `/members/[memberSlug]` | Read-only member page with a band picker and effective parts by song. |
+| `/members` | Password-protected member directory, linked as BAND from the homepage. |
+| `/members/[memberSlug]` | Password-protected, read-only member page with a band picker and effective parts by song. |
 
 Admin controls may appear inline on song pages when the current user is an admin.
 
@@ -169,7 +168,7 @@ Part pages group by song and show only assets assigned to that part for that son
 
 `timingDurationSeconds` is the whole-song length used by `/songs/timing`. The timing workspace can populate it from the original recording metadata or accept a manually entered `m:ss` value.
 
-Songs are published by default. An administrator can change the status from the song player without deleting the song document, stems, downloads, rehearsal assets, timing data, or band assignments. Unpublished songs remain visible to administrators but are omitted from public song and part lists, member set lists, and the read-only assignment board. A non-admin opening an unpublished song URL directly receives an unavailable state.
+Songs are published by default. An administrator can change the status from the song player without deleting the song document, stems, downloads, rehearsal assets, timing data, or band assignments. Unpublished songs remain visible to administrators but are omitted from public song and part lists and non-admin member set lists. A non-admin opening an unpublished song URL directly receives an unavailable state.
 
 The `/songs` page places song-tag management above the library for administrators. Administrators can create, rename, and delete tag definitions, mark one or more tags as filtered by default, and use a multi-select on every song to assign any number of tags. Deleting a definition also removes its ID from every song without deleting the songs. Members see the tags used by their current set list at the top of `/members/[memberSlug]`; selecting more than one tag matches songs carrying any selected tag. Tag selections are remembered in browser local storage per member and band, including an explicitly cleared selection. On initial page or band load without a saved selection, used tags marked as defaults begin selected. Members can still clear those defaults or choose any other filter combination. Songs that do not match appear in a separate “Filtered” list at the bottom at 50% opacity, with their part links still usable. A “Show All” button beside the heading clears and saves all tag filters.
 
@@ -221,7 +220,7 @@ Every expanded song uses its existing `originalRecording` MP3 in a custom player
 
 `/assignments` selects a band, orders its member columns by the band’s unique `voc_1` through `voc_5` defaults, and subscribes to both the song collection and that band’s `bandSongArrangements`. The board grows automatically with the viewport up to its wide desktop maximum, avoiding horizontal scrolling whenever the window can accommodate the full table; narrower viewports retain the table’s own horizontal overflow. Vocal assignments are always visible and editable for administrators: assigned vocal labels are draggable, and a missing assignment renders as a compact empty drop box. Double-clicking an empty vocal box restores that member’s band-default vocal part, moving that part from another member first if necessary to preserve uniqueness. Dropping one assigned part onto another in the same song swaps their parts; dropping it into an empty vocal box moves it there, and dropping it into the shared trash target removes it from the song. Alt/Option-clicking a label toggles its `lead` flag, and any number of parts may be leads. Lead labels use a persistent orange outline without additional text. The legacy `showVocals` compatibility field remains stored as `true` but no longer controls the interface.
 
-The assignment board is publicly readable and appears in the primary navigation for every visitor. Non-admin viewers receive the live table and stem shortcuts in a compact view-only presentation without reorder handles, vocal edit controls, the instrument collection, or active drag-and-drop targets. Firestore independently enforces admin-only writes.
+The assignment board requires a signed-in administrator. The app verifies the Firebase credential before loading the board, and the compatibility URLs lead to the same gate. Firestore rules restrict direct reads and writes of board arrangements and collaboration records to administrators. Band members can view their effective parts in the password-protected member library.
 
 Assigned `guit_a`, `guit_b`, `bass`, `keys`, `drums`, and `accordion` icons are associated with identically named instrument stems. The Acoustic Guitar icon maps to `guit_acoustic`, and the Alto Sax icon maps to `sax`. Every assigned `voc_1` through `voc_5` tile is associated with its corresponding vocal stem. The board subscribes to all mixer-track documents so these associations reflect uploaded, shown, non-background stems in real time. While a user hovers an assigned tile, holding Control or Command replaces an available tile with a real “Go to part” link that opens a new browser tab at `/songs/{songSlug}?mix={inst|voc}&part={partSlug}&member={memberSlug}`. For example, Cron’s bass assignment on California Girls links to `/songs/california-girls?mix=inst&part=bass&member=cron`. A visible `?` badge marks an assignment whose mapped stem is not playable or whose specialty instrument has no stem mapping; loading or subscription failures do not falsely mark every stem as missing. A narrow, rightmost Unassigned column after Trax shows each playable mapped instrument stem that is covered by neither a band-member slot nor Trax, plus every playable `voc_1` through `voc_5` stem without a vocal assignment. Assigning the corresponding instrument tile to Trax removes its faded warning icon because Ableton will handle that part.
 
@@ -447,9 +446,9 @@ For administrators, changing volume, pan, or mute in a stem’s live accordion w
 }
 ```
 
-The public member document contains only the fields required for navigation and assignment views, including an optional square headshot. Contact details and admin notes are isolated in an admin-only document because member pages are accessible by URL in v1.
+The member document contains the fields required for navigation and assignment views, including an optional square headshot. The password-protected member library serves a read-only projection. Contact details and admin notes are isolated in an admin-only document.
 
-Administrators can toggle “Hide from members page” in the member form. Hidden members are omitted from `/members` and the default `/admin/members` roster. Show hidden members in the admin roster reveals them with a Hidden badge so administrators can edit their contact details or restore visibility. Hiding preserves contact details, headshots, band membership, and assignments. Direct member URLs remain accessible; this is a directory visibility setting, not an access restriction. Existing members remain visible until explicitly hidden.
+Administrators can toggle “Hide from members page” in the member form. Hidden members are omitted from `/members` and the default `/admin/members` roster. Show hidden members in the admin roster reveals them with a Hidden badge so administrators can edit their contact details or restore visibility. Hiding preserves contact details, headshots, band membership, and assignments. The band password also applies to direct member URLs, including profiles hidden from the directory.
 
 ### `bands/{bandId}`
 
@@ -596,7 +595,8 @@ v1 decision:
 - Firestore and Storage admin access accepts either an `admins/{uid}` document for the signed-in Firebase Auth user or a matching email in the rules-level admin allowlist. The rules allowlist stays synchronized with `NEXT_PUBLIC_ADMIN_EMAILS` while UID documents are provisioned.
 - Admins can create songs, upload assets, and assign assets to parts.
 - Admins can create/edit members and bands and write member defaults or band-specific overrides.
-- Member pages are read-only and accessible to anyone with the URL under the current v1 access model.
+- Locked member pages show a standalone password form. The server checks `BAND_ACCESS_PASSWORD` and remembers successful access for 90 days using an HTTP-only cookie signed with `BAND_SESSION_SECRET`. Changing the password invalidates existing band cookies. Configure both values in the server environment.
+- Browser reads of members, bands, and arrangement collections require Firebase administrator access. The server serves the directory and each member's effective parts after checking the band cookie.
 - Traffic events are written only by the server and are readable only through an admin-authenticated server route.
 
 ## 13. UI Requirements
@@ -669,10 +669,10 @@ v1 decision:
 
 ## 15. Acceptance Criteria
 
-- Visiting `/` shows a list of songs.
+- Signed-out visitors to `/` see DOCS, PRESS, and BAND, along with a user icon for administrator sign-in.
 - Visiting `/songs/i-get-around` shows the song title, default parts, and assigned files.
 - Visiting `/songs/i-get-around/player` shows only that song's active player-mix stems and plays them in sync.
-- Visiting `/assignments` shows administrators one row for every song and non-admins one row for every published song, including songs created after the assignment page was introduced; `/songs/inst` redirects there.
+- Visiting `/assignments` shows verified administrators one row for every song. Other visitors see administrator sign-in. `/songs/inst` redirects there.
 - Visiting `/songs/timing` shows one accordion row for every song, with collapsed per-attribute summaries and full-width percentage timelines when expanded.
 - An administrator can create, rename, hide, show, and delete arbitrary timing attributes without deleting assignments when an attribute is merely hidden.
 - Capturing Off completes the pending section with an end handle; changing either handle immediately updates the song summary and cumulative totals in seconds.
@@ -1675,53 +1675,6 @@ Current receiving supports manual single-item check-in, individual QR landing-pa
 
 Checking in any member of a connected set appends one immutable check-in event for every member with the same operation ID, destination, method, actor, coordinates, and notes. Each member still has its own history and latest-location snapshot. The check-in UI previews the other permanent IDs that will move with the scanned or selected item, and successful batch, QR, and single-item check-ins report all affected IDs.
 
-## 19. Project Contribution Planning
-
-`/projects` is an authenticated-administrator-only workspace for estimating how much each contributor supplies to a self-contained project. The route redirects signed-out and non-admin visitors before reading project data, and its primary-navigation entry is rendered only for a signed-in administrator. The `?demo=1` compatibility flag does not grant access to this workspace. A project begins with Ike, Cron, and Josh, but stores its own open-ended contributor list so another person can be added without changing the global member or band models. Projects may be marked one-off, ongoing, or complete and may be duplicated with their complete structure and allocations as the starting point for similar work. Each project can store up to 12 tags; tags are trimmed, compared case-insensitively for duplicates, copied with duplicated projects, and exposed as multi-select project filters. Selecting multiple tags matches a project with any selected tag.
-
-Every project is composed of steps; there is no direct-allocation mode or steps toggle. The project accordion stores a weight for each step in one of two modes:
-
-- **Hours:** each step's hours are divided by the sum of all step hours to derive its project weight. The hour total is the project's total estimated time.
-- **Percent:** entered weights remain literal and should total 100%. A separate project-hour estimate is optional but required to convert the composite percentages into hour totals.
-
-Every step independently chooses contributor hours or contributor percentages. Contributor hours define relative shares and normalize automatically. For example, 5, 5, and 10 hours become 25%, 25%, and 50%, even when the weighted step itself represents 15 project hours; those normalized shares receive 3.75, 3.75, and 7.5 hours of the project total. Entered contributor percentages remain literal and the interface warns when they do not total 100%.
-
-Each step stores one workflow status: planning, in progress, or done. It may optionally depend on another project or on a step in this or another project. A project dependency is satisfied only when the target project is Complete; a step dependency is satisfied only when the target step's effective status is Done. Until then, the dependent step's effective status is Blocked. Missing targets and dependency cycles also remain visibly blocked. A blocked step cannot be marked Done. Internal step dependencies are remapped to the duplicated steps when a whole project is duplicated; external dependencies continue pointing to their original targets.
-
-The composite contributor share is the sum of each step's project-weight fraction multiplied by that step's contributor fraction. Composite hours equal the project-hour total multiplied by the composite contributor share. An allocation below or above 100% remains visible as incomplete or over-allocated instead of being silently normalized.
-
-### 19.1 Firestore Data Model
-
-Each project remains one independently duplicable document:
-
-```ts
-// contributionProjects/{projectId}
-{
-  title: string;
-  status: "one_off" | "ongoing" | "complete";
-  tags: string[];
-  contributors: Array<{ id: string; name: string }>;
-  weightMode: "hours" | "percent";
-  projectHours: number | null;
-  steps: Array<{
-    id: string;
-    title: string;
-    status: "planning" | "in_progress" | "done";
-    dependency:
-      | { kind: "project"; projectId: string }
-      | { kind: "step"; projectId: string; stepId: string }
-      | null;
-    weightValue: number;
-    contributorMode: "hours" | "percent";
-    contributorValues: Record<string, number>;
-  }>;
-  createdAt: number;
-  updatedAt: Timestamp;
-}
-```
-
-The collection is readable and writable only by authenticated administrators. Existing documents migrate in memory when read: legacy sub-project arrays become steps, and a legacy direct allocation becomes one `Project work` step so its contributor split is preserved. The next save writes only the canonical steps model. When Firebase is not configured, the repository retains a browser-local worked example for development, but the route still requires a signed-in administrator before it will render or read project data.
-
 ### 18.3 Blender cable visualization
 
 The Blender snapshot may additionally expose read-only cable segments derived from graph edges: stable edge/node/port IDs, device connector labels, direction anchors and port ordering, signal/color/channel metadata, assembly memberships and trunk status, used waypoints in meters, service slack and drop allowances, and existing website length estimates. Optional `modelHint` provides category/template information independently of an instance's display name. No new Firestore collection or cable write permission is introduced.
@@ -1827,9 +1780,9 @@ Admins manage named rider versions at `/stage-plot/list`. Under `stageRiders/cur
 4. **Print and log delivery.** Open the issued rider, choose the recipient packet and print or save the PDF. Every packet begins with the logo, the setup and edition, a plain URL and a large QR. Each subsequent page repeats the version link. After sending the rider, use **Log delivery** to record the venue and date. The **Sent**, **Still okay** and **Needs reprint** filters show distribution and replacement details.
 5. **Check at the next advance.** A scan opens `/sp?ver=CODE`. An approved code confirms that the crew can use its copy. A retired code links to the printable replacement, retaining the recipient packet. Unknown codes and draft copies ask the crew to confirm their edition with the band. The check establishes suitability for the setup printed on the cover. The band selects the setup for each booking.
 
-`/sp` is the production document library. Its version-check dialog opens on arrival, accepts the code from a printed cover and resolves replacements within the same setup. Closing the dialog shows the documents for that edition. Direct visitors see the latest approved Standard edition. The complete packet contains the technical rider followed by the rack channel guide, each with its own cover and page numbering. The combined PDF and either standalone section share one permanent edition code.
+`/sp` is the production document library. Visitors without a `ver` parameter go straight to the latest approved Standard edition. The version-check dialog accepts the code from a printed cover and resolves replacements within the same setup. A link to an approved edition opens its confirmation once per browser. Replacement notices appear on each visit to a retired code. Closing the dialog shows the documents for that edition. Standard edition 11.21.26 features the four-page technical rider and has separate detailed production advance and rack channel guide PDFs. The three documents share one permanent edition code. Click a document title to open its PDF preview dialog. Download and Print are available in both the library and the preview. Earlier editions that listed a combined packet still have that catalog format.
 
-To attach downloads to an issued revision, put its frozen PDFs in `public/production-documents/CODE/` and list their filenames, page counts, setup ID and revision in `public/production-documents/catalog.json`. Additional individual documents can be added to the same list. The register controls approval and replacement independently of the catalog. An edition awaiting PDF files uses its own issued print view. The 11.20.26 Standard release includes the agreed stand and cable setup sheets in the exported rider.
+To attach downloads to an issued revision, put its frozen PDFs in `public/production-documents/CODE/` and list their filenames, page counts, setup ID and revision in `public/production-documents/catalog.json`. List the venue-facing rider first when issuing separate PDFs without a combined packet. Printed dates with four-digit years resolve to their short date codes when the register has no exact match. Direct download URLs for the retired 11.20.26 files return to the version check. The register controls approval and replacement independently of the catalog. An edition awaiting PDF files uses its own issued print view. The 11.20.26 Standard release includes the agreed stand and cable setup sheets in the exported rider.
 
 The server maintains a small release register in `stageRiders/current/publication/registry`. Each entry records the permanent code, setup ID and name, saved revision, issue date, and nullable replacement code. Firestore transactions validate scope, keep codes unique and flatten replacements. The default stores its release code. A pre-register published default is recognized by its existing publication identity. Legacy QR links with an identifiable issued revision enter the corresponding check; ambiguous old copies require confirmation. Zero or missing default release number retains draft behavior. Special editions can be issued independently.
 

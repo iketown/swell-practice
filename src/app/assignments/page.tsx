@@ -1,5 +1,5 @@
-import { InstrumentAssignmentsClient } from "@/components/instrument-assignments-client";
+import { AssignmentsAccess } from "@/components/assignments-access";
 
 export default function AssignmentsPage() {
-  return <InstrumentAssignmentsClient />;
+  return <AssignmentsAccess />;
 }

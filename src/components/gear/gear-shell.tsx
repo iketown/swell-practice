@@ -40,14 +40,16 @@ export function GearShell({
       <header className="swell-header border-b">
         <div className={cn("mx-auto flex flex-col gap-3 px-4 py-4 sm:px-6", wide ? "max-w-7xl" : "max-w-xl")}>
           <div className="flex items-center justify-between gap-4">
-            <Image
-              src="/swell-logo-horizontal-stripes.svg"
-              alt="The Swell"
-              width={8192}
-              height={3680}
-              priority
-              className="h-9 w-auto sm:h-11"
-            />
+            <Link href="/" aria-label="The Swell home">
+              <Image
+                src="/01-swell-logo.svg"
+                alt="The Swell"
+                width={800}
+                height={346}
+                priority
+                className="h-9 w-auto sm:h-11"
+              />
+            </Link>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Gear</p>
           </div>
           <nav aria-label="Gear sections" className="flex w-full gap-2 overflow-x-auto pb-1">

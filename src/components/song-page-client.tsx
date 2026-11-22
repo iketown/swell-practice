@@ -211,7 +211,7 @@ export function SongPageClient({ slug }: { slug: string }) {
             <AudioLinesIcon data-icon="inline-start" />
             Test mixer
           </Button>
-          {admin.isAdmin ? (
+          {admin.isSignedInAdmin ? (
             <Button render={<Link href="/assignments" />} variant="secondary" nativeButton={false}>
               <ClipboardListIcon data-icon="inline-start" />
               Assign band

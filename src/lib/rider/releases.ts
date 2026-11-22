@@ -65,7 +65,9 @@ export function replaceCopies(
 }
 
 export function resolveProductionEdition(rows: RiderRelease[], code?: string) {
-  const copy = rows.find(row => row.code === code);
+  const shortDate = code?.match(/^(\d{2}\.\d{2}\.)20(\d{2})$/);
+  const copy = rows.find(row => row.code === code)
+    ?? (shortDate ? rows.find(row => row.code === shortDate[1] + shortDate[2]) : undefined);
   const target = copy?.replacement
     ? rows.find(row => row.code === copy.replacement && row.id === copy.id && !row.replacement)
     : copy;

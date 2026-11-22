@@ -28,13 +28,15 @@ export function useAdmin() {
     () => false,
   );
   const isDemoAdmin = !hasFirebaseConfig || queryDemo;
-  const isAdmin = isDemoAdmin || Boolean(user && emails.includes(email));
+  const isSignedInAdmin = Boolean(user && emails.includes(email));
+  const isAdmin = isDemoAdmin || isSignedInAdmin;
   const needsConfig = hasFirebaseConfig && emails.length === 0;
 
   return {
     user,
     loading: isDemoAdmin ? false : loading,
     isAdmin,
+    isSignedInAdmin,
     isDemoAdmin,
     needsConfig,
     hasFirebaseConfig,
